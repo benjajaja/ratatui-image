@@ -6,16 +6,20 @@ use ratatui::{backend::Backend, buffer::Buffer, layout::Rect, Terminal};
 
 use crate::ImageSource;
 
-use self::sixel::{resizeable::SixelState, StaticSixel};
+use self::{
+    halfblocks::StaticHalfBlocks,
+    sixel::{resizeable::SixelState, StaticSixel},
+};
 
 use super::Resize;
 
+pub mod halfblocks;
 pub mod sixel;
 
 // A static image backend that just holds image data and character size
 pub trait StaticBackend {
-    fn data(&self) -> &str;
-    fn size(&self) -> Rect;
+    // fn data(&self) -> &str;
+    // fn size(&self) -> Rect;
     fn render(&self, area: Rect, buf: &mut Buffer);
 }
 
@@ -31,7 +35,8 @@ pub fn pick_static<B: Backend>(
     img: DynamicImage,
     terminal: &mut Terminal<B>,
 ) -> Result<Box<dyn StaticBackend>, io::Error> {
-    Ok(Box::new(StaticSixel::from_image(img, terminal)?))
+    Ok(Box::new(StaticHalfBlocks::from_image(img, terminal)?))
+    // Ok(Box::new(StaticSixel::from_image(img, terminal)?))
 }
 
 pub fn pick_resizeable<B: Backend>(

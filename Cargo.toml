@@ -29,6 +29,7 @@ termwiz = ["dep:termwiz"]
 [dependencies]
 dyn-clone = "1.0.11"
 crossterm = { git = "https://github.com/benjajaja/crossterm", rev = "db515a16f95b36b4871488aa543f564bc929d62e" , optional = true }
+hanbun = { git = "https://github.com/benjajaja/hanbun", rev = "12c1656fb1f46acdcf08fdc2eaa8003f954319ab" } # "0.4.1"
 image = { version = "0.24.5" }
 ratatui = { git = "https://github.com/benjajaja/ratatui", rev = "8729b61fab885dc141c6e0968b4863386c544d9d", features = ["crossterm", "termion", "termwiz" ] }
 sixel-rs = { version = "0.3.3" }

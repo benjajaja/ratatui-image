@@ -54,12 +54,6 @@ pub fn encode(img: &DynamicImage) -> String {
 }
 
 impl StaticBackend for StaticSixel {
-    fn size(&self) -> Rect {
-        self.rect
-    }
-    fn data(&self) -> &str {
-        &self.data
-    }
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let rect = self.rect;
         let render_area = Rect::new(

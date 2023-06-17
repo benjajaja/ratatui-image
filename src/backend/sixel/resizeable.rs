@@ -14,7 +14,7 @@ pub struct SixelState {
 
 impl DynamicBackend for SixelState {
     fn render(&mut self, source: &ImageSource, resize: &Resize, area: Rect, buf: &mut Buffer) {
-        if let Some(rect) = resize.resize(source, self.current.size(), area) {
+        if let Some(rect) = resize.resize(source, self.current.rect, area) {
             eprintln!("resize ({resize:?})");
             let img = match resize {
                 Resize::Fit => img_resize(&source.image, source.font_size, rect),
