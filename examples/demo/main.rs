@@ -16,13 +16,15 @@ use std::{error::Error, time::Duration};
 
 use ratatui::{
     backend::Backend,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
+    text::Line,
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
-use ratatui_image::{
-    backend::{pick_resizeable, pick_static, DynamicBackend, StaticBackend},
-    ImageSource, ResizableImage, Resize, StaticImage,
+use ratatui_imagine::{
+    backend::{FixedBackend, ResizeBackend},
+    picker::Picker,
+    FixedImage, Resize, ResizeImage,
 };
 
 #[cfg(feature = "crossterm")]
@@ -46,11 +48,18 @@ pub struct App<'a> {
     pub split_percent: u16,
     pub show_resizable_images: bool,
 
-    pub image_static: Box<dyn StaticBackend>,
+    pub picker: Picker,
 
-    pub image_source: ImageSource,
-    pub image_fit_state: Box<dyn DynamicBackend>,
-    pub image_crop_state: Box<dyn DynamicBackend>,
+    pub image_static: Box<dyn FixedBackend>,
+    pub image_static_offset: (u16, u16),
+
+    pub image_fit_state: Box<dyn ResizeBackend>,
+    pub image_crop_state: Box<dyn ResizeBackend>,
+}
+
+// Since terminal cell proportion is around 1:2, this roughly results in a "portrait" proportion.
+fn static_fit() -> Rect {
+    Rect::new(0, 0, 30, 20)
 }
 
 impl<'a> App<'a> {
@@ -60,9 +69,11 @@ impl<'a> App<'a> {
             .decode()
             .unwrap();
 
-        let image_static = pick_static(dyn_img.clone(), terminal).unwrap();
+        let picker = Picker::guess(dyn_img, terminal, None).unwrap();
 
-        let (image_scale, image_fit_state) = pick_resizeable(dyn_img, terminal).unwrap();
+        let image_static = picker.new_static_fit(Resize::Fit, static_fit()).unwrap();
+
+        let image_fit_state = picker.new_state();
         let image_crop_state = image_fit_state.clone();
 
         let mut background = String::new();
@@ -79,8 +90,9 @@ impl<'a> App<'a> {
             background,
             show_resizable_images: true,
             split_percent: 70,
+            picker,
             image_static,
-            image_source: image_scale,
+            image_static_offset: (0, 0),
             image_fit_state,
             image_crop_state,
         }
@@ -93,15 +105,40 @@ impl<'a> App<'a> {
             't' => {
                 self.show_resizable_images = !self.show_resizable_images;
             }
-            'h' => {
+            'i' => {
+                self.picker.next();
+                self.image_static = self
+                    .picker
+                    .new_static_fit(Resize::Fit, static_fit())
+                    .unwrap();
+                self.image_fit_state = self.picker.new_state();
+                self.image_crop_state = self.picker.new_state();
+            }
+            'H' => {
                 if self.split_percent >= 10 {
                     self.split_percent -= 10;
                 }
             }
-            'l' => {
+            'L' => {
                 if self.split_percent <= 90 {
                     self.split_percent += 10;
                 }
+            }
+            'h' => {
+                if self.image_static_offset.0 > 0 {
+                    self.image_static_offset.0 -= 1;
+                }
+            }
+            'j' => {
+                self.image_static_offset.1 += 1;
+            }
+            'k' => {
+                if self.image_static_offset.1 > 0 {
+                    self.image_static_offset.1 -= 1;
+                }
+            }
+            'l' => {
+                self.image_static_offset.0 += 1;
             }
             _ => {}
         }
@@ -134,21 +171,24 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(chunks[1]);
 
-    let block_left_top = Block::default().borders(Borders::ALL).title("Static");
+    let block_left_top = Block::default().borders(Borders::ALL).title("Fixed");
     let area = block_left_top.inner(left_chunks[0]);
     f.render_widget(
         Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
         area,
     );
     f.render_widget(block_left_top, left_chunks[0]);
-    let image = StaticImage::new(app.image_static.as_ref());
+    let image = FixedImage::new(app.image_static.as_ref());
     f.render_widget(image, area);
 
-    let block_left_bottom = Block::default()
-        .borders(Borders::ALL)
-        .title("Fit into area");
+    let block_left_bottom = Block::default().borders(Borders::ALL).title("Crop");
+    let area = block_left_bottom.inner(left_chunks[1]);
+    f.render_widget(
+        Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
+        area,
+    );
     if app.show_resizable_images {
-        let image = ResizableImage::new(&app.image_source).resize(Resize::Fit);
+        let image = ResizeImage::new(&app.picker.source).resize(Resize::Crop);
         f.render_stateful_widget(
             image,
             block_left_bottom.inner(left_chunks[1]),
@@ -158,8 +198,13 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(block_left_bottom, left_chunks[1]);
 
     let block_right_top = Block::default().borders(Borders::ALL).title("Fit");
+    let area = block_right_top.inner(right_chunks[0]);
+    f.render_widget(
+        Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
+        area,
+    );
     if app.show_resizable_images {
-        let image = ResizableImage::new(&app.image_source).resize(Resize::Crop);
+        let image = ResizeImage::new(&app.picker.source).resize(Resize::Fit);
         f.render_stateful_widget(
             image,
             block_right_top.inner(right_chunks[0]),
@@ -167,4 +212,22 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         );
     }
     f.render_widget(block_right_top, right_chunks[0]);
+
+    let block_right_bottom = Block::default().borders(Borders::ALL).title("Help");
+    let area = block_right_bottom.inner(right_chunks[1]);
+    f.render_widget(
+        Paragraph::new(vec![
+            Line::from("Key bindings:"),
+            Line::from("H/L: resize"),
+            Line::from(format!(
+                "i: cycle image backends (current: {:?})",
+                app.picker.current()
+            )),
+            Line::from("t: toggle rendering dynamic image widgets"),
+            Line::from(format!("Font size: {:?}", app.picker.source.font_size)),
+        ])
+        .wrap(Wrap { trim: true }),
+        area,
+    );
+    f.render_widget(block_right_bottom, right_chunks[1]);
 }
