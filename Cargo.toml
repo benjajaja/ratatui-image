@@ -1,10 +1,10 @@
 [package]
-name = "ratatui-imagine"
+name = "ratatu-image"
 version = "0.1.0"
 edition = "2021"
 autoexamples = true
 authors = ["Benjamin Große <ste3ls@gmail.com>"]
-description = "An image widget for ratatui, supporting sixels"
+description = "An image widget for ratatui, supporting sixels and unicode-halfblocks"
 keywords = ["ratatui", "image", "sixel", "tui", "terminal"]
 repository = "https://github.com/benjajaja/ratatui-image"
 homepage = "https://github.com/benjajaja/ratatui-image"
@@ -25,8 +25,10 @@ sixel = ["dep:sixel-rs"]
 [dependencies]
 dyn-clone = "1.0.11"
 image = { version = "0.24.5" }
+# ratatui with "cell skipping" and "window_size", https://github.com/tui-rs-revival/ratatui/pull/215 and https://github.com/tui-rs-revival/ratatui/pull/276
 ratatui = { git = "https://github.com/benjajaja/ratatui", rev = "8729b61fab885dc141c6e0968b4863386c544d9d", features = ["crossterm", "termion", "termwiz" ] }
 sixel-rs = { version = "0.3.3", optional = true }
+# crossterm with "window_size", https://github.com/crossterm-rs/crossterm/pull/790
 crossterm = { git = "https://github.com/benjajaja/crossterm", rev = "db515a16f95b36b4871488aa543f564bc929d62e" , optional = true }
 termion = { version = "2.0", optional = true }
 termwiz = { version = "0.20", optional = true }

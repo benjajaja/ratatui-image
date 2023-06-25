@@ -899,6 +899,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 
 [[package]]
+name = "ratatu-image"
+version = "0.1.0"
+dependencies = [
+ "crossterm 0.26.1 (git+https://github.com/benjajaja/crossterm?rev=db515a16f95b36b4871488aa543f564bc929d62e)",
+ "dyn-clone",
+ "image",
+ "ratatui",
+ "sixel-rs",
+ "termion",
+ "termwiz",
+]
+
+[[package]]
 name = "ratatui"
 version = "0.21.0"
 source = "git+https://github.com/benjajaja/ratatui?rev=8729b61fab885dc141c6e0968b4863386c544d9d#8729b61fab885dc141c6e0968b4863386c544d9d"
@@ -911,19 +924,6 @@ dependencies = [
  "termwiz",
  "unicode-segmentation",
  "unicode-width",
-]
-
-[[package]]
-name = "ratatui-imagine"
-version = "0.1.0"
-dependencies = [
- "crossterm 0.26.1 (git+https://github.com/benjajaja/crossterm?rev=db515a16f95b36b4871488aa543f564bc929d62e)",
- "dyn-clone",
- "image",
- "ratatui",
- "sixel-rs",
- "termion",
- "termwiz",
 ]
 
 [[package]]

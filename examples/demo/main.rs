@@ -14,17 +14,17 @@ mod termwiz;
 
 use std::{error::Error, time::Duration};
 
+use ratatu_image::{
+    backend::{FixedBackend, ResizeBackend},
+    picker::Picker,
+    FixedImage, Resize, ResizeImage,
+};
 use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     text::Line,
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
-};
-use ratatui_imagine::{
-    backend::{FixedBackend, ResizeBackend},
-    picker::Picker,
-    FixedImage, Resize, ResizeImage,
 };
 
 #[cfg(feature = "crossterm")]

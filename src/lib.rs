@@ -1,4 +1,6 @@
-//! Ratatui image widgets
+//! Ratatu-image: image widgets for [Ratatui]
+//!
+//! [Ratatui]: https://github.com/tui-rs-revival/ratatui
 //!
 //! Render images with supported graphics protocols in the terminal with ratatui.
 //! While this generally might seem *contra natura* and something fragile, it can be worthwhile in
