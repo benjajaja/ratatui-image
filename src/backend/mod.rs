@@ -11,14 +11,15 @@ pub mod halfblocks;
 pub mod sixel;
 
 // A static image backend that just holds image data and character size
-pub trait FixedBackend {
+pub trait FixedBackend: Send + Sync {
     fn rect(&self) -> Rect;
     fn render(&self, area: Rect, buf: &mut Buffer);
+    fn data(&self) -> String;
 }
 
 // A resizeable imagen backend
 // Resizes itself from `[ResizableImageBackend]`'s render
-pub trait ResizeBackend: DynClone {
+pub trait ResizeBackend: Send + Sync + DynClone {
     fn render(&mut self, source: &ImageSource, resize: &Resize, area: Rect, buf: &mut Buffer);
 }
 

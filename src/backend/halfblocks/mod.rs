@@ -14,7 +14,7 @@ pub struct FixedHalfblocks {
     rect: Rect,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct HalfBlock {
     upper: Color,
     lower: Color,
@@ -83,5 +83,8 @@ impl FixedBackend for FixedHalfblocks {
                 .set_bg(hb.lower)
                 .set_char('▀');
         }
+    }
+    fn data(&self) -> String {
+        format!("{:?}", self.data)
     }
 }

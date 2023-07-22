@@ -1,12 +1,6 @@
-use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
-use sixel_rs::{
-    encoder::{Encoder, QuickFrameBuilder},
-    optflags::EncodePolicy,
-    status::Error,
-    sys::PixelFormat,
-};
-use std::{cmp::min, fs, io, path::Path};
+use sixel_bytes::{sixel_string, DiffusionMethod, PixelFormat, SixelError};
+use std::{cmp::min, io};
 
 use super::FixedBackend;
 use crate::{ImageSource, Resize, Result};
@@ -22,41 +16,33 @@ pub struct FixedSixel {
 
 impl FixedSixel {
     pub fn from_source(source: &ImageSource, resize: Resize, area: Rect) -> Result<Self> {
-        let (image, rect) = resize
-            .resize(source, Rect::default(), area)
-            .unwrap_or_else(|| (source.image.clone(), source.desired));
-
-        let data = encode(&image)?;
+        let (data, rect) = encode(source, &resize, area)?;
         Ok(Self { data, rect })
     }
 }
 
-// TODO: work around this abomination! There has to be a way to get the bytes without files.
-const TMP_FILE: &str = "/tmp/test_out.sixel";
 // TODO: change E to sixel_rs::status::Error and map when calling
-pub fn encode(img: &DynamicImage) -> Result<String> {
+pub fn encode(source: &ImageSource, resize: &Resize, area: Rect) -> Result<(String, Rect)> {
+    let (img, rect) = resize
+        .resize(source, Rect::default(), area)
+        .unwrap_or_else(|| (source.image.clone(), source.desired));
+
     let (w, h) = (img.width(), img.height());
-    let bytes = img.to_rgba8().as_raw().to_vec();
+    let img_rgba8 = img.to_rgba8();
+    let bytes = img_rgba8.as_raw();
 
-    let encoder = Encoder::new().map_err(sixel_err)?;
-    encoder.set_output(Path::new(TMP_FILE)).map_err(sixel_err)?;
-    encoder
-        .set_encode_policy(EncodePolicy::Fast)
-        .map_err(sixel_err)?;
-    let frame = QuickFrameBuilder::new()
-        .width(w as _)
-        .height(h as _)
-        .format(PixelFormat::RGBA8888)
-        .pixels(bytes);
-
-    encoder.encode_bytes(frame).map_err(sixel_err)?;
-
-    let data = fs::read_to_string(TMP_FILE)?;
-    fs::remove_file(TMP_FILE)?;
-    Ok(data)
+    let data = sixel_string(
+        bytes,
+        w as _,
+        h as _,
+        PixelFormat::RGBA8888,
+        DiffusionMethod::Stucki,
+    )
+    .map_err(sixel_err)?;
+    Ok((data, rect))
 }
 
-fn sixel_err(err: Error) -> io::Error {
+fn sixel_err(err: SixelError) -> io::Error {
     io::Error::new(io::ErrorKind::Other, format!("{err:?}"))
 }
 
@@ -83,5 +69,8 @@ impl FixedBackend for FixedSixel {
         buf.get_mut(render_area.left(), render_area.top())
             .set_skip(Some(false))
             .set_symbol(&self.data);
+    }
+    fn data(&self) -> String {
+        self.data.clone()
     }
 }

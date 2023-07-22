@@ -16,8 +16,8 @@ use std::{error::Error, time::Duration};
 
 use ratatu_image::{
     backend::{FixedBackend, ResizeBackend},
-    picker::Picker,
-    FixedImage, Resize, ResizeImage,
+    picker::{BackendType, Picker},
+    FixedImage, ImageSource, Resize, ResizeImage,
 };
 use ratatui::{
     backend::Backend,
@@ -40,15 +40,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub struct App<'a> {
+enum ShowImages {
+    All,
+    Fixed,
+    Resized,
+}
+
+struct App<'a> {
     pub title: &'a str,
     pub should_quit: bool,
     pub tick_rate: Duration,
     pub background: String,
     pub split_percent: u16,
-    pub show_resizable_images: bool,
+    pub show_resizable_images: ShowImages,
 
     pub picker: Picker,
+
+    pub image_source: ImageSource,
 
     pub image_static: Box<dyn FixedBackend>,
     pub image_static_offset: (u16, u16),
@@ -57,21 +65,24 @@ pub struct App<'a> {
     pub image_crop_state: Box<dyn ResizeBackend>,
 }
 
-// Since terminal cell proportion is around 1:2, this roughly results in a "portrait" proportion.
-fn static_fit() -> Rect {
-    Rect::new(0, 0, 30, 20)
-}
-
 impl<'a> App<'a> {
     pub fn new<B: Backend>(title: &'a str, terminal: &mut Terminal<B>) -> App<'a> {
-        let dyn_img = image::io::Reader::open("./assets/Ada.png")
-            .unwrap()
-            .decode()
+        let ada = "./assets/Ada.png";
+        let dyn_img = image::io::Reader::open(ada).unwrap().decode().unwrap();
+
+        let image_source =
+            ImageSource::with_terminal(dyn_img.clone(), ada.into(), terminal, None).unwrap();
+
+        let backend_type = if cfg!(feature = "sixel") {
+            BackendType::Sixel
+        } else {
+            BackendType::Halfblocks
+        };
+        let picker = Picker::from_ioctl(backend_type, None, Some(Rect::new(0, 0, 30, 20))).unwrap();
+
+        let image_static = picker
+            .new_static_fit(dyn_img, ada.into(), Resize::Fit)
             .unwrap();
-
-        let picker = Picker::guess(dyn_img, terminal, None).unwrap();
-
-        let image_static = picker.new_static_fit(Resize::Fit, static_fit()).unwrap();
 
         let image_fit_state = picker.new_state();
         let image_crop_state = image_fit_state.clone();
@@ -88,13 +99,16 @@ impl<'a> App<'a> {
             should_quit: false,
             tick_rate: Duration::from_millis(1000),
             background,
-            show_resizable_images: true,
+            show_resizable_images: ShowImages::All,
             split_percent: 70,
             picker,
+            image_source,
+
             image_static,
-            image_static_offset: (0, 0),
             image_fit_state,
             image_crop_state,
+
+            image_static_offset: (0, 0),
         }
     }
     pub fn on_key(&mut self, c: char) {
@@ -103,16 +117,44 @@ impl<'a> App<'a> {
                 self.should_quit = true;
             }
             't' => {
-                self.show_resizable_images = !self.show_resizable_images;
+                self.show_resizable_images = match self.show_resizable_images {
+                    ShowImages::All => ShowImages::Fixed,
+                    ShowImages::Fixed => ShowImages::Resized,
+                    ShowImages::Resized => ShowImages::All,
+                }
             }
             'i' => {
-                self.picker.next();
+                let next = match self.picker.backend_type() {
+                    BackendType::Halfblocks => BackendType::Sixel,
+                    BackendType::Sixel => BackendType::Halfblocks,
+                };
+                self.picker.set_backend(next);
+
                 self.image_static = self
                     .picker
-                    .new_static_fit(Resize::Fit, static_fit())
+                    .new_static_fit(
+                        self.image_source.image.clone(),
+                        self.image_source.path.clone(),
+                        Resize::Fit,
+                    )
                     .unwrap();
+
                 self.image_fit_state = self.picker.new_state();
                 self.image_crop_state = self.picker.new_state();
+            }
+            'o' => {
+                let path = match self.image_source.path.to_str() {
+                    Some("./assets/Ada.png") => "./assets/Jenkins.jpg",
+                    _ => "./assets/Ada.png",
+                };
+                let dyn_img = image::io::Reader::open(path).unwrap().decode().unwrap();
+                self.image_source =
+                    ImageSource::new(dyn_img.clone(), path.into(), self.picker.font_size(), None);
+
+                self.image_static = self
+                    .picker
+                    .new_static_fit(dyn_img, path.into(), Resize::Fit)
+                    .unwrap();
             }
             'H' => {
                 if self.split_percent >= 10 {
@@ -147,7 +189,7 @@ impl<'a> App<'a> {
     pub fn on_tick(&mut self) {}
 }
 
-pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let outer_block = Block::default().borders(Borders::TOP).title(app.title);
 
     let chunks = Layout::default()
@@ -178,8 +220,13 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         area,
     );
     f.render_widget(block_left_top, left_chunks[0]);
-    let image = FixedImage::new(app.image_static.as_ref());
-    f.render_widget(image, area);
+    match app.show_resizable_images {
+        ShowImages::Resized => {}
+        _ => {
+            let image = FixedImage::new(app.image_static.as_ref());
+            f.render_widget(image, area);
+        }
+    }
 
     let block_left_bottom = Block::default().borders(Borders::ALL).title("Crop");
     let area = block_left_bottom.inner(left_chunks[1]);
@@ -187,13 +234,16 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
         area,
     );
-    if app.show_resizable_images {
-        let image = ResizeImage::new(&app.picker.source).resize(Resize::Crop);
-        f.render_stateful_widget(
-            image,
-            block_left_bottom.inner(left_chunks[1]),
-            &mut app.image_fit_state,
-        );
+    match app.show_resizable_images {
+        ShowImages::Fixed => {}
+        _ => {
+            let image = ResizeImage::new(&app.image_source).resize(Resize::Crop);
+            f.render_stateful_widget(
+                image,
+                block_left_bottom.inner(left_chunks[1]),
+                &mut app.image_fit_state,
+            );
+        }
     }
     f.render_widget(block_left_bottom, left_chunks[1]);
 
@@ -203,13 +253,16 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
         area,
     );
-    if app.show_resizable_images {
-        let image = ResizeImage::new(&app.picker.source).resize(Resize::Fit);
-        f.render_stateful_widget(
-            image,
-            block_right_top.inner(right_chunks[0]),
-            &mut app.image_crop_state,
-        );
+    match app.show_resizable_images {
+        ShowImages::Fixed => {}
+        _ => {
+            let image = ResizeImage::new(&app.image_source).resize(Resize::Fit);
+            f.render_stateful_widget(
+                image,
+                block_right_top.inner(right_chunks[0]),
+                &mut app.image_crop_state,
+            );
+        }
     }
     f.render_widget(block_right_top, right_chunks[0]);
 
@@ -221,10 +274,11 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             Line::from("H/L: resize"),
             Line::from(format!(
                 "i: cycle image backends (current: {:?})",
-                app.picker.current()
+                app.picker.backend_type()
             )),
+            Line::from("o: cycle image"),
             Line::from("t: toggle rendering dynamic image widgets"),
-            Line::from(format!("Font size: {:?}", app.picker.source.font_size)),
+            Line::from(format!("Font size: {:?}", app.picker.font_size())),
         ])
         .wrap(Wrap { trim: true }),
         area,

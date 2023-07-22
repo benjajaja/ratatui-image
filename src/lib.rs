@@ -1,10 +1,14 @@
-//! Ratatu-image: image widgets for [Ratatui]
+//! Image widgets for [Ratatui]
 //!
 //! [Ratatui]: https://github.com/tui-rs-revival/ratatui
+//!
+//! **THIS CRATE IS EXPERIMENTAL!**
 //!
 //! Render images with supported graphics protocols in the terminal with ratatui.
 //! While this generally might seem *contra natura* and something fragile, it can be worthwhile in
 //! some applications.
+//!
+//! # Implementation
 //!
 //! The images are always resized so that they fit their nearest rectangle in columns/rows.
 //! The reason for this is because the image shall be drawn in the same "render pass" as all
@@ -12,6 +16,8 @@
 //! level, so there is no way to "clear" previous drawn text. This would leave artifacts around the
 //! image border.
 //! For this resizing it is necessary to query the terminal font size in width/height.
+//!
+//! # Widgets
 //!
 //! The [`FixedImage`] widget does not react to area resizes other than not overdrawing. Note that
 //! some image protocols or their implementations might not behave correctly in this aspect and
@@ -24,6 +30,8 @@
 //!
 //! Each widget is backed by a "backend" implementation of a given image protocol.
 //!
+//! # Backends
+//!
 //! Currently supported backends/protocols:
 //!
 //! ## Halfblocks
@@ -31,9 +39,9 @@
 //! font aspect ratio is roughly 1:2. Should work in all terminals.
 //! ## Sixel
 //! Experimental: uses temporary files.
-//! Uses [`sixel-rs`] to draw image pixels, if the terminal [supports] the [Sixel] protocol.
+//! Uses [`sixel-bytes`] to draw image pixels, if the terminal [supports] the [Sixel] protocol.
 //!
-//! [`sixel-rs`]: https://github.com/orhun/sixel-rs
+//! [`sixel-bytes`]: https://github.com/benjajaja/sixel-bytes
 //! [supports]: https://arewesixelyet.com
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel
 //!
@@ -43,7 +51,7 @@
 //!
 //! ```rust
 //! use image::{DynamicImage, ImageBuffer, Rgb};
-//! use ratatui_imagine::{
+//! use ratatu_image::{
 //!     backend::{
 //!         FixedBackend,
 //!         halfblocks::FixedHalfblocks,
@@ -53,7 +61,7 @@
 //!
 //! let image: DynamicImage = ImageBuffer::<Rgb<u8>, Vec<u8>>::new(300, 200).into();
 //!
-//! let source = ImageSource::new(image, (7, 14), None);
+//! let source = ImageSource::new(image, "filename.png".into(), (7, 14), None);
 //!
 //! let static_image = Box::new(FixedHalfblocks::from_source(
 //!     &source,
@@ -66,7 +74,11 @@
 //! let image_widget = FixedImage::new(&static_image);
 //! ```
 
-use std::{cmp::min, error::Error};
+use std::{
+    cmp::{max, min},
+    error::Error,
+    path::PathBuf,
+};
 
 use backend::{FixedBackend, ResizeBackend};
 use image::{
@@ -86,6 +98,9 @@ pub mod picker;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
+/// The terminal's font size in `(width, height)`
+pub type FontSize = (u16, u16);
+
 #[derive(Clone)]
 /// Image source for backends
 ///
@@ -95,18 +110,20 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 /// # Examples
 /// ```text
 /// use image::{DynamicImage, ImageBuffer, Rgb};
-/// use ratatui_imagine::ImageSource;
+/// use ratatu_image::ImageSource;
 ///
 /// let image: ImageBuffer::from_pixel(300, 200, Rgb::<u8>([255, 0, 0])).into();
-/// let source = ImageSource::new(image, (7, 14));
+/// let source = ImageSource::new(image, "filename.png", (7, 14));
 /// assert_eq!((43, 14), (source.rect.width, source.rect.height));
 /// ```
 ///
 pub struct ImageSource {
     /// The original image without resizing
     pub image: DynamicImage,
+    /// The original image path
+    pub path: PathBuf,
     /// The font size of the terminal
-    pub font_size: (u16, u16),
+    pub font_size: FontSize,
     /// The area that the [`ImageSource::image`] covers, but not necessarily fills
     pub desired: Rect,
     /// The background color to fill when resizing
@@ -117,12 +134,14 @@ impl ImageSource {
     /// Create a new image source
     pub fn new(
         image: DynamicImage,
-        font_size: (u16, u16),
+        path: PathBuf,
+        font_size: FontSize,
         background_color: Option<Rgb<u8>>,
     ) -> ImageSource {
         let desired = round_pixel_size_to_cells(image.width(), image.height(), font_size);
         ImageSource {
             image,
+            path,
             font_size,
             desired,
             background_color,
@@ -131,11 +150,12 @@ impl ImageSource {
     /// Create a new image source from a [Terminal](ratatui::Terminal)
     pub fn with_terminal<B: Backend>(
         image: DynamicImage,
+        path: PathBuf,
         terminal: &mut Terminal<B>,
         background_color: Option<Rgb<u8>>,
     ) -> Result<ImageSource> {
         let font_size = terminal.backend_mut().font_size()?;
-        Ok(ImageSource::new(image, font_size, background_color))
+        Ok(ImageSource::new(image, path, font_size, background_color))
     }
 }
 
@@ -143,7 +163,7 @@ impl ImageSource {
 fn round_pixel_size_to_cells(
     img_width: u32,
     img_height: u32,
-    (char_width, char_height): (u16, u16),
+    (char_width, char_height): FontSize,
 ) -> Rect {
     let width = (img_width as f32 / char_width as f32).ceil() as u16;
     let height = (img_height as f32 / char_height as f32).ceil() as u16;
@@ -173,14 +193,14 @@ impl<'a> Widget for FixedImage<'a> {
 
 /// Resizeable image widget
 pub struct ResizeImage<'a> {
-    source: &'a ImageSource,
+    image: &'a ImageSource,
     resize: Resize,
 }
 
 impl<'a> ResizeImage<'a> {
-    pub fn new(source: &'a ImageSource) -> ResizeImage<'a> {
+    pub fn new(image: &'a ImageSource) -> ResizeImage<'a> {
         ResizeImage {
-            source,
+            image,
             resize: Resize::Fit,
         }
     }
@@ -197,7 +217,7 @@ impl<'a> StatefulWidget for ResizeImage<'a> {
             return;
         }
 
-        state.render(self.source, &self.resize, area, buf)
+        state.render(self.image, &self.resize, area, buf)
     }
 }
 
@@ -254,57 +274,64 @@ impl Resize {
     }
 
     /// Check if [`ImageSource`]'s "desired" fits into `area` and is different than `current`.
-    fn needs_resize(&self, source: &ImageSource, current: Rect, area: Rect) -> Option<Rect> {
+    fn needs_resize(&self, image: &ImageSource, current: Rect, area: Rect) -> Option<Rect> {
+        let desired = image.desired;
+        // Check if resize is needed at all.
+        if desired.width <= area.width && desired.height <= area.height && desired == current {
+            let width = (desired.width * image.font_size.0) as u32;
+            let height = (desired.height * image.font_size.1) as u32;
+            if image.image.width() == width || image.image.height() == height {
+                return None;
+            }
+            // XXX: why is needed?
+            return Some(desired);
+        }
+
         match self {
             Self::Fit => {
-                let desired = source.desired;
-                if desired.width <= area.width
-                    && desired.height <= area.height
-                    && desired == current
-                {
-                    let width = (desired.width * source.font_size.0) as u32;
-                    let height = (desired.height * source.font_size.1) as u32;
-                    if source.image.width() == width || source.image.height() == height {
-                        return None;
-                    }
-                    return Some(desired);
-                }
-                let mut resized = desired;
-                if desired.width > area.width {
-                    resized.width = area.width;
-                    resized.height = ((desired.height as f32)
-                        * (area.width as f32 / desired.width as f32))
-                        .round() as u16;
-                } else if desired.height > area.height {
-                    resized.height = area.height;
-                    resized.width = ((desired.width as f32)
-                        * (area.height as f32 / desired.height as f32))
-                        .round() as u16;
-                }
-                Some(resized)
+                let (width, height) = resize(
+                    desired.width,
+                    desired.height,
+                    min(area.width, desired.width),
+                    min(area.height, desired.height),
+                );
+                Some(Rect::new(0, 0, width, height))
             }
-            Self::Crop => {
-                let desired = source.desired;
-                if desired.width <= area.width
-                    && desired.height <= area.height
-                    && desired == current
-                {
-                    let width = (desired.width * source.font_size.0) as u32;
-                    let height = (desired.height * source.font_size.1) as u32;
-                    if source.image.width() == width || source.image.height() == height {
-                        return None;
-                    }
-                    return Some(desired);
-                }
-
-                Some(Rect::new(
-                    0,
-                    0,
-                    min(desired.width, area.width),
-                    min(desired.height, area.height),
-                ))
-            }
+            Self::Crop => Some(Rect::new(
+                0,
+                0,
+                min(desired.width, area.width),
+                min(desired.height, area.height),
+            )),
         }
+    }
+}
+
+/// Ripped from https://github.com/image-rs/image/blob/master/src/math/utils.rs#L12
+/// Calculates the width and height an image should be resized to.
+/// This preserves aspect ratio, and based on the `fill` parameter
+/// will either fill the dimensions to fit inside the smaller constraint
+/// (will overflow the specified bounds on one axis to preserve
+/// aspect ratio), or will shrink so that both dimensions are
+/// completely contained within the given `width` and `height`,
+/// with empty space on one axis.
+fn resize(width: u16, height: u16, nwidth: u16, nheight: u16) -> (u16, u16) {
+    let wratio = nwidth as f64 / width as f64;
+    let hratio = nheight as f64 / height as f64;
+
+    let ratio = f64::min(wratio, hratio);
+
+    let nw = max((width as f64 * ratio).round() as u64, 1);
+    let nh = max((height as f64 * ratio).round() as u64, 1);
+
+    if nw > u64::from(u16::MAX) {
+        let ratio = u16::MAX as f64 / width as f64;
+        (u16::MAX, max((height as f64 * ratio).round() as u16, 1))
+    } else if nh > u64::from(u16::MAX) {
+        let ratio = u16::MAX as f64 / height as f64;
+        (max((width as f64 * ratio).round() as u16, 1), u16::MAX)
+    } else {
+        (nw as u16, nh as u16)
     }
 }
 
@@ -314,10 +341,12 @@ mod tests {
 
     use super::*;
 
-    fn s(w: u16, h: u16, font_size: (u16, u16)) -> ImageSource {
+    const FONT_SIZE: FontSize = (10, 10);
+
+    fn s(w: u16, h: u16) -> ImageSource {
         let image: DynamicImage =
             ImageBuffer::from_pixel(w as _, h as _, Rgb::<u8>([255, 0, 0])).into();
-        ImageSource::new(image, font_size, None)
+        ImageSource::new(image, "test".into(), FONT_SIZE, None)
     }
 
     fn r(w: u16, h: u16) -> Rect {
@@ -328,33 +357,45 @@ mod tests {
     fn needs_resize_fit() {
         let resize = Resize::Fit;
 
-        let to = resize.needs_resize(&s(100, 100, (10, 10)), r(10, 10), r(10, 10));
+        let to = resize.needs_resize(&s(100, 100), r(10, 10), r(10, 10));
         assert_eq!(None, to);
 
-        let to = resize.needs_resize(&s(80, 100, (10, 10)), r(8, 10), r(10, 10));
+        let to = resize.needs_resize(&s(80, 100), r(8, 10), r(10, 10));
         assert_eq!(None, to);
 
-        let to = resize.needs_resize(&s(100, 100, (10, 10)), r(10, 10), r(8, 10));
+        let to = resize.needs_resize(&s(100, 100), r(99, 99), r(8, 10));
         assert_eq!(Some(r(8, 8)), to);
 
-        let to = resize.needs_resize(&s(100, 100, (10, 10)), r(10, 10), r(10, 8));
+        let to = resize.needs_resize(&s(100, 100), r(99, 99), r(10, 8));
         assert_eq!(Some(r(8, 8)), to);
+
+        let to = resize.needs_resize(&s(100, 50), r(99, 99), r(4, 4));
+        assert_eq!(Some(r(4, 2)), to);
+
+        let to = resize.needs_resize(&s(50, 100), r(99, 99), r(4, 4));
+        assert_eq!(Some(r(2, 4)), to);
+
+        let to = resize.needs_resize(&s(100, 100), r(8, 8), r(11, 11));
+        assert_eq!(Some(r(10, 10)), to);
+
+        let to = resize.needs_resize(&s(100, 100), r(10, 10), r(11, 11));
+        assert_eq!(None, to);
     }
 
     #[test]
     fn needs_resize_crop() {
         let resize = Resize::Crop;
 
-        let to = resize.needs_resize(&s(100, 100, (10, 10)), r(10, 10), r(10, 10));
+        let to = resize.needs_resize(&s(100, 100), r(10, 10), r(10, 10));
         assert_eq!(None, to);
 
-        let to = resize.needs_resize(&s(80, 100, (10, 10)), r(8, 10), r(10, 10));
+        let to = resize.needs_resize(&s(80, 100), r(8, 10), r(10, 10));
         assert_eq!(None, to);
 
-        let to = resize.needs_resize(&s(100, 100, (10, 10)), r(10, 10), r(8, 10));
+        let to = resize.needs_resize(&s(100, 100), r(10, 10), r(8, 10));
         assert_eq!(Some(r(8, 10)), to);
 
-        let to = resize.needs_resize(&s(100, 100, (10, 10)), r(10, 10), r(10, 8));
+        let to = resize.needs_resize(&s(100, 100), r(10, 10), r(10, 8));
         assert_eq!(Some(r(10, 8)), to);
     }
 }
