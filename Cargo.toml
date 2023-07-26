@@ -43,3 +43,10 @@ rustix = { version = "^0.38.4", optional = true, features = ["stdio", "termios"]
 name = "demo"
 # this runs for all of the terminal backends, so it can't be built using --all-features or scraped
 doc-scrape-examples = true
+
+[[example]]
+name = "screenshot"
+
+[patch.crates-io]
+# ratatui with "cell skipping"
+ratatui = { git = "https://github.com/benjajaja/ratatui", rev = "26fec19e92bcc45eda85cb2b4bc27d4a23833c02" }

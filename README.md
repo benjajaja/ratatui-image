@@ -2,6 +2,9 @@
 
 ![Screenshot](./assets/Screenshot.png)
 
+Latest testing screenshot:
+![Testing screenshot](./assets/test_screenshot.png)
+
 Image widgets for [Ratatui]
 
 [Ratatui]: https://github.com/tui-rs-revival/ratatui

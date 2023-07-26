@@ -1,0 +1,81 @@
+use std::{assert_eq, io};
+
+use crossterm::{
+    execute,
+    terminal::{
+        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetSize,
+    },
+};
+use image::Rgb;
+use ratatu_image::{
+    backend::FixedBackend,
+    picker::{BackendType, Picker},
+    FixedImage, Resize,
+};
+use ratatui::{
+    backend::Backend,
+    layout::Rect,
+    prelude::CrosstermBackend,
+    terminal::Frame,
+    widgets::{Block, Borders, Paragraph},
+    Terminal,
+};
+struct App {
+    image: Box<dyn FixedBackend>,
+}
+
+const ASSERT_FONT_SIZE: (u16, u16) = (9, 18);
+const SCREEN_SIZE: (u16, u16) = (46, 12);
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let picker = Picker::from_ioctl(BackendType::Sixel, Some(Rgb::<u8>([255, 0, 255])))?;
+    assert_eq!(
+        ASSERT_FONT_SIZE,
+        picker.font_size(),
+        "Font size must be fixed to a specific size",
+    );
+    let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
+    let image = picker.new_static_fit(
+        dyn_img,
+        Rect::new(0, 0, SCREEN_SIZE.0 - 10, SCREEN_SIZE.1 - 4),
+        Resize::Fit,
+    )?;
+    let mut app = App { image };
+
+    // setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(
+        stdout,
+        EnterAlternateScreen,
+        SetSize(SCREEN_SIZE.0, SCREEN_SIZE.1)
+    )?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    terminal.draw(|f| ui(f, &mut app))?;
+    std::thread::sleep(std::time::Duration::from_secs(3));
+
+    // restore terminal
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
+    terminal.show_cursor()?;
+
+    Ok(())
+}
+
+fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+    let area = Rect::new(0, 0, SCREEN_SIZE.0, SCREEN_SIZE.1);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Screenshot test");
+
+    f.render_widget(
+        Paragraph::new("PartiallyHiddenScreenshotParagraphBackground\n".repeat(10)),
+        block.inner(area),
+    );
+
+    let image = FixedImage::new(app.image.as_ref());
+    f.render_widget(image, block.inner(area));
+    f.render_widget(block, area);
+}

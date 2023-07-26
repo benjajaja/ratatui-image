@@ -1,4 +1,126 @@
+[env]
+# all features except the backend ones
+ALL_FEATURES = "sixel,rustix,serde"
+
+[tasks.default]
+alias = "ci"
+
+[tasks.ci]
+dependencies = [
+  "fmt",
+  "clippy",
+  "check",
+  "test",
+]
+
 [tasks.fmt]
 command = "cargo"
 args = ["fmt", "--all", "--", "--check"]
+
+[tasks.clippy]
+command = "cargo"
+args = [
+  "clippy",
+  "--all-targets",
+  "--tests",
+  "--benches",
+  "--all-features",
+  "--",
+  "-D",
+  "warnings",
+]
+
+[tasks.check]
+command = "cargo"
+args = [
+  "check",
+  "--all-targets",
+  "--all-features"
+]
+
+[tasks.readme]
+command = "cargo"
+args = ["readme", "-o", "README.md"]
+
+[tasks.run-example]
+command = "cargo"
+args = [
+  "run", 
+  "--release", 
+  "--example", 
+  "demo",
+  "--features", "${ALL_FEATURES},crossterm",
+]
+
+# screenshot instructions for xmonad / tiling WMs:
+# 1. cargo make screenshot-spawn-xterm
+# 2. Float the new xterm window
+# 3. In xterm: cargo make screenshot-capture
+# 3b. If the resize caused a black screen, run last step again.
+
+[tasks.screenshot]
+dependencies = [
+  "screenshot-build",
+  "screenshot-capture-in-xterm",
+  "screenshot-diff",
+]
+
+[tasks.screenshot-build]
+command = "cargo"
+args = [
+  "build",
+  "--example",
+  "screenshot",
+  "--features", "sixel,rustix,crossterm",
+]
+
+[tasks.screenshot-capture-in-xterm]
+command = "cargo"
+args = [
+  "make",
+  "screenshot-spawn-xterm",
+  "-e", "cargo make screenshot-capture",
+]
+
+[tasks.screenshot-spawn-xterm]
+command = "xterm"
+args = [
+  "-ti", "340",
+  "-fa", "DejaVu",
+  "-fs", "7",
+  "-bg", "black",
+  "-fg", "white",
+  "${@}"
+]
+
+[tasks.screenshot-capture]
+dependencies = [
+  "screenshot-build",
+]
+command = "menyoki"
+args = [
+  "--quiet",
+  "capture",
+  "--countdown", "1",
+  # "--size", "200x300", # does not work with xmonad
+  # "--font", "-*-dejavu sans-*-*-*-*-7-*-*-*-*-*-*-*", # has no effect with xmonad
+  "./target/debug/examples/screenshot",
+  "png",
+  "save",
+  "target/screenshot.png",
+]
+
+[tasks.screenshot-diff]
+command = "dify"
+args = [
+  "-t", "0.15",
+  "assets/test_screenshot.png",
+  "target/screenshot.png",
+  "-o", "target/diff.png",
+]
+
+[tasks.xterm-stderr]
+script = '''
+cargo make screenshot-spawn-xterm -e "cargo run --example demo --features sixel,rustix,crossterm 2>$(tty)"
+'''
 
