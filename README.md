@@ -1,86 +1,112 @@
 # ratatu-image
 
-![Screenshot](./assets/Screenshot.png)
+### Showcase:
 
-Latest testing screenshot:
-![Testing screenshot](./assets/test_screenshot.png)
+![Recording](./assets/Recording.gif)
 
 Image widgets for [Ratatui]
 
-[Ratatui]: https://github.com/tui-rs-revival/ratatui
+**⚠️ THIS CRATE IS EXPERIMENTAL**
 
-**THIS CRATE IS EXPERIMENTAL!**
+Render images with graphics protocols in the terminal with [Ratatui].
 
-Render images with supported graphics protocols in the terminal with ratatui.
-While this generally might seem *contra natura* and something fragile, it can be worthwhile in
-some applications.
+```rust
+struct App {
+    image: Box<dyn FixedBackend>,
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let font_size = (7, 16); // Or use Picker::from_ioctl, or let user provide it.
+    let picker = Picker::new(
+        font_size,
+        BackendType::Sixel,
+        None,
+    )?;
+    let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
+    let image = picker.new_static_fit(dyn_img, Rect::new(0, 0, 30, 20), Resize::Fit)?;
+    let mut app = App { image };
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend)?;
+
+    // loop:
+    terminal.draw(|f| ui(f, &mut app))?;
+
+    Ok(())
+}
+
+fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+    let image = FixedImage::new(app.image.as_ref());
+    f.render_widget(image, f.size());
+}
+```
+
+## TUIs
+TUI application revolve around columns and rows of text naturally without the need of any
+notions of pixel sizes. [Ratatui] is based on "immediate rendering with intermediate buffers".
+
+At each frame, widgets are constructed and rendered into some character buffer, and any changes
+from respect to the last frame are then diffed and written to the terminal screen.
+
+## Terminal graphic protocols
+Some protocols allow to output image data to terminals that support it.
+
+The [Sixel] protocol mechanism is, in a nutshell, just printing an escape sequence.
+The image will be "dumped" at the cursor position, and the implementation may add enough
+carriage returns to scroll the output.
+
+## Problem
+Simply "dumping" an image into a [Ratatui] buffer is not enough. At best, the buffer diff might
+not overwrite any characters that are covered by the image in some instances, but the diff
+might change at any time due to screen/area resizing or simply other widget's contents
+changing. Then the graphics would inmediately get overwritten by the underlying character data.
+
+## Solution
+First it is necessary to suppress the covered character cells' rendering, which is addressed in
+a [Ratatui PR for cell skipping].
+
+Second it is then necessary to get the image's size in columns and rows, which is done by
+querying the terminal for it's pixel size and dividing by columns/rows to get the font size in
+pixels. Currently this is implemented with `rustix::termios`, but this is subject to change for
+a [Ratatui PR for getting window size].
 
 ## Implementation
 
 The images are always resized so that they fit their nearest rectangle in columns/rows.
-The reason for this is because the image shall be drawn in the same "render pass" as all
-surrounding text, and cells under the area of the image skip the draw on the ratatui buffer
-level, so there is no way to "clear" previous drawn text. This would leave artifacts around the
-image border.
-For this resizing it is necessary to query the terminal font size in width/height.
+This is so that the image shall be drawn in the same "render pass" as all surrounding text, and
+cells under the area of the image skip the draw on the ratatui buffer level, so there is no way
+to "clear" previous drawn text. This would leave artifacts around the image's right and bottom
+borders.
 
-## Widgets
+## Example
 
-The [`FixedImage`] widget does not react to area resizes other than not overdrawing. Note that
-some image protocols or their implementations might not behave correctly in this aspect and
-overdraw or flicker outside of the image area.
+See the [crate::picker::Picker] helper and [`examples/demo`](./examples/demo/main.rs).
 
-The [`ResizeImage`] stateful widget does react to area size changes by either resizing or
-cropping itself. The state consists of the latest resized image. A resize (and encode) happens
-every time the available area changes and either the image must be shrunk or it can grow. Thus,
-this widget may have a much bigger performance impact.
-
-Each widget is backed by a "backend" implementation of a given image protocol.
-
-## Backends
-
-Currently supported backends/protocols:
-
-### Halfblocks
-Uses the unicode character `▀` combined with foreground and background color. Assumes that the
-font aspect ratio is roughly 1:2. Should work in all terminals.
-### Sixel
-Experimental: uses temporary files.
-Uses [`sixel-bytes`] to draw image pixels, if the terminal [supports] the [Sixel] protocol.
-
-[`sixel-bytes`]: https://github.com/benjajaja/sixel-bytes
-[supports]: https://arewesixelyet.com
+[Ratatui]: https://github.com/ratatui-org/ratatui
 [Sixel]: https://en.wikipedia.org/wiki/Sixel
-
-## Examples
-
-For a more streamlined experience, see the [`crate::picker::Picker`] helper.
-
-```rust
-use image::{DynamicImage, ImageBuffer, Rgb};
-use ratatu_image::{
-    backend::{
-        FixedBackend,
-        halfblocks::FixedHalfblocks,
-    },
-    FixedImage, ImageSource, Resize,
-};
-
-let image: DynamicImage = ImageBuffer::<Rgb<u8>, Vec<u8>>::new(300, 200).into();
-
-let source = ImageSource::new(image, "filename.png".into(), (7, 14), None);
-
-let static_image = Box::new(FixedHalfblocks::from_source(
-    &source,
-    Resize::Fit,
-    source.desired,
-)).unwrap();
-assert_eq!(43, static_image.rect().width);
-assert_eq!(15, static_image.rect().height);
-
-let image_widget = FixedImage::new(&static_image);
-```
+[Ratatui PR for cell skipping]: https://github.com/ratatui-org/ratatui/pull/215
+[Ratatui PR for getting window size]: https://github.com/ratatui-org/ratatui/pull/276
 
 Current version: 0.1.1
+
+Sixel compatibility and QA:
+
+Terminal   | Fixed | Resize | Notes
+-----------|-------|--------|-------
+Xterm      | ✅    | ✅     |
+Foot       | ✅    | ✅     |
+kitty      | 😸    | 😸     | Has it own protocol which should be implemented here (WIP)
+Alacritty  | ✅    | ❌     | [with sixel patch](https://github.com/microo8/alacritty-sixel), never clears graphics.
+konsole    | ❗    | ❗     | Does not clear graphics unless cells have a background style
+Contour    | ❗    | ❗     | Text over graphics
+Wezterm    | ❌    | ❌     | [Buggy](https://github.com/wez/wezterm/issues/217#issuecomment-1657075311)
+ctx        | ❌    | ❌     | Buggy
+Blackbox   | ❔    | ❔     | Untested
+iTerm2     | ❔    | ❔     | Untested
+
+Latest Xterm testing screenshot:  
+![Testing screenshot](./assets/test_screenshot.png)
+
+Halfblocks should work in all terminals.
 
 License: MIT

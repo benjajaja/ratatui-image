@@ -4,6 +4,8 @@
     not(feature = "termwiz")
 ))]
 compile_error!("The demo needs one of the crossterm, termion, or termwiz features");
+#[cfg(not(feature = "rustix"))]
+compile_error!("The demo needs rustix until window_size is on ratataui");
 
 #[cfg(feature = "crossterm")]
 mod crossterm;
@@ -12,7 +14,7 @@ mod termion;
 #[cfg(feature = "termwiz")]
 mod termwiz;
 
-use std::{error::Error, time::Duration};
+use std::{error::Error, path::PathBuf, time::Duration};
 
 use ratatu_image::{
     backend::{FixedBackend, ResizeBackend},
@@ -22,21 +24,19 @@ use ratatu_image::{
 use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
     text::Line,
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
 
-#[cfg(feature = "crossterm")]
-use crate::crossterm::run;
-#[cfg(feature = "termion")]
-use crate::termion::run;
-#[cfg(feature = "termwiz")]
-use crate::termwiz::run;
-
 fn main() -> Result<(), Box<dyn Error>> {
-    #[cfg(any(feature = "crossterm", feature = "termion", feature = "termwiz"))]
-    run()?;
+    #[cfg(feature = "crossterm")]
+    crate::crossterm::run()?;
+    #[cfg(feature = "termion")]
+    crate::termion::run()?;
+    #[cfg(feature = "termwiz")]
+    crate::termwiz::run()?;
     Ok(())
 }
 
@@ -54,38 +54,39 @@ struct App<'a> {
     pub split_percent: u16,
     pub show_resizable_images: ShowImages,
 
-    pub picker: Picker,
-
-    pub image_source: ImageSource,
-
-    pub image_static: Box<dyn FixedBackend>,
+    pub image_source_path: PathBuf,
     pub image_static_offset: (u16, u16),
 
+    pub picker: Picker,
+    pub image_source: ImageSource,
+    pub image_static: Box<dyn FixedBackend>,
     pub image_fit_state: Box<dyn ResizeBackend>,
     pub image_crop_state: Box<dyn ResizeBackend>,
 }
 
+fn size() -> Rect {
+    Rect::new(0, 0, 30, 16)
+}
+
 impl<'a> App<'a> {
-    pub fn new<B: Backend>(title: &'a str, terminal: &mut Terminal<B>) -> App<'a> {
+    pub fn new<B: Backend>(title: &'a str, _: &mut Terminal<B>) -> App<'a> {
         let ada = "./assets/Ada.png";
         let dyn_img = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
-        let image_source =
-            ImageSource::with_terminal(dyn_img.clone(), ada.into(), terminal, None).unwrap();
-
-        let backend_type = if cfg!(feature = "sixel") {
-            BackendType::Sixel
-        } else {
-            BackendType::Halfblocks
-        };
-        let picker = Picker::from_ioctl(backend_type, None, Some(Rect::new(0, 0, 30, 20))).unwrap();
+        #[cfg(feature = "sixel")]
+        let backend_type = BackendType::Sixel;
+        #[cfg(not(feature = "sixel"))]
+        let backend_type = BackendType::Halfblocks;
+        // XXX: replace with from_terminal
+        let picker = Picker::from_ioctl(backend_type, None).unwrap();
 
         let image_static = picker
-            .new_static_fit(dyn_img, ada.into(), Resize::Fit)
+            .new_static_fit(dyn_img.clone(), size(), Resize::Fit)
             .unwrap();
 
+        let image_source = ImageSource::new(dyn_img, picker.font_size());
         let image_fit_state = picker.new_state();
-        let image_crop_state = image_fit_state.clone();
+        let image_crop_state = picker.new_state();
 
         let mut background = String::new();
 
@@ -103,6 +104,7 @@ impl<'a> App<'a> {
             split_percent: 70,
             picker,
             image_source,
+            image_source_path: ada.into(),
 
             image_static,
             image_fit_state,
@@ -124,37 +126,36 @@ impl<'a> App<'a> {
                 }
             }
             'i' => {
+                #[cfg(feature = "sixel")]
                 let next = match self.picker.backend_type() {
                     BackendType::Halfblocks => BackendType::Sixel,
                     BackendType::Sixel => BackendType::Halfblocks,
                 };
+                #[cfg(not(feature = "sixel"))]
+                let next = self.picker.backend_type().clone();
                 self.picker.set_backend(next);
 
                 self.image_static = self
                     .picker
-                    .new_static_fit(
-                        self.image_source.image.clone(),
-                        self.image_source.path.clone(),
-                        Resize::Fit,
-                    )
+                    .new_static_fit(self.image_source.image.clone(), size(), Resize::Fit)
                     .unwrap();
 
                 self.image_fit_state = self.picker.new_state();
                 self.image_crop_state = self.picker.new_state();
             }
             'o' => {
-                let path = match self.image_source.path.to_str() {
+                let path = match self.image_source_path.to_str() {
                     Some("./assets/Ada.png") => "./assets/Jenkins.jpg",
                     _ => "./assets/Ada.png",
                 };
                 let dyn_img = image::io::Reader::open(path).unwrap().decode().unwrap();
-                self.image_source =
-                    ImageSource::new(dyn_img.clone(), path.into(), self.picker.font_size(), None);
+                self.image_source = ImageSource::new(dyn_img.clone(), self.picker.font_size());
 
                 self.image_static = self
                     .picker
-                    .new_static_fit(dyn_img, path.into(), Resize::Fit)
+                    .new_static_fit(dyn_img, size(), Resize::Fit)
                     .unwrap();
+                self.image_source_path = path.into();
             }
             'H' => {
                 if self.split_percent >= 10 {
@@ -228,8 +229,13 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         }
     }
 
+    let chunks_left_bottom = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(left_chunks[1]);
+
     let block_left_bottom = Block::default().borders(Borders::ALL).title("Crop");
-    let area = block_left_bottom.inner(left_chunks[1]);
+    let area = block_left_bottom.inner(chunks_left_bottom[0]);
     f.render_widget(
         Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
         area,
@@ -237,15 +243,24 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.show_resizable_images {
         ShowImages::Fixed => {}
         _ => {
-            let image = ResizeImage::new(&app.image_source).resize(Resize::Crop);
+            let image = ResizeImage::new(&app.image_source, None).resize(Resize::Crop);
             f.render_stateful_widget(
                 image,
-                block_left_bottom.inner(left_chunks[1]),
+                block_left_bottom.inner(chunks_left_bottom[0]),
                 &mut app.image_fit_state,
             );
         }
     }
-    f.render_widget(block_left_bottom, left_chunks[1]);
+    f.render_widget(block_left_bottom, chunks_left_bottom[0]);
+
+    let block_middle_bottom = Block::default().borders(Borders::ALL).title("Placeholder");
+    f.render_widget(
+        Paragraph::new(app.background.as_str())
+            .wrap(Wrap { trim: true })
+            .style(Style::new().bg(Color::Blue)),
+        block_middle_bottom.inner(chunks_left_bottom[1]),
+    );
+    f.render_widget(block_middle_bottom, chunks_left_bottom[1]);
 
     let block_right_top = Block::default().borders(Borders::ALL).title("Fit");
     let area = block_right_top.inner(right_chunks[0]);
@@ -256,7 +271,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.show_resizable_images {
         ShowImages::Fixed => {}
         _ => {
-            let image = ResizeImage::new(&app.image_source).resize(Resize::Fit);
+            let image = ResizeImage::new(&app.image_source, None).resize(Resize::Fit);
             f.render_stateful_widget(
                 image,
                 block_right_top.inner(right_chunks[0]),

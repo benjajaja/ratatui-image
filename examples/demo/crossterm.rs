@@ -63,9 +63,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char(c) => app.on_key(c),
-                        _ => {}
+                    if let KeyCode::Char(c) = key.code {
+                        app.on_key(c);
                     }
                 }
             }

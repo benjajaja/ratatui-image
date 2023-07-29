@@ -1,8 +1,9 @@
 //! Helper module to build a backend, and swap backends at runtime
-use std::path::PathBuf;
 
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
+#[cfg(feature = "rustix")]
+use rustix::termios::Winsize;
 #[cfg(feature = "serde")]
 use serde::Deserialize;
 
@@ -22,15 +23,14 @@ pub struct Picker {
     font_size: FontSize,
     background_color: Option<Rgb<u8>>,
     backend_type: BackendType,
-    fixed_size: Option<Rect>,
 }
 
+#[derive(PartialEq, Clone, Debug, Copy)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize),
     serde(rename_all = "lowercase")
 )]
-#[derive(PartialEq, Clone, Debug, Copy)]
 pub enum BackendType {
     Halfblocks,
     #[cfg(feature = "sixel")]
@@ -59,13 +59,12 @@ impl Picker {
     ///     (7, 14),
     ///     BackendType::Halfblocks,
     ///     None,
-    ///     Some(Rect::new(0, 0, 15, 5)),
     /// ).unwrap();
     ///
     /// // For FixedImage:
     /// let image_static = picker.new_static_fit(
     ///     dyn_img,
-    ///     "./assets/Ada.png".into(),
+    ///     Rect::new(0, 0, 15, 5),
     ///     Resize::Fit,
     /// ).unwrap();
     /// // For ResizeImage:
@@ -75,13 +74,11 @@ impl Picker {
         font_size: FontSize,
         backend_type: BackendType,
         background_color: Option<Rgb<u8>>,
-        fixed_size: Option<Rect>,
     ) -> Result<Picker> {
         Ok(Picker {
             font_size,
             background_color,
             backend_type,
-            fixed_size,
         })
     }
 
@@ -90,21 +87,10 @@ impl Picker {
     pub fn from_ioctl(
         backend_type: BackendType,
         background_color: Option<Rgb<u8>>,
-        fixed_size: Option<Rect>,
     ) -> Result<Picker> {
         let stdout = rustix::stdio::stdout();
-        let winsize = rustix::termios::tcgetwinsize(stdout)?;
-        Picker::new(
-            font_size(
-                winsize.ws_xpixel,
-                winsize.ws_ypixel,
-                winsize.ws_col,
-                winsize.ws_row,
-            )?,
-            backend_type,
-            background_color,
-            fixed_size,
-        )
+        let font_size = font_size(rustix::termios::tcgetwinsize(stdout)?)?;
+        Picker::new(font_size, backend_type, background_color)
     }
 
     /// Set a specific backend
@@ -116,23 +102,24 @@ impl Picker {
     pub fn new_static_fit(
         &self,
         image: DynamicImage,
-        path: PathBuf,
+        size: Rect,
         resize: Resize,
     ) -> Result<Box<dyn FixedBackend>> {
-        match self.fixed_size {
-            Some(fixed_size) => {
-                let source = ImageSource::new(image, path, self.font_size, self.background_color);
-                match self.backend_type {
-                    BackendType::Halfblocks => Ok(Box::new(FixedHalfblocks::from_source(
-                        &source, resize, fixed_size,
-                    )?)),
-                    #[cfg(feature = "sixel")]
-                    BackendType::Sixel => Ok(Box::new(FixedSixel::from_source(
-                        &source, resize, fixed_size,
-                    )?)),
-                }
-            }
-            None => Err(String::from("Picker is missing fixed_size").into()),
+        let source = ImageSource::new(image, self.font_size);
+        match self.backend_type {
+            BackendType::Halfblocks => Ok(Box::new(FixedHalfblocks::from_source(
+                &source,
+                resize,
+                self.background_color,
+                size,
+            )?)),
+            #[cfg(feature = "sixel")]
+            BackendType::Sixel => Ok(Box::new(FixedSixel::from_source(
+                &source,
+                resize,
+                self.background_color,
+                size,
+            )?)),
         }
     }
 
@@ -159,20 +146,40 @@ impl Picker {
     }
 }
 
-fn font_size(x: u16, y: u16, cols: u16, rows: u16) -> Result<FontSize> {
+#[cfg(feature = "rustix")]
+pub fn font_size(winsize: Winsize) -> Result<FontSize> {
+    let Winsize {
+        ws_xpixel: x,
+        ws_ypixel: y,
+        ws_col: cols,
+        ws_row: rows,
+    } = winsize;
     if x == 0 || y == 0 || cols == 0 || rows == 0 {
         return Err(String::from("font_size zero value").into());
     }
     Ok((x / cols, y / rows))
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rustix"))]
 mod tests {
     use crate::picker::font_size;
+    use rustix::termios::Winsize;
 
     #[test]
     fn test_font_size() {
-        assert_eq!(true, font_size(0, 0, 10, 10).is_err());
-        assert_eq!(true, font_size(100, 100, 0, 0).is_err());
+        assert!(font_size(Winsize {
+            ws_row: 0,
+            ws_col: 0,
+            ws_xpixel: 10,
+            ws_ypixel: 10
+        })
+        .is_err());
+        assert!(font_size(Winsize {
+            ws_row: 10,
+            ws_col: 10,
+            ws_xpixel: 0,
+            ws_ypixel: 0
+        })
+        .is_err());
     }
 }

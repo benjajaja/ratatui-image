@@ -1,5 +1,7 @@
-// use crossterm::style::Color as CColor;
-use image::{imageops::FilterType, DynamicImage};
+//! Halfblocks backend implementations.
+//! Uses the unicode character `▀` combined with foreground and background color. Assumes that the
+//! font aspect ratio is roughly 1:2. Should work in all terminals.
+use image::{imageops::FilterType, DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use super::FixedBackend;
@@ -26,9 +28,14 @@ impl FixedHalfblocks {
     /// The "resolution" is determined by the font size of the terminal. Smaller fonts will result
     /// in more half-blocks for the same image size. To get a size independent of the font size,
     /// the image could be resized in relation to the font size beforehand.
-    pub fn from_source(source: &ImageSource, resize: Resize, area: Rect) -> Result<Self> {
+    pub fn from_source(
+        source: &ImageSource,
+        resize: Resize,
+        background_color: Option<Rgb<u8>>,
+        area: Rect,
+    ) -> Result<Self> {
         let (image, desired) = resize
-            .resize(source, Rect::default(), area)
+            .resize(source, Rect::default(), area, background_color, false)
             .unwrap_or_else(|| (source.image.clone(), source.desired));
         let data = encode(&image, desired);
         Ok(Self {
@@ -83,8 +90,5 @@ impl FixedBackend for FixedHalfblocks {
                 .set_bg(hb.lower)
                 .set_char('▀');
         }
-    }
-    fn data(&self) -> String {
-        format!("{:?}", self.data)
     }
 }

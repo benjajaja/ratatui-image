@@ -16,7 +16,7 @@ exclude = [
 rust-version = "1.65.0"
 
 [features]
-default = ["crossterm", "sixel", "rustix"]
+default = []
 crossterm = ["dep:crossterm"]
 termion = ["dep:termion"]
 termwiz = ["dep:termwiz"]
@@ -27,17 +27,17 @@ rustix = ["dep:rustix"]
 [dependencies]
 dyn-clone = "1.0.11"
 image = { version = "0.24.5" }
-# ratatui with "cell skipping" and "window_size", https://github.com/tui-rs-revival/ratatui/pull/215 and https://github.com/tui-rs-revival/ratatui/pull/276
-ratatui = { git = "https://github.com/benjajaja/ratatui", rev = "8729b61fab885dc141c6e0968b4863386c544d9d", features = ["crossterm", "termion", "termwiz" ] }
-# sixel-rs = { version = "0.3.3", optional = true }
 sixel-bytes = { version = "0.2.1", optional = true }
-# crossterm with "window_size", https://github.com/crossterm-rs/crossterm/pull/790
-# crossterm = { git = "https://github.com/benjajaja/crossterm", rev = "db515a16f95b36b4871488aa543f564bc929d62e" , optional = true }
 crossterm = { version = "0.25", optional = true }
 termion = { version = "2.0", optional = true }
 termwiz = { version = "0.20", optional = true }
-serde = { version = "^1.0", optional = true }
+serde = { version = "^1.0", optional = true, features = ["derive"] }
 rustix = { version = "^0.38.4", optional = true, features = ["stdio", "termios"] }
+
+[dependencies.ratatui]
+# version = "0.22.0"
+features = ["crossterm", "termion", "termwiz" ]
+path = "../ratatui"
 
 [[example]]
 name = "demo"
@@ -47,6 +47,6 @@ doc-scrape-examples = true
 [[example]]
 name = "screenshot"
 
-[patch.crates-io]
+# [patch.crates-io]
 # ratatui with "cell skipping"
-ratatui = { git = "https://github.com/benjajaja/ratatui", rev = "26fec19e92bcc45eda85cb2b4bc27d4a23833c02" }
+# ratatui = { git = "https://github.com/benjajaja/ratatui", rev = "26fec19e92bcc45eda85cb2b4bc27d4a23833c02" }

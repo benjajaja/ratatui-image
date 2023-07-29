@@ -44,10 +44,11 @@ fn run_app(terminal: &mut Terminal<TermwizBackend>, mut app: App) -> io::Result<
             .poll_input(Some(timeout))
         {
             match input {
-                InputEvent::Key(key_code) => match key_code.key {
-                    KeyCode::Char(c) => app.on_key(c),
-                    _ => {}
-                },
+                InputEvent::Key(key_code) => {
+                    if let KeyCode::Char(c) = key_code.key {
+                        app.on_key(c);
+                    }
+                }
                 InputEvent::Resized { cols, rows } => {
                     terminal
                         .backend_mut()

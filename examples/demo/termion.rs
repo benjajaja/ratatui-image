@@ -37,10 +37,11 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
         terminal.draw(|f| ui(f, &mut app))?;
 
         match events.recv()? {
-            Event::Input(key) => match key {
-                Key::Char(c) => app.on_key(c),
-                _ => {}
-            },
+            Event::Input(key) => {
+                if let Key::Char(c) = key {
+                    app.on_key(c);
+                }
+            }
             Event::Tick => app.on_tick(),
         }
         if app.should_quit {

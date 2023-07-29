@@ -74,6 +74,16 @@ args = [
   "--features", "sixel,rustix,crossterm",
 ]
 
+[tasks.demo-build]
+command = "cargo"
+args = [
+  "build",
+  "--example",
+  "demo",
+  "--features", "sixel,rustix,crossterm",
+]
+
+
 [tasks.screenshot-capture-in-xterm]
 command = "cargo"
 args = [
@@ -108,6 +118,23 @@ args = [
   "png",
   "save",
   "target/screenshot.png",
+]
+
+[tasks.screenshot-record]
+dependencies = [
+  "demo-build",
+]
+command = "menyoki"
+args = [
+  "--quiet",
+  "record",
+  # "--countdown", "1",
+  # "--size", "200x300", # does not work with xmonad
+  # "--font", "-*-dejavu sans-*-*-*-*-7-*-*-*-*-*-*-*", # has no effect with xmonad
+  "./target/debug/examples/demo",
+  "gif",
+  "save",
+  "target/recording.gif",
 ]
 
 [tasks.screenshot-diff]
