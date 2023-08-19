@@ -23,6 +23,10 @@ impl ResizeBackend for SixelState {
         area: Rect,
         buf: &mut Buffer,
     ) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
         let force = source.hash != self.hash;
         if let Some((img, rect)) =
             resize.resize(source, self.current.rect, area, background_color, force)

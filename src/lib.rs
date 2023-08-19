@@ -16,7 +16,7 @@
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let font_size = (7, 16); // Or use Picker::from_ioctl, or let user provide it.
-//!     let picker = Picker::new(
+//!     let mut picker = Picker::new(
 //!         font_size,
 //! #        #[cfg(feature = "sixel")]
 //!         BackendType::Sixel,
@@ -248,10 +248,6 @@ impl<'a> ResizeImage<'a> {
 impl<'a> StatefulWidget for ResizeImage<'a> {
     type State = Box<dyn ResizeBackend>;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
-
         state.render(self.image, &self.resize, self.background_color, area, buf)
     }
 }

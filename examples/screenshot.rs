@@ -28,7 +28,7 @@ const ASSERT_FONT_SIZE: (u16, u16) = (9, 18);
 const SCREEN_SIZE: (u16, u16) = (46, 12);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let picker = Picker::from_ioctl(BackendType::Sixel, Some(Rgb::<u8>([255, 0, 255])))?;
+    let mut picker = Picker::from_ioctl(BackendType::Sixel, Some(Rgb::<u8>([255, 0, 255])))?;
     assert_eq!(
         ASSERT_FONT_SIZE,
         picker.font_size(),

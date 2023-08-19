@@ -13,6 +13,7 @@ use crate::backend::sixel::{resizeable::SixelState, FixedSixel};
 use crate::{
     backend::{
         halfblocks::{resizeable::HalfblocksState, FixedHalfblocks},
+        kitty::{FixedKitty, KittyState},
         FixedBackend, ResizeBackend,
     },
     FontSize, ImageSource, Resize, Result,
@@ -23,6 +24,7 @@ pub struct Picker {
     font_size: FontSize,
     background_color: Option<Rgb<u8>>,
     backend_type: BackendType,
+    kitty_counter: u8,
 }
 
 #[derive(PartialEq, Clone, Debug, Copy)]
@@ -35,6 +37,7 @@ pub enum BackendType {
     Halfblocks,
     #[cfg(feature = "sixel")]
     Sixel,
+    Kitty,
 }
 
 /// Helper for building widgets
@@ -55,7 +58,7 @@ impl Picker {
     /// };
     ///
     /// let dyn_img = image::io::Reader::open("./assets/Ada.png").unwrap().decode().unwrap();
-    /// let picker = Picker::new(
+    /// let mut picker = Picker::new(
     ///     (7, 14),
     ///     BackendType::Halfblocks,
     ///     None,
@@ -79,6 +82,7 @@ impl Picker {
             font_size,
             background_color,
             backend_type,
+            kitty_counter: 0,
         })
     }
 
@@ -100,7 +104,7 @@ impl Picker {
 
     /// Returns a new *static* backend for [`crate::FixedImage`] widgets that fits into the given size.
     pub fn new_static_fit(
-        &self,
+        &mut self,
         image: DynamicImage,
         size: Rect,
         resize: Resize,
@@ -120,15 +124,29 @@ impl Picker {
                 self.background_color,
                 size,
             )?)),
+            BackendType::Kitty => {
+                self.kitty_counter += 1;
+                Ok(Box::new(FixedKitty::from_source(
+                    &source,
+                    resize,
+                    self.background_color,
+                    size,
+                    self.kitty_counter,
+                )?))
+            }
         }
     }
 
     /// Returns a new *state* backend for [`crate::ResizeImage`].
-    pub fn new_state(&self) -> Box<dyn ResizeBackend> {
+    pub fn new_state(&mut self) -> Box<dyn ResizeBackend> {
         match self.backend_type {
             BackendType::Halfblocks => Box::<HalfblocksState>::default(),
             #[cfg(feature = "sixel")]
             BackendType::Sixel => Box::<SixelState>::default(),
+            BackendType::Kitty => {
+                self.kitty_counter += 1;
+                Box::new(KittyState::new(self.kitty_counter))
+            }
         }
     }
 
