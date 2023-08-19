@@ -13,9 +13,8 @@ use ratatu_image::{
     FixedImage, Resize,
 };
 use ratatui::{
-    backend::Backend,
+    backend::{Backend, CrosstermBackend},
     layout::Rect,
-    prelude::CrosstermBackend,
     terminal::Frame,
     widgets::{Block, Borders, Paragraph},
     Terminal,

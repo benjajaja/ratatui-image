@@ -16,7 +16,7 @@ exclude = [
 rust-version = "1.65.0"
 
 [features]
-default = []
+default = ["crossterm", "sixel", "rustix"]
 crossterm = ["dep:crossterm"]
 termion = ["dep:termion"]
 termwiz = ["dep:termwiz"]
@@ -40,6 +40,10 @@ rand = { version = "0.8.5" }
 # version = "0.22.0"
 features = ["crossterm", "termion", "termwiz" ]
 path = "../ratatui"
+
+[[bin]]
+name = "ratatu-image"
+required-features = ["crossterm", "sixel", "rustix"]
 
 [[example]]
 name = "demo"

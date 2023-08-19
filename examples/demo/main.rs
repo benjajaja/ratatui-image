@@ -136,7 +136,7 @@ impl<'a> App<'a> {
                     BackendType::Sixel => BackendType::Kitty,
                     BackendType::Kitty => BackendType::Halfblocks,
                 };
-                self.picker.set_backend(next);
+                self.picker.set(next);
 
                 self.image_static = self
                     .picker

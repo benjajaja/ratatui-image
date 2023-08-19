@@ -40,6 +40,20 @@ pub enum BackendType {
     Kitty,
 }
 
+impl BackendType {
+    pub fn next(&self) -> BackendType {
+        match self {
+            #[cfg(not(feature = "sixel"))]
+            BackendType::Halfblocks => BackendType::Kitty,
+            #[cfg(feature = "sixel")]
+            BackendType::Halfblocks => BackendType::Sixel,
+            #[cfg(feature = "sixel")]
+            BackendType::Sixel => BackendType::Kitty,
+            BackendType::Kitty => BackendType::Halfblocks,
+        }
+    }
+}
+
 /// Helper for building widgets
 impl Picker {
     /// Create a picker from a given terminal [FontSize].
@@ -97,9 +111,20 @@ impl Picker {
         Picker::new(font_size, backend_type, background_color)
     }
 
+    pub fn guess(&mut self) -> BackendType {
+        self.backend_type = guess_backend();
+        self.backend_type
+    }
+
     /// Set a specific backend
     pub fn set(&mut self, r#type: BackendType) {
         self.backend_type = r#type;
+    }
+
+    /// Cycle through available backends
+    pub fn cycle_backends(&mut self) -> BackendType {
+        self.backend_type = self.backend_type.next();
+        self.backend_type
     }
 
     /// Returns a new *static* backend for [`crate::FixedImage`] widgets that fits into the given size.
@@ -150,11 +175,6 @@ impl Picker {
         }
     }
 
-    /// Cycles through available backends
-    pub fn set_backend(&mut self, backend_type: BackendType) {
-        self.backend_type = backend_type;
-    }
-
     pub fn backend_type(&self) -> &BackendType {
         &self.backend_type
     }
@@ -178,9 +198,60 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
     Ok((x / cols, y / rows))
 }
 
-#[cfg(all(test, feature = "rustix"))]
+// Check if Sixel protocol can be used
+fn guess_backend() -> BackendType {
+    if let Ok(term) = std::env::var("TERM") {
+        match term.as_str() {
+            "mlterm" | "yaft-256color" | "foot" | "foot-extra" | "alacritty" => {
+                return BackendType::Sixel
+            }
+            "st-256color" | "xterm" | "xterm-256color" => {
+                return check_device_attrs().unwrap_or(BackendType::Halfblocks)
+            }
+            term => {
+                if term.contains("kitty") {
+                    return BackendType::Kitty;
+                }
+                if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
+                    if term_program == "MacTerm" {
+                        return BackendType::Sixel;
+                    }
+                }
+            }
+        }
+    }
+    BackendType::Halfblocks
+}
+
+// Check if Sixel is within the terminal's attributes
+// see https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Sixel-Graphics
+// and https://vt100.net/docs/vt510-rm/DA1.html
+fn check_device_attrs() -> Result<BackendType> {
+    todo!();
+    // let mut term = Term::stdout();
+    //
+    // write!(&mut term, "\x1b[c")?;
+    // term.flush()?;
+    //
+    // let mut response = String::new();
+    //
+    // while let Ok(key) = term.read_key() {
+    // if let Key::Char(c) = key {
+    // response.push(c);
+    // if c == 'c' {
+    // break;
+    // }
+    // }
+    // }
+    //
+    // Ok(response.contains(";4;") || response.contains(";4c"))
+}
+
+#[cfg(all(test, feature = "rustix", feature = "sixel"))]
 mod tests {
-    use crate::picker::font_size;
+    use std::assert_eq;
+
+    use crate::picker::{font_size, BackendType, Picker};
     use rustix::termios::Winsize;
 
     #[test]
@@ -199,5 +270,14 @@ mod tests {
             ws_ypixel: 0
         })
         .is_err());
+    }
+
+    #[test]
+    fn test_cycle_backends() {
+        let mut picker = Picker::new((1, 1), BackendType::Halfblocks, None).unwrap();
+        #[cfg(feature = "sixel")]
+        assert_eq!(picker.cycle_backends(), BackendType::Sixel);
+        assert_eq!(picker.cycle_backends(), BackendType::Kitty);
+        assert_eq!(picker.cycle_backends(), BackendType::Halfblocks);
     }
 }

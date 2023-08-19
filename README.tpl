@@ -28,5 +28,13 @@ Latest Xterm testing screenshot:
 
 Halfblocks should work in all terminals.
 
+### Comparison:
+
+* [viuer](https://crates.io/crates/viuer)
+  Renders graphics in different terminals/protocols, but "dumps" the image, making it difficult to
+  work for TUI programs.
+  The terminal protocol guessing code has been taken almost verbatim, thus the author of viuer is
+  included in the copyright notice.
+
 License: {{license}}
 
