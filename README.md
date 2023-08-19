@@ -17,7 +17,7 @@ struct App {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let font_size = (7, 16); // Or use Picker::from_ioctl, or let user provide it.
-    let picker = Picker::new(
+    let mut picker = Picker::new(
         font_size,
         BackendType::Sixel,
         None,
@@ -93,16 +93,16 @@ Sixel compatibility and QA:
 
 Terminal   | Fixed | Resize | Notes
 -----------|-------|--------|-------
-Xterm      | ✅    | ✅     |
-Foot       | ✅    | ✅     |
-kitty      | 😸    | 😸     | Has it own protocol which should be implemented here (WIP)
-Alacritty  | ✅    | ❌     | [with sixel patch](https://github.com/microo8/alacritty-sixel), never clears graphics.
-konsole    | ❗    | ❗     | Does not clear graphics unless cells have a background style
-Contour    | ❗    | ❗     | Text over graphics
+Xterm      | ✔️     | ✔️      |
+Foot       | ✔️     | ✔️      |
+kitty      | ✔️     | ✔️      |
+Alacritty  | ✔️     | ❌     | [with sixel patch](https://github.com/microo8/alacritty-sixel), never clears graphics.
+iTerm2     | ❌    | ❌     | Unimplemented, has a protocolo [similar to sixel](https://iterm2.com/documentation-images.html)
+konsole    | ❌    | ❌     | Does not clear graphics unless cells have a background style
+Contour    | ❌    | ❌     | Text over graphics
 Wezterm    | ❌    | ❌     | [Buggy](https://github.com/wez/wezterm/issues/217#issuecomment-1657075311)
 ctx        | ❌    | ❌     | Buggy
 Blackbox   | ❔    | ❔     | Untested
-iTerm2     | ❔    | ❔     | Untested
 
 Latest Xterm testing screenshot:  
 ![Testing screenshot](./assets/test_screenshot.png)

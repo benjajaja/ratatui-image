@@ -40,6 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[derive(Debug)]
 enum ShowImages {
     All,
     Fixed,
@@ -52,7 +53,7 @@ struct App<'a> {
     pub tick_rate: Duration,
     pub background: String,
     pub split_percent: u16,
-    pub show_resizable_images: ShowImages,
+    pub show_images: ShowImages,
 
     pub image_source_path: PathBuf,
     pub image_static_offset: (u16, u16),
@@ -76,9 +77,9 @@ impl<'a> App<'a> {
         #[cfg(feature = "sixel")]
         let backend_type = BackendType::Sixel;
         #[cfg(not(feature = "sixel"))]
-        let backend_type = BackendType::Halfblocks;
+        let backend_type = BackendType::Kitty;
         // XXX: replace with from_terminal
-        let picker = Picker::from_ioctl(backend_type, None).unwrap();
+        let mut picker = Picker::from_ioctl(backend_type, None).unwrap();
 
         let image_static = picker
             .new_static_fit(dyn_img.clone(), size(), Resize::Fit)
@@ -100,7 +101,7 @@ impl<'a> App<'a> {
             should_quit: false,
             tick_rate: Duration::from_millis(1000),
             background,
-            show_resizable_images: ShowImages::All,
+            show_images: ShowImages::All,
             split_percent: 70,
             picker,
             image_source,
@@ -119,20 +120,22 @@ impl<'a> App<'a> {
                 self.should_quit = true;
             }
             't' => {
-                self.show_resizable_images = match self.show_resizable_images {
+                self.show_images = match self.show_images {
                     ShowImages::All => ShowImages::Fixed,
                     ShowImages::Fixed => ShowImages::Resized,
                     ShowImages::Resized => ShowImages::All,
                 }
             }
             'i' => {
-                #[cfg(feature = "sixel")]
                 let next = match self.picker.backend_type() {
+                    #[cfg(not(feature = "sixel"))]
+                    BackendType::Halfblocks => BackendType::Kitty,
+                    #[cfg(feature = "sixel")]
                     BackendType::Halfblocks => BackendType::Sixel,
-                    BackendType::Sixel => BackendType::Halfblocks,
+                    #[cfg(feature = "sixel")]
+                    BackendType::Sixel => BackendType::Kitty,
+                    BackendType::Kitty => BackendType::Halfblocks,
                 };
-                #[cfg(not(feature = "sixel"))]
-                let next = self.picker.backend_type().clone();
                 self.picker.set_backend(next);
 
                 self.image_static = self
@@ -140,8 +143,8 @@ impl<'a> App<'a> {
                     .new_static_fit(self.image_source.image.clone(), size(), Resize::Fit)
                     .unwrap();
 
-                self.image_fit_state = self.picker.new_state();
-                self.image_crop_state = self.picker.new_state();
+                self.image_fit_state.reset();
+                self.image_crop_state.reset();
             }
             'o' => {
                 let path = match self.image_source_path.to_str() {
@@ -221,7 +224,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         area,
     );
     f.render_widget(block_left_top, left_chunks[0]);
-    match app.show_resizable_images {
+    match app.show_images {
         ShowImages::Resized => {}
         _ => {
             let image = FixedImage::new(app.image_static.as_ref());
@@ -240,14 +243,14 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
         area,
     );
-    match app.show_resizable_images {
+    match app.show_images {
         ShowImages::Fixed => {}
         _ => {
             let image = ResizeImage::new(&app.image_source, None).resize(Resize::Crop);
             f.render_stateful_widget(
                 image,
                 block_left_bottom.inner(chunks_left_bottom[0]),
-                &mut app.image_fit_state,
+                &mut app.image_crop_state,
             );
         }
     }
@@ -268,14 +271,14 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
         area,
     );
-    match app.show_resizable_images {
+    match app.show_images {
         ShowImages::Fixed => {}
         _ => {
             let image = ResizeImage::new(&app.image_source, None).resize(Resize::Fit);
             f.render_stateful_widget(
                 image,
                 block_right_top.inner(right_chunks[0]),
-                &mut app.image_crop_state,
+                &mut app.image_fit_state,
             );
         }
     }
@@ -292,7 +295,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 app.picker.backend_type()
             )),
             Line::from("o: cycle image"),
-            Line::from("t: toggle rendering dynamic image widgets"),
+            Line::from(format!("t: toggle ({:?})", app.show_images)),
             Line::from(format!("Font size: {:?}", app.picker.font_size())),
         ])
         .wrap(Wrap { trim: true }),

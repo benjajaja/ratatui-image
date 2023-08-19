@@ -8,9 +8,9 @@
 use image::{DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect};
 use sixel_bytes::{sixel_string, DiffusionMethod, PixelFormat, SixelError};
-use std::{cmp::min, io};
+use std::io;
 
-use super::FixedBackend;
+use super::{render_area, FixedBackend};
 use crate::{ImageSource, Resize, Result};
 
 pub mod resizeable;
@@ -43,23 +43,6 @@ impl FixedSixel {
             overdraw: false,
         })
     }
-
-    fn render_area(&self, area: Rect) -> Option<Rect> {
-        let rect = self.rect;
-        if self.overdraw {
-            return Some(Rect::new(
-                area.x,
-                area.y,
-                min(rect.width, area.width),
-                min(rect.height, area.height),
-            ));
-        }
-
-        if rect.width > area.width || rect.height > area.height {
-            return None;
-        }
-        Some(Rect::new(area.x, area.y, rect.width, rect.height))
-    }
 }
 
 // TODO: change E to sixel_rs::status::Error and map when calling
@@ -88,7 +71,7 @@ impl FixedBackend for FixedSixel {
         self.rect
     }
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        let render_area = match self.render_area(area) {
+        let render_area = match render_area(self.rect, area, self.overdraw) {
             None => {
                 // If we render out of area, then the buffer will attempt to write regular text (or
                 // possibly other sixels) over the image.
