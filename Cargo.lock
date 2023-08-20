@@ -742,6 +742,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
+
+[[package]]
 name = "pest"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -970,12 +976,14 @@ dependencies = [
 
 [[package]]
 name = "ratatui"
-version = "0.21.0"
+version = "0.22.0"
+source = "git+https://github.com/benjajaja/ratatui?rev=26fec19e92bcc45eda85cb2b4bc27d4a23833c02#26fec19e92bcc45eda85cb2b4bc27d4a23833c02"
 dependencies = [
  "bitflags 2.3.3",
  "cassowary",
  "crossterm 0.26.1",
  "indoc",
+ "paste",
  "termion",
  "termwiz",
  "unicode-segmentation",

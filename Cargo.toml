@@ -39,7 +39,9 @@ rand = { version = "0.8.5" }
 [dependencies.ratatui]
 # version = "0.22.0"
 features = ["crossterm", "termion", "termwiz" ]
-path = "../ratatui"
+# path = "../ratatui"
+git = "https://github.com/benjajaja/ratatui"
+rev = "26fec19e92bcc45eda85cb2b4bc27d4a23833c02"
 
 [[bin]]
 name = "ratatu-image"

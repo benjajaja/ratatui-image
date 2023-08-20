@@ -1,7 +1,7 @@
 # ratatu-image
 
 [![GitHub CI
-Status](https://img.shields.io/github/actions/workflow/status/benjajaja/ratatu-image/ci.yml?style=flat-square&logo=github)](https://github.com/benjajaja/ratatu-image/actions?query=workflow%3ACI+)
+Status](https://img.shields.io/github/actions/workflow/status/benjajaja/ratatu-image/ci.yaml?style=flat-square&logo=github)](https://github.com/benjajaja/ratatu-image/actions?query=workflow%3A)
 
 ### Showcase:
 
