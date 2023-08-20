@@ -8,8 +8,10 @@ alias = "ci"
 [tasks.ci]
 dependencies = [
   "fmt",
-  "clippy",
+  "clippy-all",
+  "clippy-backend",
   "check",
+  "check-all",
   "test",
 ]
 
@@ -17,13 +19,23 @@ dependencies = [
 command = "cargo"
 args = ["fmt", "--all", "--", "--check"]
 
-[tasks.clippy]
+[tasks.clippy-backend]
+command = "cargo"
+args = [
+  "clippy",
+  "--tests",
+  "--features=rustix,${@}",
+  "--",
+  "-D",
+  "warnings",
+]
+
+[tasks.clippy-all]
 command = "cargo"
 args = [
   "clippy",
   "--all-targets",
   "--tests",
-  "--benches",
   "--all-features",
   "--",
   "-D",
@@ -31,6 +43,13 @@ args = [
 ]
 
 [tasks.check]
+command = "cargo"
+args = [
+  "check",
+  "--features=rustix,${@}",
+]
+
+[tasks.check-all]
 command = "cargo"
 args = [
   "check",

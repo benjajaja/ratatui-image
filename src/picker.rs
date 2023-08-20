@@ -4,6 +4,8 @@ use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
 #[cfg(feature = "rustix")]
 use rustix::termios::Winsize;
+#[cfg(all(feature = "sixel", feature = "rustix"))]
+use rustix::termios::{LocalModes, OptionalActions};
 #[cfg(feature = "serde")]
 use serde::Deserialize;
 
@@ -102,18 +104,10 @@ impl Picker {
 
     /// Query the terminal window size with I/O for font size.
     #[cfg(feature = "rustix")]
-    pub fn from_ioctl(
-        backend_type: BackendType,
-        background_color: Option<Rgb<u8>>,
-    ) -> Result<Picker> {
+    pub fn from_termios(background_color: Option<Rgb<u8>>) -> Result<Picker> {
         let stdout = rustix::stdio::stdout();
         let font_size = font_size(rustix::termios::tcgetwinsize(stdout)?)?;
-        Picker::new(font_size, backend_type, background_color)
-    }
-
-    pub fn guess(&mut self) -> BackendType {
-        self.backend_type = guess_backend();
-        self.backend_type
+        Picker::new(font_size, guess_backend(), background_color)
     }
 
     /// Set a specific backend
@@ -198,20 +192,25 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
     Ok((x / cols, y / rows))
 }
 
-// Check if Sixel protocol can be used
+#[cfg(feature = "rustix")]
+// Guess what protocol should be used, with termios stdin/out queries.
 fn guess_backend() -> BackendType {
     if let Ok(term) = std::env::var("TERM") {
         match term.as_str() {
-            "mlterm" | "yaft-256color" | "foot" | "foot-extra" | "alacritty" => {
-                return BackendType::Sixel
-            }
-            "st-256color" | "xterm" | "xterm-256color" => {
-                return check_device_attrs().unwrap_or(BackendType::Halfblocks)
+            #[cfg(all(feature = "sixel", feature = "rustix"))]
+            "mlterm" | "yaft-256color" => {
+                return BackendType::Sixel;
             }
             term => {
+                #[cfg(all(feature = "sixel", feature = "rustix"))]
+                match check_device_attrs() {
+                    Ok(t) => return t,
+                    Err(err) => eprintln!("{err}"),
+                };
                 if term.contains("kitty") {
                     return BackendType::Kitty;
                 }
+                #[cfg(all(feature = "sixel", feature = "rustix"))]
                 if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
                     if term_program == "MacTerm" {
                         return BackendType::Sixel;
@@ -223,28 +222,57 @@ fn guess_backend() -> BackendType {
     BackendType::Halfblocks
 }
 
-// Check if Sixel is within the terminal's attributes
-// see https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Sixel-Graphics
-// and https://vt100.net/docs/vt510-rm/DA1.html
+#[cfg(all(feature = "sixel", feature = "rustix"))]
+/// Check if Sixel is within the terminal's attributes
+/// see https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Sixel-Graphics
+/// and https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h4-Functions-using-CSI-_-ordered-by-the-final-character-lparen-s-rparen:CSI-Ps-c.1CA3
+/// and https://vt100.net/docs/vt510-rm/DA1.html
+/// Tested with:
+/// * foot
+/// * patched alactritty (positive)
+/// * unpatched alactritty (negative)
+/// * xterm -ti vt340
+/// * kitty (negative)
+/// * wezterm
 fn check_device_attrs() -> Result<BackendType> {
-    todo!();
-    // let mut term = Term::stdout();
-    //
-    // write!(&mut term, "\x1b[c")?;
-    // term.flush()?;
-    //
-    // let mut response = String::new();
-    //
-    // while let Ok(key) = term.read_key() {
-    // if let Key::Char(c) = key {
-    // response.push(c);
-    // if c == 'c' {
-    // break;
-    // }
-    // }
-    // }
-    //
-    // Ok(response.contains(";4;") || response.contains(";4c"))
+    let stdin = rustix::stdio::stdin();
+    let termios_original = rustix::termios::tcgetattr(stdin)?;
+    let mut termios = termios_original.clone();
+    // Disable canonical mode to read without waiting for Enter, disable echoing
+    termios.local_modes &= !LocalModes::ICANON;
+    termios.local_modes &= !LocalModes::ECHO;
+    rustix::termios::tcsetattr(stdin, OptionalActions::Drain, &termios)?;
+
+    rustix::io::write(rustix::stdio::stdout(), b"\x1b[c")?;
+
+    let mut buf = String::new();
+    loop {
+        let mut charbuf = [0; 1];
+        rustix::io::read(stdin, &mut charbuf)?;
+        if charbuf[0] == 0 {
+            continue;
+        }
+        buf.push(char::from(charbuf[0]));
+        if charbuf[0] == b'c' {
+            break;
+        }
+    }
+    // Reset to previous attrs
+    rustix::termios::tcsetattr(stdin, OptionalActions::Now, &termios_original)?;
+
+    if buf.contains(";4;") || buf.contains("?4;") || buf.contains(";4c") || buf.contains("?4c") {
+        Ok(BackendType::Sixel)
+    } else {
+        Err(format!(
+            "CSI sixel support not detected: ^[{}",
+            if buf.len() > 1 {
+                &buf[1..]
+            } else {
+                "(nothing)"
+            }
+        )
+        .into())
+    }
 }
 
 #[cfg(all(test, feature = "rustix", feature = "sixel"))]

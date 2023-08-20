@@ -16,7 +16,7 @@ struct App {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let font_size = (7, 16); // Or use Picker::from_ioctl, or let user provide it.
+    let font_size = (7, 16); // Or use Picker::from_termios, or let user provide it.
     let mut picker = Picker::new(
         font_size,
         BackendType::Sixel,
@@ -108,5 +108,13 @@ Latest Xterm testing screenshot:
 ![Testing screenshot](./assets/test_screenshot.png)
 
 Halfblocks should work in all terminals.
+
+### Comparison:
+
+* [viuer](https://crates.io/crates/viuer)
+  Renders graphics in different terminals/protocols, but "dumps" the image, making it difficult to
+  work for TUI programs.
+  The terminal protocol guessing code has been adapted to rustix, thus the author of viuer is
+  included in the copyright notice.
 
 License: MIT

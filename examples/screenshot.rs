@@ -7,11 +7,7 @@ use crossterm::{
     },
 };
 use image::Rgb;
-use ratatu_image::{
-    backend::FixedBackend,
-    picker::{BackendType, Picker},
-    FixedImage, Resize,
-};
+use ratatu_image::{backend::FixedBackend, picker::Picker, FixedImage, Resize};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::Rect,
@@ -27,7 +23,7 @@ const ASSERT_FONT_SIZE: (u16, u16) = (9, 18);
 const SCREEN_SIZE: (u16, u16) = (46, 12);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut picker = Picker::from_ioctl(BackendType::Sixel, Some(Rgb::<u8>([255, 0, 255])))?;
+    let mut picker = Picker::from_termios(Some(Rgb::<u8>([255, 0, 255])))?;
     assert_eq!(
         ASSERT_FONT_SIZE,
         picker.font_size(),

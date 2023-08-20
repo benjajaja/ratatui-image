@@ -16,7 +16,7 @@ exclude = [
 rust-version = "1.65.0"
 
 [features]
-default = ["crossterm", "sixel", "rustix"]
+default = []
 crossterm = ["dep:crossterm"]
 termion = ["dep:termion"]
 termwiz = ["dep:termwiz"]
@@ -43,6 +43,7 @@ path = "../ratatui"
 
 [[bin]]
 name = "ratatu-image"
+path = "src/bin/ratatu-image"
 required-features = ["crossterm", "sixel", "rustix"]
 
 [[example]]

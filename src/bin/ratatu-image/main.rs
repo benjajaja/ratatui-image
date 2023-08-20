@@ -10,11 +10,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use image::Rgb;
-use ratatu_image::{
-    backend::ResizeBackend,
-    picker::{BackendType, Picker},
-    ImageSource, Resize, ResizeImage,
-};
+use ratatu_image::{backend::ResizeBackend, picker::Picker, ImageSource, Resize, ResizeImage};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -36,8 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Usage: <program> [path/to/image]");
     let image = image::io::Reader::open(&filename)?.decode()?;
 
-    let mut picker = Picker::from_ioctl(BackendType::Halfblocks, Some(Rgb::<u8>([255, 0, 255])))?;
-    picker.guess();
+    let mut picker = Picker::from_termios(Some(Rgb::<u8>([255, 0, 255])))?;
 
     let image_source = ImageSource::new(image, picker.font_size());
     let image_state = picker.new_state();

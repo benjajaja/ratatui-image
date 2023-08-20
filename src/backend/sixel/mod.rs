@@ -8,9 +8,10 @@
 use image::{DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect};
 use sixel_bytes::{sixel_string, DiffusionMethod, PixelFormat, SixelError};
+use std::cmp::min;
 use std::io;
 
-use super::{render_area, FixedBackend};
+use super::FixedBackend;
 use crate::{ImageSource, Resize, Result};
 
 pub mod resizeable;
@@ -110,4 +111,20 @@ impl FixedBackend for FixedSixel {
             }
         }
     }
+}
+
+fn render_area(rect: Rect, area: Rect, overdraw: bool) -> Option<Rect> {
+    if overdraw {
+        return Some(Rect::new(
+            area.x,
+            area.y,
+            min(rect.width, area.width),
+            min(rect.height, area.height),
+        ));
+    }
+
+    if rect.width > area.width || rect.height > area.height {
+        return None;
+    }
+    Some(Rect::new(area.x, area.y, rect.width, rect.height))
 }

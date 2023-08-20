@@ -1,5 +1,4 @@
 //! Backends for the widgets
-use std::cmp::min;
 
 use dyn_clone::DynClone;
 use image::Rgb;
@@ -36,19 +35,3 @@ pub trait ResizeBackend: Send + Sync + DynClone {
 }
 
 dyn_clone::clone_trait_object!(ResizeBackend);
-
-fn render_area(rect: Rect, area: Rect, overdraw: bool) -> Option<Rect> {
-    if overdraw {
-        return Some(Rect::new(
-            area.x,
-            area.y,
-            min(rect.width, area.width),
-            min(rect.height, area.height),
-        ));
-    }
-
-    if rect.width > area.width || rect.height > area.height {
-        return None;
-    }
-    Some(Rect::new(area.x, area.y, rect.width, rect.height))
-}

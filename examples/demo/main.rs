@@ -74,12 +74,7 @@ impl<'a> App<'a> {
         let ada = "./assets/Ada.png";
         let dyn_img = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
-        #[cfg(feature = "sixel")]
-        let backend_type = BackendType::Sixel;
-        #[cfg(not(feature = "sixel"))]
-        let backend_type = BackendType::Kitty;
-        // XXX: replace with from_terminal
-        let mut picker = Picker::from_ioctl(backend_type, None).unwrap();
+        let mut picker = Picker::from_termios(None).unwrap();
 
         let image_static = picker
             .new_static_fit(dyn_img.clone(), size(), Resize::Fit)

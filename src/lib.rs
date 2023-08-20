@@ -15,7 +15,7 @@
 //! }
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let font_size = (7, 16); // Or use Picker::from_ioctl, or let user provide it.
+//!     let font_size = (7, 16); // Or use Picker::from_termios, or let user provide it.
 //!     let mut picker = Picker::new(
 //!         font_size,
 //! #        #[cfg(feature = "sixel")]
