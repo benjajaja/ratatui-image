@@ -43,7 +43,7 @@ path = "../ratatui"
 
 [[bin]]
 name = "ratatu-image"
-path = "src/bin/ratatu-image"
+path = "./src/bin/ratatu-image/main.rs" # cargo readme needs this for some reason
 required-features = ["crossterm", "sixel", "rustix"]
 
 [[example]]

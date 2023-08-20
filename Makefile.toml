@@ -1,17 +1,29 @@
 [env]
 # all features except the backend ones
 ALL_FEATURES = "sixel,rustix,serde"
+BACKEND = "crossterm"
+[env.termion]
+BACKEND = "termion"
+[env.termwiz]
+BACKEND = "termwiz"
 
 [tasks.default]
 alias = "ci"
 
+[tasks.ci-all]
+script = '''
+cargo make ci
+cargo make --profile termion ci
+cargo make --profile termwiz ci
+cargo make clippy-all
+cargo make check-all
+'''
+
 [tasks.ci]
 dependencies = [
   "fmt",
-  "clippy-all",
-  "clippy-backend",
+  "clippy",
   "check",
-  "check-all",
   "test",
 ]
 
@@ -19,12 +31,12 @@ dependencies = [
 command = "cargo"
 args = ["fmt", "--all", "--", "--check"]
 
-[tasks.clippy-backend]
+[tasks.clippy]
 command = "cargo"
 args = [
   "clippy",
   "--tests",
-  "--features=rustix,${@}",
+  "--features=rustix,${BACKEND}",
   "--",
   "-D",
   "warnings",
@@ -46,7 +58,7 @@ args = [
 command = "cargo"
 args = [
   "check",
-  "--features=rustix,${@}",
+  "--features=rustix,${BACKEND}",
 ]
 
 [tasks.check-all]
