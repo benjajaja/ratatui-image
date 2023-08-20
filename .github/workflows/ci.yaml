@@ -31,11 +31,7 @@ jobs:
         toolchain: stable
         profile: minimal
         override: true
-    - name: Install cargo-make
-      uses: actions-rs/cargo@v1
-      with:
-        command: install
-        args: cargo-make
+    - uses: davidB/rust-cargo-make@v1
     - name: CI ${{ matrix.backend }}
       uses: actions-rs/cargo@v1
       with:
@@ -53,11 +49,7 @@ jobs:
         toolchain: stable
         profile: minimal
         override: true
-    - name: Install cargo-make
-      uses: actions-rs/cargo@v1
-      with:
-        command: install
-        args: cargo-make
+    - uses: davidB/rust-cargo-make@v1
     - name: Make readme
       run: cargo make readme
     - name: Ensure no changes
