@@ -1,5 +1,17 @@
 name: CI
-on: [push, pull_request]
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  merge_group:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 env:
   CLICOLOR_FORCE: 1
 jobs:
@@ -24,8 +36,29 @@ jobs:
       with:
         command: install
         args: cargo-make
-    - name: Run CI
+    - name: CI ${{ matrix.backend }}
       uses: actions-rs/cargo@v1
       with:
         command: make
-        args: ci
+        args: --profile ${{ matrix.backend }} ci
+  ensure-readme:
+    name: Ensure readme is up-to-date
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Install rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+    - name: Install cargo-make
+      uses: actions-rs/cargo@v1
+      with:
+        command: install
+        args: cargo-make
+    - name: Make readme
+      run: cargo make readme
+    - name: Ensure no changes
+      run: git diff --exit-code .

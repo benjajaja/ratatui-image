@@ -15,8 +15,6 @@ script = '''
 cargo make ci
 cargo make --profile termion ci
 cargo make --profile termwiz ci
-cargo make clippy-all
-cargo make check-all
 '''
 
 [tasks.ci]
