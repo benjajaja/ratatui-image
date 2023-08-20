@@ -23,6 +23,8 @@ jobs:
       matrix:
         backend: [crossterm, termion, termwiz]
     steps:
+    - name: Install libsixel
+      run: sudo apt-get -y install libsixel-dev
     - name: Checkout
       uses: actions/checkout@v2
     - name: Install rust
