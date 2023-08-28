@@ -76,6 +76,16 @@ args = [
   "--features", "sixel,rustix,crossterm",
 ]
 
+[tasks.screenshot-run]
+command = "cargo"
+args = [
+  "run",
+  "--example",
+  "screenshot",
+  "--features", "sixel,rustix,crossterm",
+  "--", "--wait",
+]
+
 [tasks.demo-build]
 command = "cargo"
 args = [
@@ -153,3 +163,36 @@ script = '''
 cargo make screenshot-spawn-xterm -e "cargo run --example demo --features sixel,rustix,crossterm 2>$(tty)"
 '''
 
+[tasks.xvfb-screenshot]
+dependencies = ["screenshot-build"]
+run_task = [
+  {name = ["xvfb", "xvfb-xterm", "xvfb-xwd"], fork = true, parallel = true},
+]
+
+[tasks.xvfb]
+script = '''
+Xvfb :99 -screen 0 320x240x8 -terminate 1
+'''
+
+[tasks.xvfb-xterm]
+dependencies = ["screenshot-build"]
+env = { "DISPLAY" = ":99" }
+script = '''
+until xterm -e true; do
+  sleep 0.1
+done
+xterm -ti 340 -bg black -fg white -e "cargo make screenshot-run"
+'''
+
+[tasks.xvfb-xwd]
+env = { "DISPLAY" = ":99" }
+script = '''
+until stat ./target/SCREENSHOT_PID 1>/dev/null 2>&1; do
+  sleep 0.1
+done
+PID=$(cat ./target/SCREENSHOT_PID)
+if [ "$PID" == "" ]; then exit 1; fi
+xwd -root -silent | convert xwd:- png:./target/xwd.png
+rm ./target/SCREENSHOT_PID
+kill $PID
+'''

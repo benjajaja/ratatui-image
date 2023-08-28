@@ -1,10 +1,8 @@
-use std::{assert_eq, io};
+use std::{env, io};
 
 use crossterm::{
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetSize,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use image::Rgb;
 use ratatui::{
@@ -19,16 +17,16 @@ struct App {
     image: Box<dyn Protocol>,
 }
 
-const ASSERT_FONT_SIZE: (u16, u16) = (9, 18);
+// const ASSERT_FONT_SIZE: (u16, u16) = (9, 18);
 const SCREEN_SIZE: (u16, u16) = (46, 12);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut picker = Picker::from_termios(Some(Rgb::<u8>([255, 0, 255])))?;
-    assert_eq!(
-        ASSERT_FONT_SIZE,
-        picker.font_size(),
-        "Font size must be fixed to a specific size",
-    );
+    // assert_eq!(
+    // ASSERT_FONT_SIZE,
+    // picker.font_size(),
+    // "Font size must be fixed to a specific size",
+    // );
     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
     let image = picker.new_static_fit(
         dyn_img,
@@ -43,13 +41,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     execute!(
         stdout,
         EnterAlternateScreen,
-        SetSize(SCREEN_SIZE.0, SCREEN_SIZE.1)
+        // SetSize(SCREEN_SIZE.0, SCREEN_SIZE.1)
     )?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
     terminal.draw(|f| ui(f, &mut app))?;
-    std::thread::sleep(std::time::Duration::from_secs(3));
+
+    if env::args().nth(1) == Some("--wait".to_string()) {
+        let pid = std::process::id();
+        std::fs::write("./target/SCREENSHOT_PID", format!("{pid}"))?;
+
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    } else {
+        std::thread::sleep(std::time::Duration::from_secs(3));
+    }
 
     // restore terminal
     disable_raw_mode()?;
