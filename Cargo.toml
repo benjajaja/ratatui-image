@@ -17,9 +17,9 @@ rust-version = "1.65.0"
 
 [features]
 default = []
-crossterm = ["dep:crossterm"]
-termion = ["dep:termion"]
-termwiz = ["dep:termwiz"]
+crossterm = ["dep:crossterm", "ratatui/crossterm"]
+termion = ["dep:termion", "ratatui/termion"]
+termwiz = ["dep:termwiz", "ratatui/termwiz"]
 sixel = ["dep:sixel-bytes"]
 serde = ["dep:serde"]
 rustix = ["dep:rustix"]
@@ -37,11 +37,8 @@ base64 = { version = "^0.21.2" }
 rand = { version = "0.8.5" }
 
 [dependencies.ratatui]
-# version = "0.22.0"
-features = ["crossterm", "termion", "termwiz" ]
-# path = "../ratatui"
-git = "https://github.com/benjajaja/ratatui"
-rev = "26fec19e92bcc45eda85cb2b4bc27d4a23833c02"
+version = "0.23.0"
+features = []
 
 [[bin]]
 name = "ratatu-image"
