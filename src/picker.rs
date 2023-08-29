@@ -102,7 +102,10 @@ impl Picker {
         })
     }
 
-    /// Query the terminal window size with I/O for font size.
+    /// Query the terminal window size with I/O for font size and graphics capabilities.
+    ///
+    /// This writes and reads from stdin momentarily. Best be called *before* initializing the
+    /// terminal backend, to be safe.
     #[cfg(feature = "rustix")]
     pub fn from_termios(background_color: Option<Rgb<u8>>) -> Result<Picker> {
         let stdout = rustix::stdio::stdout();

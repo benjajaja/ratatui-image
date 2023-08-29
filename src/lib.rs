@@ -2,6 +2,8 @@
 //!
 //! **⚠️ THIS CRATE IS EXPERIMENTAL**
 //!
+//! **⚠️ THE `TERMWIZ` RATATUI BACKEND IS BROKEN**
+//!
 //! Render images with graphics protocols in the terminal with [Ratatui].
 //!
 //! ```rust
@@ -15,8 +17,8 @@
 //! }
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let font_size = (7, 16); // Or use Picker::from_termios, or let user provide it.
-//!     let mut picker = Picker::new(
+//!     let font_size = (7, 16);
+//!     let mut picker = Picker::new( // Or use Picker::from_termios, or let user provide it.
 //!         font_size,
 //! #        #[cfg(feature = "sixel")]
 //!         BackendType::Sixel,

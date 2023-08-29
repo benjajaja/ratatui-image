@@ -23,6 +23,7 @@ dependencies = [
   "clippy",
   "check",
   "test",
+  "readme",
 ]
 
 [tasks.fmt]
