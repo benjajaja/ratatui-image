@@ -10,7 +10,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use image::Rgb;
-use ratatu_image::{backend::ResizeBackend, picker::Picker, ImageSource, Resize, ResizeImage};
+use ratatu_image::{picker::Picker, protocol::ResizeProtocol, ImageSource, Resize, ResizeImage};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -23,7 +23,7 @@ struct App {
     pub filename: String,
     pub picker: Picker,
     pub image_source: ImageSource,
-    pub image_state: Box<dyn ResizeBackend>,
+    pub image_state: Box<dyn ResizeProtocol>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -34,8 +34,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut picker = Picker::from_termios(Some(Rgb::<u8>([255, 0, 255])))?;
 
-    let image_source = ImageSource::new(image, picker.font_size());
-    let image_state = picker.new_state();
+    let image_source = ImageSource::new(image.clone(), picker.font_size());
+    let image_state = picker.new_state(image);
 
     let mut app = App {
         filename,
@@ -66,7 +66,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             'q' => break,
                             ' ' => {
                                 app.picker.cycle_backends();
-                                app.image_state = app.picker.new_state();
+                                app.image_state =
+                                    app.picker.new_state(app.image_source.image.clone());
                             }
                             _ => {}
                         },
@@ -116,7 +117,7 @@ fn ui(f: &mut Frame<CrosstermBackend<Stdout>>, app: &mut App) {
     f.render_widget(block_top, chunks[0]);
 
     let block_bottom = Block::default().borders(Borders::ALL).title("image");
-    let image = ResizeImage::new(&app.image_source, None).resize(Resize::Fit);
+    let image = ResizeImage::new(None).resize(Resize::Fit);
     f.render_stateful_widget(image, block_bottom.inner(chunks[1]), &mut app.image_state);
     f.render_widget(block_bottom, chunks[1]);
 }

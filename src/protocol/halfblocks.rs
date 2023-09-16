@@ -4,10 +4,8 @@
 use image::{imageops::FilterType, DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
-use super::FixedBackend;
+use super::{Protocol, ResizeProtocol};
 use crate::{ImageSource, Resize, Result};
-
-pub mod resizeable;
 
 // Fixed Halfblocks backend
 #[derive(Clone, Default)]
@@ -73,10 +71,7 @@ fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
     data
 }
 
-impl FixedBackend for FixedHalfblocks {
-    fn rect(&self) -> Rect {
-        self.rect
-    }
+impl Protocol for FixedHalfblocks {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         for (i, hb) in self.data.iter().enumerate() {
             let x = i as u16 % self.rect.width;
@@ -90,5 +85,54 @@ impl FixedBackend for FixedHalfblocks {
                 .set_bg(hb.lower)
                 .set_char('▀');
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct HalfblocksState {
+    source: ImageSource,
+    current: FixedHalfblocks,
+    hash: u64,
+}
+
+impl HalfblocksState {
+    pub fn new(source: ImageSource) -> HalfblocksState {
+        HalfblocksState {
+            source,
+            current: FixedHalfblocks::default(),
+            hash: u64::default(),
+        }
+    }
+}
+
+impl ResizeProtocol for HalfblocksState {
+    fn rect(&self) -> Rect {
+        self.current.rect
+    }
+    fn render(
+        &mut self,
+        resize: &Resize,
+        background_color: Option<Rgb<u8>>,
+        area: Rect,
+        buf: &mut Buffer,
+    ) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
+        let force = self.source.hash != self.hash;
+        if let Some((img, rect)) = resize.resize(
+            &self.source,
+            self.current.rect,
+            area,
+            background_color,
+            force,
+        ) {
+            let data = encode(&img, rect);
+            let current = FixedHalfblocks { data, rect };
+            self.current = current;
+            self.hash = self.source.hash;
+        }
+        FixedHalfblocks::render(&self.current, area, buf);
     }
 }

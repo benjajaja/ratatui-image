@@ -2,32 +2,29 @@
 //!
 //! **⚠️ THIS CRATE IS EXPERIMENTAL**
 //!
-//! **⚠️ THE `TERMWIZ` RATATUI BACKEND IS BROKEN**
+//! **⚠️ THE `TERMWIZ` RATATUI BACKEND IS BROKEN WITH THIS CRATE**
 //!
 //! Render images with graphics protocols in the terminal with [Ratatui].
 //!
+//! # Quick start
 //! ```rust
-//! # use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame, layout::Rect};
-//! # use ratatu_image::{
-//! #   picker::{Picker, BackendType},
-//! #   Resize, FixedImage, backend::FixedBackend,
-//! # };
+//! use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame, layout::Rect};
+//! use ratatu_image::{
+//!   picker::{Picker, BackendType},
+//!   ImageSource, Resize, ResizeImage, protocol::ResizeProtocol,
+//! };
+//!
 //! struct App {
-//!     image: Box<dyn FixedBackend>,
+//!     // We need to hold the render state.
+//!     image: Box<dyn ResizeProtocol>,
 //! }
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let font_size = (7, 16);
-//!     let mut picker = Picker::new( // Or use Picker::from_termios, or let user provide it.
-//!         font_size,
-//! #        #[cfg(feature = "sixel")]
-//!         BackendType::Sixel,
-//! #        #[cfg(not(feature = "sixel"))]
-//! #        BackendType::Halfblocks,
-//!         None,
-//!     )?;
+//!     // It is highly recommended to use Picker::from_termios() instead!
+//!     let mut picker = Picker::new((7, 16), BackendType::Sixel, None)?;
+//!
 //!     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
-//!     let image = picker.new_static_fit(dyn_img, Rect::new(0, 0, 30, 20), Resize::Fit)?;
+//!     let image = picker.new_state(dyn_img);
 //!     let mut app = App { image };
 //!
 //!     let backend = TestBackend::new(80, 30);
@@ -40,47 +37,10 @@
 //! }
 //!
 //! fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-//!     let image = FixedImage::new(app.image.as_ref());
-//!     f.render_widget(image, f.size());
+//!     let image = ResizeImage::new(None);
+//!     f.render_stateful_widget(image, f.size(), &mut app.image);
 //! }
 //! ```
-//!
-//! # TUIs
-//! TUI application revolve around columns and rows of text naturally without the need of any
-//! notions of pixel sizes. [Ratatui] is based on "immediate rendering with intermediate buffers".
-//!
-//! At each frame, widgets are constructed and rendered into some character buffer, and any changes
-//! from respect to the last frame are then diffed and written to the terminal screen.
-//!
-//! # Terminal graphic protocols
-//! Some protocols allow to output image data to terminals that support it.
-//!
-//! The [Sixel] protocol mechanism is, in a nutshell, just printing an escape sequence.
-//! The image will be "dumped" at the cursor position, and the implementation may add enough
-//! carriage returns to scroll the output.
-//!
-//! # Problem
-//! Simply "dumping" an image into a [Ratatui] buffer is not enough. At best, the buffer diff might
-//! not overwrite any characters that are covered by the image in some instances, but the diff
-//! might change at any time due to screen/area resizing or simply other widget's contents
-//! changing. Then the graphics would inmediately get overwritten by the underlying character data.
-//!
-//! # Solution
-//! First it is necessary to suppress the covered character cells' rendering, which is addressed in
-//! a [Ratatui PR for cell skipping].
-//!
-//! Second it is then necessary to get the image's size in columns and rows, which is done by
-//! querying the terminal for it's pixel size and dividing by columns/rows to get the font size in
-//! pixels. Currently this is implemented with `rustix::termios`, but this is subject to change for
-//! a [Ratatui PR for getting window size].
-//!
-//! # Implementation
-//!
-//! The images are always resized so that they fit their nearest rectangle in columns/rows.
-//! This is so that the image shall be drawn in the same "render pass" as all surrounding text, and
-//! cells under the area of the image skip the draw on the ratatui buffer level, so there is no way
-//! to "clear" previous drawn text. This would leave artifacts around the image's right and bottom
-//! borders.
 //!
 //! # Example
 //!
@@ -97,19 +57,19 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use backend::{FixedBackend, ResizeBackend};
 use image::{
     imageops::{self, FilterType},
     DynamicImage, ImageBuffer, Rgb,
 };
+use protocol::{Protocol, ResizeProtocol};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
     widgets::{StatefulWidget, Widget},
 };
 
-pub mod backend;
 pub mod picker;
+pub mod protocol;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -117,10 +77,10 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 pub type FontSize = (u16, u16);
 
 #[derive(Clone)]
-/// Image source for [crate::backend::ResizeBackend]s
+/// Image source for [crate::protocol::ResizeProtocol]s
 ///
-/// A `[ResizeBackend]` needs to resize the ImageSource to its state when the available area
-/// changes. A `[FixedBackend]` only needs it once.
+/// A `[ResizeProtocol]` needs to resize the ImageSource to its state when the available area
+/// changes. A `[Protocol]` only needs it once.
 ///
 /// # Examples
 /// ```text
@@ -171,16 +131,16 @@ impl ImageSource {
     }
 }
 
-/// Fixed size image widget that uses [FixedBackend].
+/// Fixed size image widget that uses [Protocol].
 ///
 /// The widget does *not* react to area resizes, and is not even guaranteed to **not** overdraw.
-/// Its advantage is that the [FixedBackend] it uses needs only one initial resize.
+/// Its advantage is that the [Protocol] it uses needs only one initial resize.
 ///
 /// ```rust
 /// # use ratatui::{backend::Backend, terminal::Frame};
-/// # use ratatu_image::{Resize, FixedImage, backend::FixedBackend};
+/// # use ratatu_image::{Resize, FixedImage, protocol::Protocol};
 /// struct App {
-///     image_static: Box<dyn FixedBackend>,
+///     image_static: Box<dyn Protocol>,
 /// }
 /// fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 ///     let image = FixedImage::new(app.image_static.as_ref());
@@ -188,11 +148,11 @@ impl ImageSource {
 /// }
 /// ```
 pub struct FixedImage<'a> {
-    image: &'a dyn FixedBackend,
+    image: &'a dyn Protocol,
 }
 
 impl<'a> FixedImage<'a> {
-    pub fn new(image: &'a dyn FixedBackend) -> FixedImage<'a> {
+    pub fn new(image: &'a dyn Protocol) -> FixedImage<'a> {
         FixedImage { image }
     }
 }
@@ -207,19 +167,19 @@ impl<'a> Widget for FixedImage<'a> {
     }
 }
 
-/// Resizeable image widget that uses an [ImageSource] and [ResizeBackend] state.
+/// Resizeable image widget that uses an [ImageSource] and [ResizeProtocol] state.
 ///
 /// This stateful widget reacts to area resizes and resizes its image data accordingly.
 ///
 /// ```rust
 /// # use ratatui::{backend::Backend, terminal::Frame};
-/// # use ratatu_image::{ImageSource, Resize, ResizeImage, backend::ResizeBackend};
+/// # use ratatu_image::{ImageSource, Resize, ResizeImage, protocol::ResizeProtocol};
 /// struct App {
 ///     image_source: ImageSource,
-///     image_state: Box<dyn ResizeBackend>,
+///     image_state: Box<dyn ResizeProtocol>,
 /// }
 /// fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-///     let image = ResizeImage::new(&app.image_source, None).resize(Resize::Crop);
+///     let image = ResizeImage::new(None).resize(Resize::Crop);
 ///     f.render_stateful_widget(
 ///         image,
 ///         f.size(),
@@ -227,30 +187,28 @@ impl<'a> Widget for FixedImage<'a> {
 ///     );
 /// }
 /// ```
-pub struct ResizeImage<'a> {
-    image: &'a ImageSource,
+pub struct ResizeImage {
     resize: Resize,
     background_color: Option<Rgb<u8>>,
 }
 
-impl<'a> ResizeImage<'a> {
-    pub fn new(image: &'a ImageSource, background_color: Option<Rgb<u8>>) -> ResizeImage<'a> {
+impl ResizeImage {
+    pub fn new(background_color: Option<Rgb<u8>>) -> ResizeImage {
         ResizeImage {
-            image,
             resize: Resize::Fit,
             background_color,
         }
     }
-    pub fn resize(mut self, resize: Resize) -> ResizeImage<'a> {
+    pub fn resize(mut self, resize: Resize) -> ResizeImage {
         self.resize = resize;
         self
     }
 }
 
-impl<'a> StatefulWidget for ResizeImage<'a> {
-    type State = Box<dyn ResizeBackend>;
+impl StatefulWidget for ResizeImage {
+    type State = Box<dyn ResizeProtocol>;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        state.render(self.image, &self.resize, self.background_color, area, buf)
+        state.render(&self.resize, self.background_color, area, buf)
     }
 }
 

@@ -4,8 +4,6 @@ use dyn_clone::DynClone;
 use image::Rgb;
 use ratatui::{buffer::Buffer, layout::Rect};
 
-use crate::ImageSource;
-
 use super::Resize;
 
 pub mod halfblocks;
@@ -13,18 +11,16 @@ pub mod kitty;
 #[cfg(feature = "sixel")]
 pub mod sixel;
 
-/// A fixed image backend for the [crate::FixedImage] widget.
-pub trait FixedBackend: Send + Sync {
-    fn rect(&self) -> Rect;
+/// A fixed image protocol for the [crate::FixedImage] widget.
+pub trait Protocol: Send + Sync {
     fn render(&self, area: Rect, buf: &mut Buffer);
 }
 
-/// A resizing image backend for the [crate::ResizeImage] widget.
-pub trait ResizeBackend: Send + Sync + DynClone {
+/// A resizing image protocol for the [crate::ResizeImage] widget.
+pub trait ResizeProtocol: Send + Sync + DynClone {
     fn rect(&self) -> Rect;
     fn render(
         &mut self,
-        source: &ImageSource,
         resize: &Resize,
         background_color: Option<Rgb<u8>>,
         area: Rect,
@@ -34,4 +30,4 @@ pub trait ResizeBackend: Send + Sync + DynClone {
     fn reset(&mut self) {}
 }
 
-dyn_clone::clone_trait_object!(ResizeBackend);
+dyn_clone::clone_trait_object!(ResizeProtocol);

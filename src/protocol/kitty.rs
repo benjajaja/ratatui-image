@@ -7,7 +7,7 @@ use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::{ImageSource, Resize, Result};
 
-use super::{FixedBackend, ResizeBackend};
+use super::{Protocol, ResizeProtocol};
 
 // Fixed Kitty backend (WARNING: transmits image data on every render!)
 #[derive(Clone, Default)]
@@ -43,18 +43,16 @@ impl FixedKitty {
     }
 }
 
-impl FixedBackend for FixedKitty {
-    fn rect(&self) -> Rect {
-        self.rect
-    }
+impl Protocol for FixedKitty {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let mut seq = Some(self.transmit_data.clone());
         render(area, self.rect, buf, self.unique_id, &mut seq);
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct KittyState {
+    source: ImageSource,
     pub unique_id: u8,
     rect: Rect,
     hash: u64,
@@ -69,21 +67,23 @@ enum KittyProtoState {
 }
 
 impl KittyState {
-    pub fn new(id: u8) -> KittyState {
+    pub fn new(source: ImageSource, id: u8) -> KittyState {
         KittyState {
+            source,
             unique_id: id,
-            ..Default::default()
+            rect: Rect::default(),
+            hash: u64::default(),
+            proto_state: KittyProtoState::default(),
         }
     }
 }
 
-impl ResizeBackend for KittyState {
+impl ResizeProtocol for KittyState {
     fn rect(&self) -> Rect {
         self.rect
     }
     fn render(
         &mut self,
-        source: &ImageSource,
         resize: &Resize,
         background_color: Option<Rgb<u8>>,
         area: Rect,
@@ -93,10 +93,12 @@ impl ResizeBackend for KittyState {
             return;
         }
 
-        let force = source.hash != self.hash;
-        if let Some((img, rect)) = resize.resize(source, self.rect, area, background_color, force) {
+        let force = self.source.hash != self.hash;
+        if let Some((img, rect)) =
+            resize.resize(&self.source, self.rect, area, background_color, force)
+        {
             let data = transmit_virtual(&img, self.unique_id);
-            self.hash = source.hash;
+            self.hash = self.source.hash;
             self.rect = rect;
             self.proto_state = KittyProtoState::TransmitAndPlace(data);
         }
