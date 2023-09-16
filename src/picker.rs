@@ -10,13 +10,13 @@ use rustix::termios::{LocalModes, OptionalActions};
 use serde::Deserialize;
 
 #[cfg(feature = "sixel")]
-use crate::backend::sixel::{resizeable::SixelState, FixedSixel};
+use crate::protocol::sixel::{FixedSixel, SixelState};
 
 use crate::{
-    backend::{
-        halfblocks::{resizeable::HalfblocksState, FixedHalfblocks},
+    protocol::{
+        halfblocks::{FixedHalfblocks, HalfblocksState},
         kitty::{FixedKitty, KittyState},
-        FixedBackend, ResizeBackend,
+        Protocol, ResizeProtocol,
     },
     FontSize, ImageSource, Resize, Result,
 };
@@ -82,12 +82,12 @@ impl Picker {
     ///
     /// // For FixedImage:
     /// let image_static = picker.new_static_fit(
-    ///     dyn_img,
+    ///     dyn_img.clone(),
     ///     Rect::new(0, 0, 15, 5),
     ///     Resize::Fit,
     /// ).unwrap();
     /// // For ResizeImage:
-    /// let image_fit_state = picker.new_state();
+    /// let image_fit_state = picker.new_state(dyn_img);
     /// ```
     pub fn new(
         font_size: FontSize,
@@ -130,7 +130,7 @@ impl Picker {
         image: DynamicImage,
         size: Rect,
         resize: Resize,
-    ) -> Result<Box<dyn FixedBackend>> {
+    ) -> Result<Box<dyn Protocol>> {
         let source = ImageSource::new(image, self.font_size);
         match self.backend_type {
             BackendType::Halfblocks => Ok(Box::new(FixedHalfblocks::from_source(
@@ -160,14 +160,15 @@ impl Picker {
     }
 
     /// Returns a new *state* backend for [`crate::ResizeImage`].
-    pub fn new_state(&mut self) -> Box<dyn ResizeBackend> {
+    pub fn new_state(&mut self, image: DynamicImage) -> Box<dyn ResizeProtocol> {
+        let source = ImageSource::new(image, self.font_size);
         match self.backend_type {
-            BackendType::Halfblocks => Box::<HalfblocksState>::default(),
+            BackendType::Halfblocks => Box::new(HalfblocksState::new(source)),
             #[cfg(feature = "sixel")]
-            BackendType::Sixel => Box::<SixelState>::default(),
+            BackendType::Sixel => Box::new(SixelState::new(source)),
             BackendType::Kitty => {
                 self.kitty_counter += 1;
-                Box::new(KittyState::new(self.kitty_counter))
+                Box::new(KittyState::new(source, self.kitty_counter))
             }
         }
     }

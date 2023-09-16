@@ -17,8 +17,8 @@ mod termwiz;
 use std::{error::Error, path::PathBuf, time::Duration};
 
 use ratatu_image::{
-    backend::{FixedBackend, ResizeBackend},
     picker::{BackendType, Picker},
+    protocol::{Protocol, ResizeProtocol},
     FixedImage, ImageSource, Resize, ResizeImage,
 };
 use ratatui::{
@@ -60,9 +60,9 @@ struct App<'a> {
 
     pub picker: Picker,
     pub image_source: ImageSource,
-    pub image_static: Box<dyn FixedBackend>,
-    pub image_fit_state: Box<dyn ResizeBackend>,
-    pub image_crop_state: Box<dyn ResizeBackend>,
+    pub image_static: Box<dyn Protocol>,
+    pub image_fit_state: Box<dyn ResizeProtocol>,
+    pub image_crop_state: Box<dyn ResizeProtocol>,
 }
 
 fn size() -> Rect {
@@ -80,9 +80,9 @@ impl<'a> App<'a> {
             .new_static_fit(dyn_img.clone(), size(), Resize::Fit)
             .unwrap();
 
-        let image_source = ImageSource::new(dyn_img, picker.font_size());
-        let image_fit_state = picker.new_state();
-        let image_crop_state = picker.new_state();
+        let image_source = ImageSource::new(dyn_img.clone(), picker.font_size());
+        let image_fit_state = picker.new_state(dyn_img.clone());
+        let image_crop_state = picker.new_state(dyn_img);
 
         let mut background = String::new();
 
@@ -241,7 +241,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.show_images {
         ShowImages::Fixed => {}
         _ => {
-            let image = ResizeImage::new(&app.image_source, None).resize(Resize::Crop);
+            let image = ResizeImage::new(None).resize(Resize::Crop);
             f.render_stateful_widget(
                 image,
                 block_left_bottom.inner(chunks_left_bottom[0]),
@@ -269,7 +269,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.show_images {
         ShowImages::Fixed => {}
         _ => {
-            let image = ResizeImage::new(&app.image_source, None).resize(Resize::Fit);
+            let image = ResizeImage::new(None).resize(Resize::Fit);
             f.render_stateful_widget(
                 image,
                 block_right_top.inner(right_chunks[0]),

@@ -7,7 +7,7 @@ use crossterm::{
     },
 };
 use image::Rgb;
-use ratatu_image::{backend::FixedBackend, picker::Picker, FixedImage, Resize};
+use ratatu_image::{picker::Picker, protocol::Protocol, FixedImage, Resize};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::Rect,
@@ -16,7 +16,7 @@ use ratatui::{
     Terminal,
 };
 struct App {
-    image: Box<dyn FixedBackend>,
+    image: Box<dyn Protocol>,
 }
 
 const ASSERT_FONT_SIZE: (u16, u16) = (9, 18);
