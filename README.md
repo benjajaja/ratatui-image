@@ -1,7 +1,7 @@
 # ratatui-image
 
 [![GitHub CI
-Status](https://img.shields.io/github/actions/workflow/status/benjajaja/ratatu-image/ci.yaml?style=flat-square&logo=github)](https://github.com/benjajaja/ratatu-image/actions?query=workflow%3A)
+Status](https://img.shields.io/github/actions/workflow/status/benjajaja/ratatui-image/ci.yaml?style=flat-square&logo=github)](https://github.com/benjajaja/ratatui-image/actions?query=workflow%3A)
 
 ### Showcase:
 
@@ -54,6 +54,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 ## Examples
 
 See the [crate::picker::Picker] helper and [`examples/demo`](./examples/demo/main.rs).
+The lib also includes a binary that renders an image file.
 
 [Ratatui]: https://github.com/ratatui-org/ratatui
 [Sixel]: https://en.wikipedia.org/wiki/Sixel

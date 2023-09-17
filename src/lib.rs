@@ -45,6 +45,7 @@
 //! # Examples
 //!
 //! See the [crate::picker::Picker] helper and [`examples/demo`](./examples/demo/main.rs).
+//! The lib also includes a binary that renders an image file.
 //!
 //! [Ratatui]: https://github.com/ratatui-org/ratatui
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel

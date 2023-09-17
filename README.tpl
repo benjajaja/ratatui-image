@@ -1,7 +1,7 @@
 # {{crate}}
 
 [![GitHub CI
-Status](https://img.shields.io/github/actions/workflow/status/benjajaja/ratatu-image/ci.yaml?style=flat-square&logo=github)](https://github.com/benjajaja/ratatu-image/actions?query=workflow%3A)
+Status](https://img.shields.io/github/actions/workflow/status/benjajaja/ratatui-image/ci.yaml?style=flat-square&logo=github)](https://github.com/benjajaja/ratatui-image/actions?query=workflow%3A)
 
 ### Showcase:
 

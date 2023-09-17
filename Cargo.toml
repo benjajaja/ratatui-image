@@ -41,8 +41,8 @@ version = "0.23.0"
 features = []
 
 [[bin]]
-name = "ratatu-image"
-path = "./src/bin/ratatu-image/main.rs" # cargo readme needs this for some reason
+name = "ratatui-image"
+path = "./src/bin/ratatui-image/main.rs" # cargo readme needs this for some reason
 required-features = ["crossterm", "sixel", "rustix"]
 
 [[example]]

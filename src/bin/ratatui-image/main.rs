@@ -95,7 +95,9 @@ fn ui(f: &mut Frame<CrosstermBackend<Stdout>>, app: &mut App) {
         .constraints([Constraint::Min(6), Constraint::Min(1)].as_ref())
         .split(f.size());
 
-    let block_top = Block::default().borders(Borders::ALL).title("ratatu-image");
+    let block_top = Block::default()
+        .borders(Borders::ALL)
+        .title("ratatui-image");
     let dyn_img = &app.image_source.image;
     let lines = vec![
         Line::from(format!(
