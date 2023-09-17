@@ -18,7 +18,7 @@ Terminal   | Fixed | Resize | Notes
 Xterm      | ✔️     | ✔️      |
 Foot       | ✔️     | ✔️      |
 kitty      | ✔️     | ✔️      |
-Alacritty  | ✔️     | ❌     | [with sixel patch](https://github.com/microo8/alacritty-sixel), never clears graphics.
+Alacritty  | ✔️     | ❌     | [with sixel patch](https://github.com/microo8/alacritty-sixel), but never clears graphics.
 iTerm2     | ❌    | ❌     | Unimplemented, has a protocolo [similar to sixel](https://iterm2.com/documentation-images.html)
 konsole    | ❌    | ❌     | Does not clear graphics unless cells have a background style
 Contour    | ❌    | ❌     | Text over graphics
@@ -38,6 +38,9 @@ Halfblocks should work in all terminals.
   work for TUI programs.
   The terminal protocol guessing code has been adapted to rustix, thus the author of viuer is
   included in the copyright notice.
+* [yazi](https://github.com/sxyazi/yazi)
+  Not a library but a terminal file manager that implementes many graphics protocols and lets you
+  preview images in the filesystem.
 
 License: {{license}}
 

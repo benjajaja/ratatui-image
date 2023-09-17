@@ -42,7 +42,7 @@
 //! }
 //! ```
 //!
-//! # Example
+//! # Examples
 //!
 //! See the [crate::picker::Picker] helper and [`examples/demo`](./examples/demo/main.rs).
 //!
