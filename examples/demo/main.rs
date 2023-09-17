@@ -16,11 +16,6 @@ mod termwiz;
 
 use std::{error::Error, path::PathBuf, time::Duration};
 
-use ratatu_image::{
-    picker::{BackendType, Picker},
-    protocol::{Protocol, ResizeProtocol},
-    FixedImage, ImageSource, Resize, ResizeImage,
-};
 use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -28,6 +23,11 @@ use ratatui::{
     text::Line,
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
+};
+use ratatui_image::{
+    picker::{BackendType, Picker},
+    protocol::{Protocol, ResizeProtocol},
+    FixedImage, ImageSource, Resize, ResizeImage,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {

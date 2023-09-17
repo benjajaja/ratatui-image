@@ -9,7 +9,7 @@
 //! # Quick start
 //! ```rust
 //! use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame, layout::Rect};
-//! use ratatu_image::{
+//! use ratatui_image::{
 //!   picker::{Picker, BackendType},
 //!   ImageSource, Resize, ResizeImage, protocol::ResizeProtocol,
 //! };
@@ -85,7 +85,7 @@ pub type FontSize = (u16, u16);
 /// # Examples
 /// ```text
 /// use image::{DynamicImage, ImageBuffer, Rgb};
-/// use ratatu_image::ImageSource;
+/// use ratatui_image::ImageSource;
 ///
 /// let image: ImageBuffer::from_pixel(300, 200, Rgb::<u8>([255, 0, 0])).into();
 /// let source = ImageSource::new(image, "filename.png", (7, 14));
@@ -138,7 +138,7 @@ impl ImageSource {
 ///
 /// ```rust
 /// # use ratatui::{backend::Backend, terminal::Frame};
-/// # use ratatu_image::{Resize, FixedImage, protocol::Protocol};
+/// # use ratatui_image::{Resize, FixedImage, protocol::Protocol};
 /// struct App {
 ///     image_static: Box<dyn Protocol>,
 /// }
@@ -173,7 +173,7 @@ impl<'a> Widget for FixedImage<'a> {
 ///
 /// ```rust
 /// # use ratatui::{backend::Backend, terminal::Frame};
-/// # use ratatu_image::{ImageSource, Resize, ResizeImage, protocol::ResizeProtocol};
+/// # use ratatui_image::{ImageSource, Resize, ResizeImage, protocol::ResizeProtocol};
 /// struct App {
 ///     image_source: ImageSource,
 ///     image_state: Box<dyn ResizeProtocol>,

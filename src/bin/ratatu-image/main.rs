@@ -10,7 +10,6 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use image::Rgb;
-use ratatu_image::{picker::Picker, protocol::ResizeProtocol, ImageSource, Resize, ResizeImage};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -18,6 +17,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
+use ratatui_image::{picker::Picker, protocol::ResizeProtocol, ImageSource, Resize, ResizeImage};
 
 struct App {
     pub filename: String,

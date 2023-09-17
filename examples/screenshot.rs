@@ -7,7 +7,6 @@ use crossterm::{
     },
 };
 use image::Rgb;
-use ratatu_image::{picker::Picker, protocol::Protocol, FixedImage, Resize};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::Rect,
@@ -15,6 +14,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Terminal,
 };
+use ratatui_image::{picker::Picker, protocol::Protocol, FixedImage, Resize};
 struct App {
     image: Box<dyn Protocol>,
 }

@@ -973,23 +973,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ratatu-image"
-version = "0.1.1"
-dependencies = [
- "base64",
- "crossterm 0.25.0",
- "dyn-clone",
- "image",
- "rand",
- "ratatui",
- "rustix",
- "serde",
- "sixel-bytes",
- "termion",
- "termwiz",
-]
-
-[[package]]
 name = "ratatui"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1006,6 +989,23 @@ dependencies = [
  "termwiz",
  "unicode-segmentation",
  "unicode-width",
+]
+
+[[package]]
+name = "ratatui-image"
+version = "0.2.0"
+dependencies = [
+ "base64",
+ "crossterm 0.25.0",
+ "dyn-clone",
+ "image",
+ "rand",
+ "ratatui",
+ "rustix",
+ "serde",
+ "sixel-bytes",
+ "termion",
+ "termwiz",
 ]
 
 [[package]]

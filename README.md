@@ -1,4 +1,4 @@
-# ratatu-image
+# ratatui-image
 
 [![GitHub CI
 Status](https://img.shields.io/github/actions/workflow/status/benjajaja/ratatu-image/ci.yaml?style=flat-square&logo=github)](https://github.com/benjajaja/ratatu-image/actions?query=workflow%3A)
@@ -18,7 +18,7 @@ Render images with graphics protocols in the terminal with [Ratatui].
 ## Quick start
 ```rust
 use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame, layout::Rect};
-use ratatu_image::{
+use ratatui_image::{
   picker::{Picker, BackendType},
   ImageSource, Resize, ResizeImage, protocol::ResizeProtocol,
 };
@@ -60,7 +60,7 @@ See the [crate::picker::Picker] helper and [`examples/demo`](./examples/demo/mai
 [Ratatui PR for cell skipping]: https://github.com/ratatui-org/ratatui/pull/215
 [Ratatui PR for getting window size]: https://github.com/ratatui-org/ratatui/pull/276
 
-Current version: 0.1.1
+Current version: 0.2.0
 
 Sixel compatibility and QA:
 
