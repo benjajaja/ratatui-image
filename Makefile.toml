@@ -1,6 +1,4 @@
 [env]
-# all features except the backend ones
-ALL_FEATURES = "sixel,rustix,serde"
 BACKEND = "crossterm"
 [env.termion]
 BACKEND = "termion"
@@ -32,41 +30,15 @@ args = ["fmt", "--all", "--", "--check"]
 
 [tasks.clippy]
 command = "cargo"
-args = [
-  "clippy",
-  "--tests",
-  "--features=rustix,${BACKEND}",
-  "--",
-  "-D",
-  "warnings",
-]
-
-[tasks.clippy-all]
-command = "cargo"
-args = [
-  "clippy",
-  "--all-targets",
-  "--tests",
-  "--all-features",
-  "--",
-  "-D",
-  "warnings",
-]
+args = ["clippy", "--tests", "--all-features", "--", "-D", "warnings"]
 
 [tasks.check]
 command = "cargo"
-args = [
-  "check",
-  "--features=rustix,${BACKEND}",
-]
+args = ["check", "--all-features", "--all-targets"]
 
-[tasks.check-all]
+[tasks.test]
 command = "cargo"
-args = [
-  "check",
-  "--all-targets",
-  "--all-features"
-]
+args = ["test", "--all-features", "--all-targets"]
 
 [tasks.readme]
 command = "cargo"
@@ -79,7 +51,7 @@ args = [
   "--release", 
   "--example", 
   "demo",
-  "--features", "${ALL_FEATURES},crossterm",
+  "--features", "sixel,rustix,serde,crossterm",
 ]
 
 # screenshot instructions for xmonad / tiling WMs:

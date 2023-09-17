@@ -20,8 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        backend: [crossterm, termion, termwiz]
     steps:
     - name: Install libsixel
       run: sudo apt-get -y install libsixel-dev
@@ -34,11 +32,12 @@ jobs:
         profile: minimal
         override: true
     - uses: davidB/rust-cargo-make@v1
-    - name: CI ${{ matrix.backend }}
+    - name: CI
       uses: actions-rs/cargo@v1
       with:
         command: make
-        args: --profile ${{ matrix.backend }} ci
+        args: ci
+
   ensure-readme:
     name: Ensure readme is up-to-date
     runs-on: ubuntu-latest

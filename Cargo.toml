@@ -52,6 +52,7 @@ doc-scrape-examples = true
 
 [[example]]
 name = "screenshot"
+required-features = ["crossterm", "sixel", "rustix"]
 
 # [patch.crates-io]
 # ratatui with "cell skipping"
