@@ -14,7 +14,7 @@ mod termion;
 #[cfg(feature = "termwiz")]
 mod termwiz;
 
-use std::{error::Error, path::PathBuf, time::Duration};
+use std::{error::Error, num::Wrapping as w, path::PathBuf, time::Duration};
 
 use ratatui::{
     backend::Backend,
@@ -86,8 +86,19 @@ impl<'a> App<'a> {
 
         let mut background = String::new();
 
-        for i in 0..10_000 {
-            let c: char = ((48 + (i % 70)) as u8).into();
+        let mut r: [u64; 2] = [0x8a5cd789635d2dff, 0x121fd2155c472f96];
+        for _ in 0..5_000 {
+            let mut s1 = w(r[0]);
+            let s0 = w(r[1]);
+            let result = s0 + s1;
+            r[0] = s0.0;
+            s1 ^= s1 << 23;
+            r[1] = (s1 ^ s0 ^ (s1 >> 18) ^ (s0 >> 5)).0;
+            let c = match result.0 % 4 {
+                0 => '.',
+                1 => ' ',
+                _ => '…',
+            };
             background.push(c);
         }
 
