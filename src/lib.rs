@@ -11,7 +11,7 @@
 //! use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame, layout::Rect};
 //! use ratatui_image::{
 //!   picker::{Picker, ProtocolType},
-//!   ImageSource, Resize, ResizeImage, protocol::ResizeProtocol,
+//!   Resize, ResizeImage, protocol::{ImageSource, ResizeProtocol},
 //! };
 //!
 //! struct App {
@@ -42,10 +42,29 @@
 //! }
 //! ```
 //!
+//! # Widget choice
+//! The [ResizeImage] widget adapts to its render area, is more robust against overdraw bugs and
+//! artifacts, and plays nicer with some of the graphics protocols. However, frequent render area
+//! resizes might affect performance.
+//!
+//! The [FixedImage] widgets does not adapt to rendering area (except not drawing at all if space
+//! is insufficient), is more bug prone (overdrawing or artifacts), and is not aligned with some of
+//! the protocols. Its only upside is that it is stateless (in terms of ratatui), and thus is not
+//! performance-impacted by render area resizes.
+//!
 //! # Examples
 //!
 //! See the [crate::picker::Picker] helper and [`examples/demo`](./examples/demo/main.rs).
 //! The lib also includes a binary that renders an image file.
+//!
+//! # Features
+//! * `sixel` (default) compiles with libsixel.
+//! * `rustix` (default) enables [picker::Picker::from_termios] to guess which graphics protocol to use and what
+//! font-size the terminal has.
+//! * `crossterm` / `termion` / `termwiz` should match your ratatui backend. `termwiz` is not
+//! working correctly with ratatu-image!
+//! * `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
+//! useful to save it in some user configuration.
 //!
 //! [Ratatui]: https://github.com/ratatui-org/ratatui
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel
@@ -53,16 +72,14 @@
 //! [Ratatui PR for getting window size]: https://github.com/ratatui-org/ratatui/pull/276
 use std::{
     cmp::{max, min},
-    collections::hash_map::DefaultHasher,
     error::Error,
-    hash::{Hash, Hasher},
 };
 
 use image::{
     imageops::{self, FilterType},
     DynamicImage, ImageBuffer, Rgb,
 };
-use protocol::{Protocol, ResizeProtocol};
+use protocol::{ImageSource, Protocol, ResizeProtocol};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -77,65 +94,10 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 /// The terminal's font size in `(width, height)`
 pub type FontSize = (u16, u16);
 
-#[derive(Clone)]
-/// Image source for [crate::protocol::ResizeProtocol]s
-///
-/// A `[ResizeProtocol]` needs to resize the ImageSource to its state when the available area
-/// changes. A `[Protocol]` only needs it once.
-///
-/// # Examples
-/// ```text
-/// use image::{DynamicImage, ImageBuffer, Rgb};
-/// use ratatui_image::ImageSource;
-///
-/// let image: ImageBuffer::from_pixel(300, 200, Rgb::<u8>([255, 0, 0])).into();
-/// let source = ImageSource::new(image, "filename.png", (7, 14));
-/// assert_eq!((43, 14), (source.rect.width, source.rect.height));
-/// ```
-///
-pub struct ImageSource {
-    /// The original image without resizing
-    pub image: DynamicImage,
-    /// The font size of the terminal
-    pub font_size: FontSize,
-    /// The area that the [`ImageSource::image`] covers, but not necessarily fills
-    pub desired: Rect,
-    pub hash: u64,
-}
-
-impl ImageSource {
-    /// Create a new image source
-    pub fn new(image: DynamicImage, font_size: FontSize) -> ImageSource {
-        let desired =
-            ImageSource::round_pixel_size_to_cells(image.width(), image.height(), font_size);
-
-        let mut state = DefaultHasher::new();
-        image.as_bytes().hash(&mut state);
-        let hash = state.finish();
-
-        ImageSource {
-            image,
-            font_size,
-            desired,
-            hash,
-        }
-    }
-    /// Round an image pixel size to the nearest matching cell size, given a font size.
-    fn round_pixel_size_to_cells(
-        img_width: u32,
-        img_height: u32,
-        (char_width, char_height): FontSize,
-    ) -> Rect {
-        let width = (img_width as f32 / char_width as f32).ceil() as u16;
-        let height = (img_height as f32 / char_height as f32).ceil() as u16;
-        Rect::new(0, 0, width, height)
-    }
-}
-
 /// Fixed size image widget that uses [Protocol].
 ///
-/// The widget does *not* react to area resizes, and is not even guaranteed to **not** overdraw.
-/// Its advantage is that the [Protocol] it uses needs only one initial resize.
+/// The widget does **not** react to area resizes, and is not even guaranteed to **not** overdraw.
+/// Its advantage lies in that the [Protocol] needs only one initial resize.
 ///
 /// ```rust
 /// # use ratatui::{backend::Backend, terminal::Frame};
@@ -168,15 +130,14 @@ impl<'a> Widget for FixedImage<'a> {
     }
 }
 
-/// Resizeable image widget that uses an [ImageSource] and [ResizeProtocol] state.
+/// Resizeable image widget that uses a [ResizeProtocol] state.
 ///
 /// This stateful widget reacts to area resizes and resizes its image data accordingly.
 ///
 /// ```rust
 /// # use ratatui::{backend::Backend, terminal::Frame};
-/// # use ratatui_image::{ImageSource, Resize, ResizeImage, protocol::ResizeProtocol};
+/// # use ratatui_image::{Resize, ResizeImage, protocol::{ResizeProtocol}};
 /// struct App {
-///     image_source: ImageSource,
 ///     image_state: Box<dyn ResizeProtocol>,
 /// }
 /// fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {

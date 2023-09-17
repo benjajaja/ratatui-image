@@ -17,7 +17,11 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
-use ratatui_image::{picker::Picker, protocol::ResizeProtocol, ImageSource, Resize, ResizeImage};
+use ratatui_image::{
+    picker::Picker,
+    protocol::{ImageSource, ResizeProtocol},
+    Resize, ResizeImage,
+};
 
 struct App {
     pub filename: String,

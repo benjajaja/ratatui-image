@@ -20,7 +20,7 @@ Render images with graphics protocols in the terminal with [Ratatui].
 use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame, layout::Rect};
 use ratatui_image::{
   picker::{Picker, ProtocolType},
-  ImageSource, Resize, ResizeImage, protocol::ResizeProtocol,
+  Resize, ResizeImage, protocol::{ImageSource, ResizeProtocol},
 };
 
 struct App {
@@ -51,10 +51,29 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 }
 ```
 
+## Widget choice
+The [ResizeImage] widget adapts to its render area, is more robust against overdraw bugs and
+artifacts, and plays nicer with some of the graphics protocols. However, frequent render area
+resizes might affect performance.
+
+The [FixedImage] widgets does not adapt to rendering area (except not drawing at all if space
+is insufficient), is more bug prone (overdrawing or artifacts), and is not aligned with some of
+the protocols. Its only upside is that it is stateless (in terms of ratatui), and thus is not
+performance-impacted by render area resizes.
+
 ## Examples
 
 See the [crate::picker::Picker] helper and [`examples/demo`](./examples/demo/main.rs).
 The lib also includes a binary that renders an image file.
+
+## Features
+* `sixel` (default) compiles with libsixel.
+* `rustix` (default) enables [picker::Picker::from_termios] to guess which graphics protocol to use and what
+font-size the terminal has.
+* `crossterm` / `termion` / `termwiz` should match your ratatui backend. `termwiz` is not
+working correctly with ratatu-image!
+* `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
+useful to save it in some user configuration.
 
 [Ratatui]: https://github.com/ratatui-org/ratatui
 [Sixel]: https://en.wikipedia.org/wiki/Sixel

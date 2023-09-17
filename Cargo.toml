@@ -16,7 +16,7 @@ exclude = [
 rust-version = "1.65.0"
 
 [features]
-default = []
+default = ["sixel", "rustix"]
 crossterm = ["dep:crossterm", "ratatui/crossterm"]
 termion = ["dep:termion", "ratatui/termion"]
 termwiz = ["dep:termwiz", "ratatui/termwiz"]

@@ -26,8 +26,8 @@ use ratatui::{
 };
 use ratatui_image::{
     picker::{Picker, ProtocolType},
-    protocol::{Protocol, ResizeProtocol},
-    FixedImage, ImageSource, Resize, ResizeImage,
+    protocol::{ImageSource, Protocol, ResizeProtocol},
+    FixedImage, Resize, ResizeImage,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {

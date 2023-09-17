@@ -7,7 +7,7 @@ use rustix::termios::Winsize;
 #[cfg(all(feature = "sixel", feature = "rustix"))]
 use rustix::termios::{LocalModes, OptionalActions};
 #[cfg(feature = "serde")]
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "sixel")]
 use crate::protocol::sixel::{FixedSixel, SixelState};
@@ -29,10 +29,11 @@ pub struct Picker {
     kitty_counter: u8,
 }
 
+/// Serde-friendly protocol-type enum for [Picker].
 #[derive(PartialEq, Clone, Debug, Copy)]
 #[cfg_attr(
     feature = "serde",
-    derive(Deserialize),
+    derive(Deserialize, Serialize),
     serde(rename_all = "lowercase")
 )]
 pub enum ProtocolType {
@@ -58,36 +59,35 @@ impl ProtocolType {
 
 /// Helper for building widgets
 impl Picker {
-    /// Create a picker from a given terminal [FontSize].
+    /// Guess both font-size and appropiate graphics protocol to use.
+    ///
+    /// This writes and reads from stdin momentarily. Best be called *before* initializing the
+    /// terminal backend, to be safe.
     ///
     /// # Example
     /// ```rust
-    /// use std::io;
-    /// use ratatu_image::{
-    ///     picker::{ProtocolType, Picker},
-    ///     Resize,
-    /// };
-    /// use ratatui::{
-    ///     backend::{Backend, TestBackend},
-    ///     layout::Rect,
-    ///     Terminal,
-    /// };
+    /// use ratatui_image::picker::Picker;
+    /// let mut picker = Picker::from_termios(None);
+    /// ```
+    #[cfg(feature = "rustix")]
+    pub fn from_termios(background_color: Option<Rgb<u8>>) -> Result<Picker> {
+        let stdout = rustix::stdio::stdout();
+        let font_size = font_size(rustix::termios::tcgetwinsize(stdout)?)?;
+        Picker::new(font_size, guess_protocol(), background_color)
+    }
+
+    /// Create a picker from a given terminal [FontSize] and [ProtocolType].
+    /// This is useful to allow overriding the best-guess of [Picker::from_termios], for example
+    /// from some user configuration.
     ///
-    /// let dyn_img = image::io::Reader::open("./assets/Ada.png").unwrap().decode().unwrap();
-    /// let mut picker = Picker::new(
-    ///     (7, 14),
-    ///     ProtocolType::Halfblocks,
-    ///     None,
-    /// ).unwrap();
+    /// # Example
+    /// ```rust
+    /// use ratatui_image::picker::{ProtocolType, Picker};
     ///
-    /// // For FixedImage:
-    /// let image_static = picker.new_static_fit(
-    ///     dyn_img.clone(),
-    ///     Rect::new(0, 0, 15, 5),
-    ///     Resize::Fit,
-    /// ).unwrap();
-    /// // For ResizeImage:
-    /// let image_fit_state = picker.new_state(dyn_img);
+    /// let user_fontsize = (7, 14);
+    /// let user_protocol = ProtocolType::Halfblocks;
+    ///
+    /// let mut picker = Picker::new(user_fontsize, user_protocol, None).unwrap();
     /// ```
     pub fn new(
         font_size: FontSize,
@@ -102,23 +102,12 @@ impl Picker {
         })
     }
 
-    /// Query the terminal window size with I/O for font size and graphics capabilities.
-    ///
-    /// This writes and reads from stdin momentarily. Best be called *before* initializing the
-    /// terminal backend, to be safe.
-    #[cfg(feature = "rustix")]
-    pub fn from_termios(background_color: Option<Rgb<u8>>) -> Result<Picker> {
-        let stdout = rustix::stdio::stdout();
-        let font_size = font_size(rustix::termios::tcgetwinsize(stdout)?)?;
-        Picker::new(font_size, guess_protocol(), background_color)
-    }
-
-    /// Set a specific protocol
+    /// Set a specific protocol.
     pub fn set(&mut self, r#type: ProtocolType) {
         self.protocol_type = r#type;
     }
 
-    /// Cycle through available protocols
+    /// Cycle through available protocols.
     pub fn cycle_protocols(&mut self) -> ProtocolType {
         self.protocol_type = self.protocol_type.next();
         self.protocol_type
