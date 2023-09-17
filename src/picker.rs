@@ -1,4 +1,4 @@
-//! Helper module to build a backend, and swap backends at runtime
+//! Helper module to build a protocol, and swap protocols at runtime
 
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
@@ -25,7 +25,7 @@ use crate::{
 pub struct Picker {
     font_size: FontSize,
     background_color: Option<Rgb<u8>>,
-    backend_type: BackendType,
+    protocol_type: ProtocolType,
     kitty_counter: u8,
 }
 
@@ -35,23 +35,23 @@ pub struct Picker {
     derive(Deserialize),
     serde(rename_all = "lowercase")
 )]
-pub enum BackendType {
+pub enum ProtocolType {
     Halfblocks,
     #[cfg(feature = "sixel")]
     Sixel,
     Kitty,
 }
 
-impl BackendType {
-    pub fn next(&self) -> BackendType {
+impl ProtocolType {
+    pub fn next(&self) -> ProtocolType {
         match self {
             #[cfg(not(feature = "sixel"))]
-            BackendType::Halfblocks => BackendType::Kitty,
+            ProtocolType::Halfblocks => ProtocolType::Kitty,
             #[cfg(feature = "sixel")]
-            BackendType::Halfblocks => BackendType::Sixel,
+            ProtocolType::Halfblocks => ProtocolType::Sixel,
             #[cfg(feature = "sixel")]
-            BackendType::Sixel => BackendType::Kitty,
-            BackendType::Kitty => BackendType::Halfblocks,
+            ProtocolType::Sixel => ProtocolType::Kitty,
+            ProtocolType::Kitty => ProtocolType::Halfblocks,
         }
     }
 }
@@ -64,7 +64,7 @@ impl Picker {
     /// ```rust
     /// use std::io;
     /// use ratatu_image::{
-    ///     picker::{BackendType, Picker},
+    ///     picker::{ProtocolType, Picker},
     ///     Resize,
     /// };
     /// use ratatui::{
@@ -76,7 +76,7 @@ impl Picker {
     /// let dyn_img = image::io::Reader::open("./assets/Ada.png").unwrap().decode().unwrap();
     /// let mut picker = Picker::new(
     ///     (7, 14),
-    ///     BackendType::Halfblocks,
+    ///     ProtocolType::Halfblocks,
     ///     None,
     /// ).unwrap();
     ///
@@ -91,13 +91,13 @@ impl Picker {
     /// ```
     pub fn new(
         font_size: FontSize,
-        backend_type: BackendType,
+        protocol_type: ProtocolType,
         background_color: Option<Rgb<u8>>,
     ) -> Result<Picker> {
         Ok(Picker {
             font_size,
             background_color,
-            backend_type,
+            protocol_type,
             kitty_counter: 0,
         })
     }
@@ -110,21 +110,21 @@ impl Picker {
     pub fn from_termios(background_color: Option<Rgb<u8>>) -> Result<Picker> {
         let stdout = rustix::stdio::stdout();
         let font_size = font_size(rustix::termios::tcgetwinsize(stdout)?)?;
-        Picker::new(font_size, guess_backend(), background_color)
+        Picker::new(font_size, guess_protocol(), background_color)
     }
 
-    /// Set a specific backend
-    pub fn set(&mut self, r#type: BackendType) {
-        self.backend_type = r#type;
+    /// Set a specific protocol
+    pub fn set(&mut self, r#type: ProtocolType) {
+        self.protocol_type = r#type;
     }
 
-    /// Cycle through available backends
-    pub fn cycle_backends(&mut self) -> BackendType {
-        self.backend_type = self.backend_type.next();
-        self.backend_type
+    /// Cycle through available protocols
+    pub fn cycle_protocols(&mut self) -> ProtocolType {
+        self.protocol_type = self.protocol_type.next();
+        self.protocol_type
     }
 
-    /// Returns a new *static* backend for [`crate::FixedImage`] widgets that fits into the given size.
+    /// Returns a new *static* protocol for [`crate::FixedImage`] widgets that fits into the given size.
     pub fn new_static_fit(
         &mut self,
         image: DynamicImage,
@@ -132,21 +132,21 @@ impl Picker {
         resize: Resize,
     ) -> Result<Box<dyn Protocol>> {
         let source = ImageSource::new(image, self.font_size);
-        match self.backend_type {
-            BackendType::Halfblocks => Ok(Box::new(FixedHalfblocks::from_source(
+        match self.protocol_type {
+            ProtocolType::Halfblocks => Ok(Box::new(FixedHalfblocks::from_source(
                 &source,
                 resize,
                 self.background_color,
                 size,
             )?)),
             #[cfg(feature = "sixel")]
-            BackendType::Sixel => Ok(Box::new(FixedSixel::from_source(
+            ProtocolType::Sixel => Ok(Box::new(FixedSixel::from_source(
                 &source,
                 resize,
                 self.background_color,
                 size,
             )?)),
-            BackendType::Kitty => {
+            ProtocolType::Kitty => {
                 self.kitty_counter += 1;
                 Ok(Box::new(FixedKitty::from_source(
                     &source,
@@ -159,22 +159,22 @@ impl Picker {
         }
     }
 
-    /// Returns a new *state* backend for [`crate::ResizeImage`].
+    /// Returns a new *state* protocol for [`crate::ResizeImage`].
     pub fn new_state(&mut self, image: DynamicImage) -> Box<dyn ResizeProtocol> {
         let source = ImageSource::new(image, self.font_size);
-        match self.backend_type {
-            BackendType::Halfblocks => Box::new(HalfblocksState::new(source)),
+        match self.protocol_type {
+            ProtocolType::Halfblocks => Box::new(HalfblocksState::new(source)),
             #[cfg(feature = "sixel")]
-            BackendType::Sixel => Box::new(SixelState::new(source)),
-            BackendType::Kitty => {
+            ProtocolType::Sixel => Box::new(SixelState::new(source)),
+            ProtocolType::Kitty => {
                 self.kitty_counter += 1;
                 Box::new(KittyState::new(source, self.kitty_counter))
             }
         }
     }
 
-    pub fn backend_type(&self) -> &BackendType {
-        &self.backend_type
+    pub fn protocol_type(&self) -> &ProtocolType {
+        &self.protocol_type
     }
 
     pub fn font_size(&self) -> FontSize {
@@ -198,12 +198,12 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
 
 #[cfg(feature = "rustix")]
 // Guess what protocol should be used, with termios stdin/out queries.
-fn guess_backend() -> BackendType {
+fn guess_protocol() -> ProtocolType {
     if let Ok(term) = std::env::var("TERM") {
         match term.as_str() {
             #[cfg(all(feature = "sixel", feature = "rustix"))]
             "mlterm" | "yaft-256color" => {
-                return BackendType::Sixel;
+                return ProtocolType::Sixel;
             }
             term => {
                 #[cfg(all(feature = "sixel", feature = "rustix"))]
@@ -212,18 +212,18 @@ fn guess_backend() -> BackendType {
                     Err(err) => eprintln!("{err}"),
                 };
                 if term.contains("kitty") {
-                    return BackendType::Kitty;
+                    return ProtocolType::Kitty;
                 }
                 #[cfg(all(feature = "sixel", feature = "rustix"))]
                 if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
                     if term_program == "MacTerm" {
-                        return BackendType::Sixel;
+                        return ProtocolType::Sixel;
                     }
                 }
             }
         }
     }
-    BackendType::Halfblocks
+    ProtocolType::Halfblocks
 }
 
 #[cfg(all(feature = "sixel", feature = "rustix"))]
@@ -238,7 +238,7 @@ fn guess_backend() -> BackendType {
 /// * xterm -ti vt340
 /// * kitty (negative)
 /// * wezterm
-fn check_device_attrs() -> Result<BackendType> {
+fn check_device_attrs() -> Result<ProtocolType> {
     let stdin = rustix::stdio::stdin();
     let termios_original = rustix::termios::tcgetattr(stdin)?;
     let mut termios = termios_original.clone();
@@ -265,7 +265,7 @@ fn check_device_attrs() -> Result<BackendType> {
     rustix::termios::tcsetattr(stdin, OptionalActions::Now, &termios_original)?;
 
     if buf.contains(";4;") || buf.contains("?4;") || buf.contains(";4c") || buf.contains("?4c") {
-        Ok(BackendType::Sixel)
+        Ok(ProtocolType::Sixel)
     } else {
         Err(format!(
             "CSI sixel support not detected: ^[{}",
@@ -283,7 +283,7 @@ fn check_device_attrs() -> Result<BackendType> {
 mod tests {
     use std::assert_eq;
 
-    use crate::picker::{font_size, BackendType, Picker};
+    use crate::picker::{font_size, Picker, ProtocolType};
     use rustix::termios::Winsize;
 
     #[test]
@@ -305,11 +305,11 @@ mod tests {
     }
 
     #[test]
-    fn test_cycle_backends() {
-        let mut picker = Picker::new((1, 1), BackendType::Halfblocks, None).unwrap();
+    fn test_cycle_protocol() {
+        let mut picker = Picker::new((1, 1), ProtocolType::Halfblocks, None).unwrap();
         #[cfg(feature = "sixel")]
-        assert_eq!(picker.cycle_backends(), BackendType::Sixel);
-        assert_eq!(picker.cycle_backends(), BackendType::Kitty);
-        assert_eq!(picker.cycle_backends(), BackendType::Halfblocks);
+        assert_eq!(picker.cycle_protocols(), ProtocolType::Sixel);
+        assert_eq!(picker.cycle_protocols(), ProtocolType::Kitty);
+        assert_eq!(picker.cycle_protocols(), ProtocolType::Halfblocks);
     }
 }

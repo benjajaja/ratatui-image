@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         KeyCode::Char(c) => match c {
                             'q' => break,
                             ' ' => {
-                                app.picker.cycle_backends();
+                                app.picker.cycle_protocols();
                                 app.image_state =
                                     app.picker.new_state(app.image_source.image.clone());
                             }
@@ -102,7 +102,7 @@ fn ui(f: &mut Frame<CrosstermBackend<Stdout>>, app: &mut App) {
     let lines = vec![
         Line::from(format!(
             "Terminal: {:?}, font size: {:?}",
-            app.picker.backend_type(),
+            app.picker.protocol_type(),
             app.picker.font_size()
         )),
         Line::from(format!("File: {}", app.filename)),

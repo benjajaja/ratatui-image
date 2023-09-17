@@ -1,4 +1,4 @@
-//! Sixel backend implementations.
+//! Sixel protocol implementations.
 //! Uses [`sixel-bytes`] to draw image pixels, if the terminal [supports] the [Sixel] protocol.
 //! Needs the `sixel` feature.
 //!
@@ -14,7 +14,7 @@ use std::io;
 use super::{Protocol, ResizeProtocol};
 use crate::{ImageSource, Resize, Result};
 
-// Fixed sixel backend
+// Fixed sixel protocol
 #[derive(Clone, Default)]
 pub struct FixedSixel {
     pub data: String,
@@ -82,7 +82,7 @@ fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) 
             // On some implementations (e.g. patched Alactritty), image graphics are never
             // overwritten and simply draw over other UI elements.
             //
-            // Note that [ResizeBackend] forces to ignore this early return, since it will
+            // Note that [ResizeProtocol] forces to ignore this early return, since it will
             // always resize itself to the area.
             return;
         }

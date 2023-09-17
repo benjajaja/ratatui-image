@@ -25,7 +25,7 @@ use ratatui::{
     Frame, Terminal,
 };
 use ratatui_image::{
-    picker::{BackendType, Picker},
+    picker::{Picker, ProtocolType},
     protocol::{Protocol, ResizeProtocol},
     FixedImage, ImageSource, Resize, ResizeImage,
 };
@@ -122,14 +122,14 @@ impl<'a> App<'a> {
                 }
             }
             'i' => {
-                let next = match self.picker.backend_type() {
+                let next = match self.picker.protocol_type() {
                     #[cfg(not(feature = "sixel"))]
-                    BackendType::Halfblocks => BackendType::Kitty,
+                    ProtocolType::Halfblocks => ProtocolType::Kitty,
                     #[cfg(feature = "sixel")]
-                    BackendType::Halfblocks => BackendType::Sixel,
+                    ProtocolType::Halfblocks => ProtocolType::Sixel,
                     #[cfg(feature = "sixel")]
-                    BackendType::Sixel => BackendType::Kitty,
-                    BackendType::Kitty => BackendType::Halfblocks,
+                    ProtocolType::Sixel => ProtocolType::Kitty,
+                    ProtocolType::Kitty => ProtocolType::Halfblocks,
                 };
                 self.picker.set(next);
 
@@ -286,8 +286,8 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             Line::from("Key bindings:"),
             Line::from("H/L: resize"),
             Line::from(format!(
-                "i: cycle image backends (current: {:?})",
-                app.picker.backend_type()
+                "i: cycle image protocols (current: {:?})",
+                app.picker.protocol_type()
             )),
             Line::from("o: cycle image"),
             Line::from(format!("t: toggle ({:?})", app.show_images)),

@@ -10,7 +10,7 @@
 //! ```rust
 //! use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame, layout::Rect};
 //! use ratatui_image::{
-//!   picker::{Picker, BackendType},
+//!   picker::{Picker, ProtocolType},
 //!   ImageSource, Resize, ResizeImage, protocol::ResizeProtocol,
 //! };
 //!
@@ -21,7 +21,7 @@
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // It is highly recommended to use Picker::from_termios() instead!
-//!     let mut picker = Picker::new((7, 16), BackendType::Sixel, None)?;
+//!     let mut picker = Picker::new((7, 16), ProtocolType::Sixel, None)?;
 //!
 //!     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
 //!     let image = picker.new_state(dyn_img);

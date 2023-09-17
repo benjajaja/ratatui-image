@@ -1,4 +1,4 @@
-//! Backends for the widgets
+//! Protocol backends for the widgets
 
 use dyn_clone::DynClone;
 use image::Rgb;

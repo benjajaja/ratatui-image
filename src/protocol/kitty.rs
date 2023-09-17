@@ -9,7 +9,7 @@ use crate::{ImageSource, Resize, Result};
 
 use super::{Protocol, ResizeProtocol};
 
-// Fixed Kitty backend (WARNING: transmits image data on every render!)
+// Fixed Kitty protocol (transmits image data on every render!)
 #[derive(Clone, Default)]
 pub struct FixedKitty {
     transmit_data: String,
