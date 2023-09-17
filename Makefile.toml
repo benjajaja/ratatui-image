@@ -166,12 +166,12 @@ cargo make screenshot-spawn-xterm -e "cargo run --example demo --features sixel,
 [tasks.xvfb-screenshot]
 dependencies = ["screenshot-build"]
 run_task = [
-  {name = ["xvfb", "xvfb-xterm", "xvfb-xwd"], fork = true, parallel = true},
+  {name = ["xvfb", "xvfb-xwd", "xvfb-kitty"], fork = true, parallel = true},
 ]
 
 [tasks.xvfb]
 script = '''
-Xvfb :99 -screen 0 320x240x8 -terminate 1
+Xvfb :99 -screen 0 320x240x8 +extension GLX +render -terminate 1
 '''
 
 [tasks.xvfb-xterm]
@@ -183,6 +183,17 @@ until xterm -e true; do
 done
 xterm -ti 340 -bg black -fg white -e "cargo make screenshot-run"
 '''
+
+[tasks.xvfb-kitty]
+dependencies = ["screenshot-build"]
+env = { "DISPLAY" = ":99" }
+script = '''
+until xterm -e true; do
+  sleep 0.1
+done
+kitty -o linux_display_server=x11 cargo make screenshot-run
+'''
+
 
 [tasks.xvfb-xwd]
 env = { "DISPLAY" = ":99" }
