@@ -48,6 +48,10 @@ impl Protocol for FixedKitty {
         let mut seq = Some(self.transmit_data.clone());
         render(area, self.rect, buf, self.unique_id, &mut seq);
     }
+
+    fn rect(&self) -> Rect {
+        self.rect
+    }
 }
 
 #[derive(Clone)]

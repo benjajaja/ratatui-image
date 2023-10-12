@@ -21,6 +21,7 @@ pub mod sixel;
 /// A fixed image protocol for the [crate::FixedImage] widget.
 pub trait Protocol: Send + Sync {
     fn render(&self, area: Rect, buf: &mut Buffer);
+    fn rect(&self) -> Rect;
 }
 
 /// A resizing image protocol for the [crate::ResizeImage] widget.

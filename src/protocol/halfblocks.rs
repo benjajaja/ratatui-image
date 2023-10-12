@@ -86,6 +86,10 @@ impl Protocol for FixedHalfblocks {
                 .set_char('▀');
         }
     }
+
+    fn rect(&self) -> Rect {
+        self.rect
+    }
 }
 
 #[derive(Clone)]

@@ -62,6 +62,9 @@ impl Protocol for FixedSixel {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         render(self.rect, &self.data, area, buf, false)
     }
+    fn rect(&self) -> Rect {
+        self.rect
+    }
 }
 
 fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) {
