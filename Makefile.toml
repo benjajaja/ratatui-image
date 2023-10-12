@@ -22,6 +22,7 @@ dependencies = [
   "check",
   "test",
   "readme",
+  "build",
 ]
 
 [tasks.fmt]
@@ -43,6 +44,11 @@ args = ["test", "--all-features", "--all-targets"]
 [tasks.readme]
 command = "cargo"
 args = ["readme", "-o", "README.md"]
+
+[tasks.build]
+command = "cargo"
+args = ["build"]
+
 
 [tasks.run-example]
 command = "cargo"
