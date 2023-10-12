@@ -897,6 +897,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkg-config"
+version = "0.3.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
+
+[[package]]
 name = "png"
 version = "0.17.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1238,20 +1244,21 @@ checksum = "7bd3e3206899af3f8b12af284fafc038cc1dc2b41d1b89dd17297221c5d225de"
 
 [[package]]
 name = "sixel-bytes"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc85538935dbd35be147097f53c57d8a30746582d0543b03e00ebdd7a62ab89c"
+checksum = "45cad296a72571e80953823496e9a55caf893e264de9a7c5cfd29427fca720fc"
 dependencies = [
- "sixel-sys",
+ "sixel-sys-static",
 ]
 
 [[package]]
-name = "sixel-sys"
-version = "0.3.1"
+name = "sixel-sys-static"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb46e0cd5569bf910390844174a5a99d52dd40681fff92228d221d9f8bf87dea"
+checksum = "2988846c5099382a880a7dd385d38b203a60430710a9c22e538d500e6908f4f9"
 dependencies = [
  "make-cmd",
+ "pkg-config",
 ]
 
 [[package]]
