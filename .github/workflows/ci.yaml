@@ -17,41 +17,48 @@ env:
 jobs:
   ci:
     name: CI
-    runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: true
+    runs-on: ${{ matrix.platform }}
     steps:
-    - name: Install libsixel
-      run: sudo apt-get -y install libsixel-dev
-    - name: Checkout
-      uses: actions/checkout@v2
-    - name: Install rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
-    - uses: davidB/rust-cargo-make@v1
-    - name: CI
-      uses: actions-rs/cargo@v1
-      with:
-        command: make
-        args: ci
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - uses: davidB/rust-cargo-make@v1
+      - name: CI
+        if: matrix.platform == 'ubuntu-latest'
+        uses: actions-rs/cargo@v1
+        with:
+          command: make
+          args: ci
+      - name: Build only
+        if: matrix.platform != 'ubuntu-latest'
+        uses: actions-rs/cargo@v1
+        with:
+          command: make
+          args: build
 
   ensure-readme:
     name: Ensure readme is up-to-date
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-    - name: Install rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
-    - uses: davidB/rust-cargo-make@v1
-    - name: Make readme
-      run: cargo make readme
-    - name: Ensure no changes
-      run: git diff --exit-code .
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - uses: davidB/rust-cargo-make@v1
+      - name: Make readme
+        run: cargo make readme
+      - name: Ensure no changes
+        run: git diff --exit-code .

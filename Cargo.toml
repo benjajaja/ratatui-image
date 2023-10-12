@@ -16,7 +16,7 @@ exclude = [
 rust-version = "1.65.0"
 
 [features]
-default = ["sixel", "rustix"]
+default = []
 crossterm = ["dep:crossterm", "ratatui/crossterm"]
 termion = ["dep:termion", "ratatui/termion"]
 termwiz = ["dep:termwiz", "ratatui/termwiz"]
@@ -54,6 +54,3 @@ doc-scrape-examples = true
 name = "screenshot"
 required-features = ["crossterm", "sixel", "rustix"]
 
-# [patch.crates-io]
-# ratatui with "cell skipping"
-# ratatui = { git = "https://github.com/benjajaja/ratatui", rev = "26fec19e92bcc45eda85cb2b4bc27d4a23833c02" }
