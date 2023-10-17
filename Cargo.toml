@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-image"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 autoexamples = true
 authors = ["Benjamin Große <ste3ls@gmail.com>"]
@@ -43,7 +43,7 @@ features = []
 [[bin]]
 name = "ratatui-image"
 path = "./src/bin/ratatui-image/main.rs" # cargo readme needs this for some reason
-required-features = ["crossterm", "sixel", "rustix"]
+required-features = ["crossterm"]
 
 [[example]]
 name = "demo"

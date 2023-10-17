@@ -2,10 +2,8 @@
 
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
-#[cfg(feature = "rustix")]
-use rustix::termios::Winsize;
-#[cfg(all(feature = "sixel", feature = "rustix"))]
-use rustix::termios::{LocalModes, OptionalActions};
+#[cfg(all(feature = "sixel", feature = "rustix", unix))]
+use rustix::termios::{LocalModes, OptionalActions, Winsize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -69,10 +67,12 @@ impl Picker {
     /// use ratatui_image::picker::Picker;
     /// let mut picker = Picker::from_termios(None);
     /// ```
-    #[cfg(feature = "rustix")]
+    #[cfg(all(feature = "rustix", unix))]
     pub fn from_termios(background_color: Option<Rgb<u8>>) -> Result<Picker> {
-        let stdout = rustix::stdio::stdout();
-        let font_size = font_size(rustix::termios::tcgetwinsize(stdout)?)?;
+        use rustix::{stdio::stdout, termios::tcgetwinsize};
+
+        let stdout = stdout();
+        let font_size = font_size(tcgetwinsize(stdout)?)?;
         Picker::new(font_size, guess_protocol(), background_color)
     }
 
@@ -171,7 +171,7 @@ impl Picker {
     }
 }
 
-#[cfg(feature = "rustix")]
+#[cfg(all(feature = "rustix", unix))]
 pub fn font_size(winsize: Winsize) -> Result<FontSize> {
     let Winsize {
         ws_xpixel: x,
@@ -185,7 +185,7 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
     Ok((x / cols, y / rows))
 }
 
-#[cfg(feature = "rustix")]
+#[cfg(all(feature = "rustix", unix))]
 // Guess what protocol should be used, with termios stdin/out queries.
 fn guess_protocol() -> ProtocolType {
     if let Ok(term) = std::env::var("TERM") {
@@ -215,7 +215,7 @@ fn guess_protocol() -> ProtocolType {
     ProtocolType::Halfblocks
 }
 
-#[cfg(all(feature = "sixel", feature = "rustix"))]
+#[cfg(all(feature = "sixel", feature = "rustix", unix))]
 /// Check if Sixel is within the terminal's attributes
 /// see https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Sixel-Graphics
 /// and https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h4-Functions-using-CSI-_-ordered-by-the-final-character-lparen-s-rparen:CSI-Ps-c.1CA3

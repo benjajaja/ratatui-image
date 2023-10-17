@@ -80,7 +80,7 @@ useful to save it in some user configuration.
 [Ratatui PR for cell skipping]: https://github.com/ratatui-org/ratatui/pull/215
 [Ratatui PR for getting window size]: https://github.com/ratatui-org/ratatui/pull/276
 
-Current version: 0.3.2
+Current version: 0.3.3
 
 Sixel compatibility and QA:
 

@@ -17,6 +17,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
+#[cfg(not(all(feature = "rustix", unix)))]
+use ratatui_image::picker::ProtocolType;
 use ratatui_image::{
     picker::Picker,
     protocol::{ImageSource, ResizeProtocol},
@@ -36,7 +38,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Usage: <program> [path/to/image]");
     let image = image::io::Reader::open(&filename)?.decode()?;
 
+    #[cfg(all(feature = "rustix", unix))]
     let mut picker = Picker::from_termios(Some(Rgb::<u8>([255, 0, 255])))?;
+    #[cfg(not(all(feature = "rustix", unix)))]
+    let mut picker = {
+        let font_size = (8, 16);
+        let protocol = ProtocolType::Halfblocks;
+        Picker::new(font_size, protocol, Some(Rgb::<u8>([255, 0, 255])))?
+    };
 
     let image_source = ImageSource::new(image.clone(), picker.font_size());
     let image_state = picker.new_state(image);
