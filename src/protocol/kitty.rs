@@ -18,7 +18,7 @@ pub struct FixedKitty {
 }
 
 impl FixedKitty {
-    /// Create a FixedHalfblocks from an image.
+    /// Create a FixedKitty from an image.
     ///
     /// The "resolution" is determined by the font size of the terminal. Smaller fonts will result
     /// in more half-blocks for the same image size. To get a size independent of the font size,
@@ -497,6 +497,7 @@ static DIACRITICS: [char; 297] = [
     '\u{1D243}',
     '\u{1D244}',
 ];
+#[inline]
 fn diacritic(y: u16) -> char {
     if y >= DIACRITICS.len() as u16 {
         DIACRITICS[0]

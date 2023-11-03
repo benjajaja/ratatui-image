@@ -2,8 +2,10 @@
 
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
+#[cfg(all(feature = "rustix", unix))]
+use rustix::termios::Winsize;
 #[cfg(all(feature = "sixel", feature = "rustix", unix))]
-use rustix::termios::{LocalModes, OptionalActions, Winsize};
+use rustix::termios::{LocalModes, OptionalActions};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
