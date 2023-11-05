@@ -8,8 +8,9 @@ use crossterm::{
 };
 use image::Rgb;
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
+    backend::CrosstermBackend,
     layout::Rect,
+    prelude::Backend,
     terminal::Frame,
     widgets::{Block, Borders, Paragraph},
     Terminal,
@@ -23,20 +24,6 @@ const ASSERT_FONT_SIZE: (u16, u16) = (9, 18);
 const SCREEN_SIZE: (u16, u16) = (46, 12);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut picker = Picker::from_termios(Some(Rgb::<u8>([255, 0, 255])))?;
-    assert_eq!(
-        ASSERT_FONT_SIZE,
-        picker.font_size(),
-        "Font size must be fixed to a specific size",
-    );
-    let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
-    let image = picker.new_static_fit(
-        dyn_img,
-        Rect::new(0, 0, SCREEN_SIZE.0 - 10, SCREEN_SIZE.1 - 4),
-        Resize::Fit,
-    )?;
-    let mut app = App { image };
-
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -47,6 +34,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
+    let mut picker = Picker::from_termios()?;
+    picker.background_color = Some(Rgb::<u8>([255, 0, 255]));
+    assert_eq!(
+        ASSERT_FONT_SIZE, picker.font_size,
+        "Font size must be fixed to a specific size",
+    );
+    let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
+    let image = picker.new_protocol(
+        dyn_img,
+        Rect::new(0, 0, SCREEN_SIZE.0 - 10, SCREEN_SIZE.1 - 4),
+        Resize::Fit,
+    )?;
+    let mut app = App { image };
 
     terminal.draw(|f| ui(f, &mut app))?;
     std::thread::sleep(std::time::Duration::from_secs(3));

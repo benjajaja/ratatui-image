@@ -7,11 +7,9 @@ Status](https://img.shields.io/github/actions/workflow/status/benjajaja/ratatui-
 
 ![Recording](./assets/Recording.gif)
 
-Image widgets for [Ratatui]
+Image widgets with multiple graphics protocol backends for [Ratatui]
 
-**⚠️ THIS CRATE IS EXPERIMENTAL**
-
-**⚠️ THE `TERMWIZ` RATATUI BACKEND IS BROKEN WITH THIS CRATE**
+**⚠️ THIS CRATE IS EXPERIMENTAL, AND THE `TERMWIZ` RATATUI BACKEND DOES NOT WORK**
 
 Render images with graphics protocols in the terminal with [Ratatui].
 
@@ -29,17 +27,18 @@ struct App {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // It is highly recommended to use Picker::from_termios() instead!
-    let mut picker = Picker::new((7, 16), ProtocolType::Sixel, None)?;
-
-    let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
-    let image = picker.new_state(dyn_img);
-    let mut app = App { image };
-
     let backend = TestBackend::new(80, 30);
     let mut terminal = Terminal::new(backend)?;
 
-    // loop:
+    // Should use Picker::from_termios(), but we can't put that here because that would break doctests!
+    let mut picker = Picker::new((8, 12));
+    picker.guess_protocol();
+
+    let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
+    let image = picker.new_resize_protocol(dyn_img);
+    let mut app = App { image };
+
+    // This would be your typical `loop {` in a real app:
     terminal.draw(|f| ui(f, &mut app))?;
 
     Ok(())
@@ -50,6 +49,15 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_stateful_widget(image, f.size(), &mut app.image);
 }
 ```
+
+## Graphics protocols in terminals
+Different terminals support different graphics protocols such as sixels,
+kitty-graphics-protocol, or iTerm2-graphics-protocol. If no such protocol is supported, it is
+still possible to render images with unicode "halfblocks" that have fore- and background color.
+
+The [picker::Picker] helper is there to do all this graphics-protocol guessing, and also to map
+character-cell-size to pixel size so that we can e.g. "fit" an image inside a desired
+columns+rows bound etc.
 
 ## Widget choice
 The [ResizeImage] widget adapts to its render area, is more robust against overdraw bugs and
@@ -68,19 +76,16 @@ The lib also includes a binary that renders an image file.
 
 ## Features
 * `sixel` (default) compiles with libsixel.
-* `rustix` (default) enables [picker::Picker::from_termios] to guess which graphics protocol to use and what
-font-size the terminal has.
-* `crossterm` / `termion` / `termwiz` should match your ratatui backend. `termwiz` is not
-working correctly with ratatu-image!
+* `rustix` (default) enables much better guessing of graphics protocols with `rustix::termios::tcgetattr`.
+* `crossterm` or `termion` should match your ratatui backend. `termwiz` is available, but not
+working correctly with ratatu-image.
 * `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
 useful to save it in some user configuration.
 
 [Ratatui]: https://github.com/ratatui-org/ratatui
 [Sixel]: https://en.wikipedia.org/wiki/Sixel
-[Ratatui PR for cell skipping]: https://github.com/ratatui-org/ratatui/pull/215
-[Ratatui PR for getting window size]: https://github.com/ratatui-org/ratatui/pull/276
 
-Current version: 0.3.3
+Current version: 0.3.4
 
 Sixel compatibility and QA:
 

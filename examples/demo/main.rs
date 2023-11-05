@@ -25,7 +25,7 @@ use ratatui::{
     Frame, Terminal,
 };
 use ratatui_image::{
-    picker::{Picker, ProtocolType},
+    picker::Picker,
     protocol::{ImageSource, Protocol, ResizeProtocol},
     FixedImage, Resize, ResizeImage,
 };
@@ -74,15 +74,16 @@ impl<'a> App<'a> {
         let ada = "./assets/Ada.png";
         let dyn_img = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
-        let mut picker = Picker::from_termios(None).unwrap();
+        let mut picker = Picker::from_termios().unwrap();
+        picker.guess_protocol();
 
         let image_static = picker
-            .new_static_fit(dyn_img.clone(), size(), Resize::Fit)
+            .new_protocol(dyn_img.clone(), size(), Resize::Fit)
             .unwrap();
 
-        let image_source = ImageSource::new(dyn_img.clone(), picker.font_size());
-        let image_fit_state = picker.new_state(dyn_img.clone());
-        let image_crop_state = picker.new_state(dyn_img);
+        let image_source = ImageSource::new(dyn_img.clone(), picker.font_size);
+        let image_fit_state = picker.new_resize_protocol(dyn_img.clone());
+        let image_crop_state = picker.new_resize_protocol(dyn_img);
 
         let mut background = String::new();
 
@@ -133,24 +134,19 @@ impl<'a> App<'a> {
                 }
             }
             'i' => {
-                let next = match self.picker.protocol_type() {
-                    #[cfg(not(feature = "sixel"))]
-                    ProtocolType::Halfblocks => ProtocolType::Kitty,
-                    #[cfg(feature = "sixel")]
-                    ProtocolType::Halfblocks => ProtocolType::Sixel,
-                    #[cfg(feature = "sixel")]
-                    ProtocolType::Sixel => ProtocolType::Kitty,
-                    ProtocolType::Kitty => ProtocolType::Halfblocks,
-                };
-                self.picker.set(next);
+                self.picker.cycle_protocols();
 
                 self.image_static = self
                     .picker
-                    .new_static_fit(self.image_source.image.clone(), size(), Resize::Fit)
+                    .new_protocol(self.image_source.image.clone(), size(), Resize::Fit)
                     .unwrap();
 
-                self.image_fit_state.reset();
-                self.image_crop_state.reset();
+                self.image_fit_state = self
+                    .picker
+                    .new_resize_protocol(self.image_source.image.clone());
+                self.image_crop_state = self
+                    .picker
+                    .new_resize_protocol(self.image_source.image.clone());
             }
             'o' => {
                 let path = match self.image_source_path.to_str() {
@@ -158,11 +154,11 @@ impl<'a> App<'a> {
                     _ => "./assets/Ada.png",
                 };
                 let dyn_img = image::io::Reader::open(path).unwrap().decode().unwrap();
-                self.image_source = ImageSource::new(dyn_img.clone(), self.picker.font_size());
+                self.image_source = ImageSource::new(dyn_img.clone(), self.picker.font_size);
 
                 self.image_static = self
                     .picker
-                    .new_static_fit(dyn_img, size(), Resize::Fit)
+                    .new_protocol(dyn_img, size(), Resize::Fit)
                     .unwrap();
                 self.image_source_path = path.into();
             }
@@ -298,11 +294,11 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             Line::from("H/L: resize"),
             Line::from(format!(
                 "i: cycle image protocols (current: {:?})",
-                app.picker.protocol_type()
+                app.picker.protocol_type
             )),
             Line::from("o: cycle image"),
             Line::from(format!("t: toggle ({:?})", app.show_images)),
-            Line::from(format!("Font size: {:?}", app.picker.font_size())),
+            Line::from(format!("Font size: {:?}", app.picker.font_size)),
         ])
         .wrap(Wrap { trim: true }),
         area,

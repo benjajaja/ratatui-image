@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-image"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 autoexamples = true
 authors = ["Benjamin Große <ste3ls@gmail.com>"]
@@ -16,7 +16,7 @@ exclude = [
 rust-version = "1.65.0"
 
 [features]
-default = []
+default = ["crossterm","rustix"]
 crossterm = ["dep:crossterm", "ratatui/crossterm"]
 termion = ["dep:termion", "ratatui/termion"]
 termwiz = ["dep:termwiz", "ratatui/termwiz"]
@@ -35,10 +35,7 @@ serde = { version = "^1.0", optional = true, features = ["derive"] }
 rustix = { version = "^0.38.4", optional = true, features = ["stdio", "termios"] }
 base64 = { version = "^0.21.2" }
 rand = { version = "0.8.5" }
-
-[dependencies.ratatui]
-version = "0.23.0"
-features = []
+ratatui = { version = "0.23.0", features = [] }
 
 [[bin]]
 name = "ratatui-image"
