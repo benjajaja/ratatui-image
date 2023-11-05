@@ -4,8 +4,6 @@ use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
 #[cfg(all(feature = "rustix", unix))]
 use rustix::termios::Winsize;
-#[cfg(all(feature = "sixel", feature = "rustix", unix))]
-use rustix::termios::{LocalModes, OptionalActions};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -23,9 +21,9 @@ use crate::{
 
 #[derive(Clone, Copy)]
 pub struct Picker {
-    font_size: FontSize,
-    background_color: Option<Rgb<u8>>,
-    protocol_type: ProtocolType,
+    pub font_size: FontSize,
+    pub background_color: Option<Rgb<u8>>,
+    pub protocol_type: ProtocolType,
     kitty_counter: u8,
 }
 
@@ -59,23 +57,22 @@ impl ProtocolType {
 
 /// Helper for building widgets
 impl Picker {
-    /// Guess both font-size and appropiate graphics protocol to use.
+    /// Query terminal for font-size with some escape sequence.
     ///
-    /// This writes and reads from stdin momentarily. Best be called *before* initializing the
-    /// terminal backend, to be safe.
+    /// This writes and reads from stdin momentarily.
     ///
     /// # Example
     /// ```rust
     /// use ratatui_image::picker::Picker;
-    /// let mut picker = Picker::from_termios(None);
+    /// let mut picker = Picker::from_termios();
     /// ```
     #[cfg(all(feature = "rustix", unix))]
-    pub fn from_termios(background_color: Option<Rgb<u8>>) -> Result<Picker> {
+    pub fn from_termios() -> Result<Picker> {
         use rustix::{stdio::stdout, termios::tcgetwinsize};
 
         let stdout = stdout();
         let font_size = font_size(tcgetwinsize(stdout)?)?;
-        Picker::new(font_size, guess_protocol(), background_color)
+        Ok(Picker::new(font_size))
     }
 
     /// Create a picker from a given terminal [FontSize] and [ProtocolType].
@@ -89,24 +86,23 @@ impl Picker {
     /// let user_fontsize = (7, 14);
     /// let user_protocol = ProtocolType::Halfblocks;
     ///
-    /// let mut picker = Picker::new(user_fontsize, user_protocol, None).unwrap();
+    /// let mut picker = Picker::new(user_fontsize);
+    /// picker.protocol_type = user_protocol;
     /// ```
-    pub fn new(
-        font_size: FontSize,
-        protocol_type: ProtocolType,
-        background_color: Option<Rgb<u8>>,
-    ) -> Result<Picker> {
-        Ok(Picker {
+    pub fn new(font_size: FontSize) -> Picker {
+        Picker {
             font_size,
-            background_color,
-            protocol_type,
+            background_color: None,
+            protocol_type: ProtocolType::Halfblocks,
             kitty_counter: 0,
-        })
+        }
     }
 
-    /// Set a specific protocol.
-    pub fn set(&mut self, r#type: ProtocolType) {
-        self.protocol_type = r#type;
+    /// Guess the best protocol for the current terminal by issuing some escape sequences to
+    /// stdout.
+    pub fn guess_protocol(&mut self) -> ProtocolType {
+        self.protocol_type = guess_protocol();
+        self.protocol_type
     }
 
     /// Cycle through available protocols.
@@ -115,8 +111,8 @@ impl Picker {
         self.protocol_type
     }
 
-    /// Returns a new *static* protocol for [`crate::FixedImage`] widgets that fits into the given size.
-    pub fn new_static_fit(
+    /// Returns a new protocol for [`crate::FixedImage`] widgets that fits into the given size.
+    pub fn new_protocol(
         &mut self,
         image: DynamicImage,
         size: Rect,
@@ -150,8 +146,8 @@ impl Picker {
         }
     }
 
-    /// Returns a new *state* protocol for [`crate::ResizeImage`].
-    pub fn new_state(&mut self, image: DynamicImage) -> Box<dyn ResizeProtocol> {
+    /// Returns a new *resize* protocol for [`crate::ResizeImage`] widgets.
+    pub fn new_resize_protocol(&mut self, image: DynamicImage) -> Box<dyn ResizeProtocol> {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
             ProtocolType::Halfblocks => Box::new(HalfblocksState::new(source)),
@@ -162,14 +158,6 @@ impl Picker {
                 Box::new(KittyState::new(source, self.kitty_counter))
             }
         }
-    }
-
-    pub fn protocol_type(&self) -> &ProtocolType {
-        &self.protocol_type
-    }
-
-    pub fn font_size(&self) -> FontSize {
-        self.font_size
     }
 }
 
@@ -187,25 +175,23 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
     Ok((x / cols, y / rows))
 }
 
-#[cfg(all(feature = "rustix", unix))]
 // Guess what protocol should be used, with termios stdin/out queries.
 fn guess_protocol() -> ProtocolType {
     if let Ok(term) = std::env::var("TERM") {
         match term.as_str() {
-            #[cfg(all(feature = "sixel", feature = "rustix"))]
+            #[cfg(feature = "sixel")]
             "mlterm" | "yaft-256color" => {
                 return ProtocolType::Sixel;
             }
-            term => {
-                #[cfg(all(feature = "sixel", feature = "rustix"))]
-                match check_device_attrs() {
-                    Ok(t) => return t,
-                    Err(err) => eprintln!("{err}"),
-                };
+            _ => {
+                #[cfg(all(feature = "rustix", unix))]
+                if let Ok(t) = check_device_attrs() {
+                    return t;
+                }
                 if term.contains("kitty") {
                     return ProtocolType::Kitty;
                 }
-                #[cfg(all(feature = "sixel", feature = "rustix"))]
+                #[cfg(feature = "sixel")]
                 if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
                     if term_program == "MacTerm" {
                         return ProtocolType::Sixel;
@@ -217,19 +203,23 @@ fn guess_protocol() -> ProtocolType {
     ProtocolType::Halfblocks
 }
 
-#[cfg(all(feature = "sixel", feature = "rustix", unix))]
-/// Check if Sixel is within the terminal's attributes
+#[cfg(all(feature = "rustix", unix))]
+/// Check for kitty or sixel terminal support.
 /// see https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Sixel-Graphics
 /// and https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h4-Functions-using-CSI-_-ordered-by-the-final-character-lparen-s-rparen:CSI-Ps-c.1CA3
 /// and https://vt100.net/docs/vt510-rm/DA1.html
 /// Tested with:
-/// * foot
 /// * patched alactritty (positive)
 /// * unpatched alactritty (negative)
 /// * xterm -ti vt340
-/// * kitty (negative)
+/// * kitty
 /// * wezterm
+/// * foot
+/// * konsole (kitty protocol)
+/// NOTE: "tested" means that it guesses correctly, not necessarily rendering correctly.
 fn check_device_attrs() -> Result<ProtocolType> {
+    use rustix::termios::{LocalModes, OptionalActions};
+
     let stdin = rustix::stdio::stdin();
     let termios_original = rustix::termios::tcgetattr(stdin)?;
     let mut termios = termios_original.clone();
@@ -238,9 +228,18 @@ fn check_device_attrs() -> Result<ProtocolType> {
     termios.local_modes &= !LocalModes::ECHO;
     rustix::termios::tcsetattr(stdin, OptionalActions::Drain, &termios)?;
 
-    rustix::io::write(rustix::stdio::stdout(), b"\x1b[c")?;
+    rustix::io::write(
+        rustix::stdio::stdout(),
+        // Queries first for kitty support with `_Gi=...<ESC>\` and then for "graphics attributes"
+        // (sixel) with `<ESC>[c`.
+        // The query for kitty might not produce any response at all and we'd be stuck reading from
+        // stdin forever. But the second query should always get some kind of response.
+        // See https://sw.kovidgoyal.net/kitty/graphics-protocol/#querying-support-and-available-transmission-mediums
+        b"\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c",
+    )?;
 
     let mut buf = String::new();
+
     loop {
         let mut charbuf = [0; 1];
         rustix::io::read(stdin, &mut charbuf)?;
@@ -248,6 +247,7 @@ fn check_device_attrs() -> Result<ProtocolType> {
             continue;
         }
         buf.push(char::from(charbuf[0]));
+        // TODO: The response to the first kitty query could potentially be something like `<ESC>_Gi=31;error message containing a "c"<ESC>\ and we would then not detect sixel support correctly.
         if charbuf[0] == b'c' {
             break;
         }
@@ -255,19 +255,14 @@ fn check_device_attrs() -> Result<ProtocolType> {
     // Reset to previous attrs
     rustix::termios::tcsetattr(stdin, OptionalActions::Now, &termios_original)?;
 
-    if buf.contains(";4;") || buf.contains("?4;") || buf.contains(";4c") || buf.contains("?4c") {
-        Ok(ProtocolType::Sixel)
-    } else {
-        Err(format!(
-            "CSI sixel support not detected: ^[{}",
-            if buf.len() > 1 {
-                &buf[1..]
-            } else {
-                "(nothing)"
-            }
-        )
-        .into())
+    if buf.contains("_Gi=31;OK") {
+        return Ok(ProtocolType::Kitty);
     }
+    #[cfg(feature = "sixel")]
+    if buf.contains(";4;") || buf.contains("?4;") || buf.contains(";4c") || buf.contains("?4c") {
+        return Ok(ProtocolType::Sixel);
+    }
+    Err("graphics support not detected".into())
 }
 
 #[cfg(all(test, feature = "rustix", feature = "sixel"))]
@@ -297,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_cycle_protocol() {
-        let mut picker = Picker::new((1, 1), ProtocolType::Halfblocks, None).unwrap();
+        let mut picker = Picker::new((1, 1));
         #[cfg(feature = "sixel")]
         assert_eq!(picker.cycle_protocols(), ProtocolType::Sixel);
         assert_eq!(picker.cycle_protocols(), ProtocolType::Kitty);

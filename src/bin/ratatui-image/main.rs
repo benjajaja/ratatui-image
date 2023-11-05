@@ -1,6 +1,5 @@
 use std::{
-    env,
-    io::{self, Stdout},
+    env, io,
     time::{Duration, Instant},
 };
 
@@ -13,12 +12,11 @@ use image::Rgb;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
+    prelude::Backend,
     text::Line,
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
-#[cfg(not(all(feature = "rustix", unix)))]
-use ratatui_image::picker::ProtocolType;
 use ratatui_image::{
     picker::Picker,
     protocol::{ImageSource, ResizeProtocol},
@@ -36,19 +34,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filename = env::args()
         .nth(1)
         .expect("Usage: <program> [path/to/image]");
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
     let image = image::io::Reader::open(&filename)?.decode()?;
 
     #[cfg(all(feature = "rustix", unix))]
-    let mut picker = Picker::from_termios(Some(Rgb::<u8>([255, 0, 255])))?;
+    let mut picker = Picker::from_termios()?;
     #[cfg(not(all(feature = "rustix", unix)))]
     let mut picker = {
         let font_size = (8, 16);
-        let protocol = ProtocolType::Halfblocks;
-        Picker::new(font_size, protocol, Some(Rgb::<u8>([255, 0, 255])))?
+        Picker::new(font_size)
     };
+    picker.guess_protocol();
+    picker.background_color = Some(Rgb::<u8>([255, 0, 255]));
 
-    let image_source = ImageSource::new(image.clone(), picker.font_size());
-    let image_state = picker.new_state(image);
+    let image_source = ImageSource::new(image.clone(), picker.font_size);
+    let image_state = picker.new_resize_protocol(image);
 
     let mut app = App {
         filename,
@@ -56,12 +61,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         image_source,
         image_state,
     };
-
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
 
     let mut last_tick = Instant::now();
     let tick_rate = Duration::from_millis(1000);
@@ -79,8 +78,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             'q' => break,
                             ' ' => {
                                 app.picker.cycle_protocols();
-                                app.image_state =
-                                    app.picker.new_state(app.image_source.image.clone());
+                                app.image_state = app
+                                    .picker
+                                    .new_resize_protocol(app.image_source.image.clone());
                             }
                             _ => {}
                         },
@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn ui(f: &mut Frame<CrosstermBackend<Stdout>>, app: &mut App) {
+fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(6), Constraint::Min(1)].as_ref())
@@ -115,8 +115,7 @@ fn ui(f: &mut Frame<CrosstermBackend<Stdout>>, app: &mut App) {
     let lines = vec![
         Line::from(format!(
             "Terminal: {:?}, font size: {:?}",
-            app.picker.protocol_type(),
-            app.picker.font_size()
+            app.picker.protocol_type, app.picker.font_size
         )),
         Line::from(format!("File: {}", app.filename)),
         Line::from(format!(
