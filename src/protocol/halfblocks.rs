@@ -110,16 +110,10 @@ impl HalfblocksState {
 }
 
 impl ResizeProtocol for HalfblocksState {
-    fn rect(&self) -> Rect {
-        self.current.rect
+    fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
+        resize.needs_resize(&self.source, self.current.rect, area, false)
     }
-    fn render(
-        &mut self,
-        resize: &Resize,
-        background_color: Option<Rgb<u8>>,
-        area: Rect,
-        buf: &mut Buffer,
-    ) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -137,6 +131,8 @@ impl ResizeProtocol for HalfblocksState {
             self.current = current;
             self.hash = self.source.hash;
         }
+    }
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
         FixedHalfblocks::render(&self.current, area, buf);
     }
 }

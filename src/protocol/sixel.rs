@@ -142,16 +142,10 @@ impl SixelState {
 }
 
 impl ResizeProtocol for SixelState {
-    fn rect(&self) -> Rect {
-        self.current.rect
+    fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
+        resize.needs_resize(&self.source, self.current.rect, area, false)
     }
-    fn render(
-        &mut self,
-        resize: &Resize,
-        background_color: Option<Rgb<u8>>,
-        area: Rect,
-        buf: &mut Buffer,
-    ) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -166,8 +160,7 @@ impl ResizeProtocol for SixelState {
         ) {
             match encode(img) {
                 Ok(data) => {
-                    let current = FixedSixel { data, rect };
-                    self.current = current;
+                    self.current = FixedSixel { data, rect };
                     self.hash = self.source.hash;
                 }
                 Err(_err) => {
@@ -175,7 +168,8 @@ impl ResizeProtocol for SixelState {
                 }
             }
         }
-
+    }
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
         render(self.current.rect, &self.current.data, area, buf, true);
     }
 }

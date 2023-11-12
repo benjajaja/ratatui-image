@@ -7,19 +7,31 @@ Status](https://img.shields.io/github/actions/workflow/status/benjajaja/ratatui-
 
 ![Recording](./assets/Recording.gif)
 
-Image widgets with multiple graphics protocol backends for [Ratatui]
+## Image widgets with multiple graphics protocol backends for [Ratatui]
 
 **⚠️ THIS CRATE IS EXPERIMENTAL, AND THE `TERMWIZ` RATATUI BACKEND DOES NOT WORK**
 
 Render images with graphics protocols in the terminal with [Ratatui].
 
+#### Query the terminal for available graphics protocols (or guess from `$TERM` or similar).
+
+Some terminals may implement one or more graphics protocols, such as Sixels or Kitty's
+graphics protocol. Query the terminal with some escape sequence. Fallback to "halfblocks" which
+uses some unicode half-block characters with fore- and background colors.
+
+#### Query the terminal for the font-size in pixels.
+If there is an actual graphics protocol available, it is necessary to know the font-size to
+be able to map the image pixels to character cell area. The image can be resized, fit, or
+cropped to an area. Query the terminal for the window and columns/rows sizes, and derive the
+font-size.
+
+#### Render the image by the means of the guessed protocol.
+Usually that means outputting some escape sequence, but the details vary wildly.
+
 ## Quick start
 ```rust
-use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame, layout::Rect};
-use ratatui_image::{
-  picker::{Picker, ProtocolType},
-  Resize, ResizeImage, protocol::{ImageSource, ResizeProtocol},
-};
+use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame};
+use ratatui_image::{picker::Picker, ResizeImage, protocol::ResizeProtocol};
 
 struct App {
     // We need to hold the render state.
@@ -61,17 +73,32 @@ columns+rows bound etc.
 
 ## Widget choice
 The [ResizeImage] widget adapts to its render area, is more robust against overdraw bugs and
-artifacts, and plays nicer with some of the graphics protocols. However, frequent render area
-resizes might affect performance.
+artifacts, and plays nicer with some of the graphics protocols.
+The resizing and encoding is blocking by default, but it is possible to offload this to another
+thread or async task (see `examples/async.rs`).
 
 The [FixedImage] widgets does not adapt to rendering area (except not drawing at all if space
-is insufficient), is more bug prone (overdrawing or artifacts), and is not aligned with some of
-the protocols. Its only upside is that it is stateless (in terms of ratatui), and thus is not
-performance-impacted by render area resizes.
+is insufficient), may be a bit more bug prone (overdrawing or artifacts), and is not friendly
+with some of the protocols (e.g. the Kitty graphics protocol, which is stateful). Its only
+upside is that it is stateless (in terms of ratatui), and thus can never block the rendering
+thread/task.
 
 ## Examples
 
-See the [crate::picker::Picker] helper and [`examples/demo`](./examples/demo/main.rs).
+`examples/demo.rs` is a fully fledged demo:
+* Guessing the graphics protocol and the terminal font-size.
+* Both [FixedImage] and [ResizeImage].
+* [Resize::Fit] and [Resize::Crop].
+* Reacts to resizes from terminal or widget layout.
+* Cycle through available graphics protocols at runtime.
+* Load different images.
+* Cycle toggling [FixedImage], [ResizeImage], or both, to demonstrate correct state after
+  removal.
+* Works with crossterm and termion backends.
+
+`examples/async.rs` shows how to offload resize and encoding to another thread, to avoid
+blocking the UI thread.
+
 The lib also includes a binary that renders an image file.
 
 ## Features

@@ -83,16 +83,10 @@ impl KittyState {
 }
 
 impl ResizeProtocol for KittyState {
-    fn rect(&self) -> Rect {
-        self.rect
+    fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
+        resize.needs_resize(&self.source, self.rect, area, false)
     }
-    fn render(
-        &mut self,
-        resize: &Resize,
-        background_color: Option<Rgb<u8>>,
-        area: Rect,
-        buf: &mut Buffer,
-    ) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -106,7 +100,8 @@ impl ResizeProtocol for KittyState {
             self.rect = rect;
             self.proto_state = KittyProtoState::TransmitAndPlace(data);
         }
-
+    }
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
         // Transmit only once
         let mut seq = match &mut self.proto_state {
             KittyProtoState::TransmitAndPlace(seq) => {
@@ -118,11 +113,6 @@ impl ResizeProtocol for KittyState {
         };
 
         render(area, self.rect, buf, self.unique_id, &mut seq);
-    }
-    fn reset(&mut self) {
-        self.rect = Rect::default();
-        self.hash = u64::default();
-        self.proto_state = KittyProtoState::default();
     }
 }
 

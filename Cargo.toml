@@ -51,3 +51,6 @@ doc-scrape-examples = true
 name = "screenshot"
 required-features = ["crossterm", "sixel", "rustix"]
 
+[[example]]
+name = "async"
+required-features = ["crossterm", "sixel", "rustix"]

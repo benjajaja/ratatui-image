@@ -20,22 +20,44 @@ pub mod sixel;
 
 /// A fixed image protocol for the [crate::FixedImage] widget.
 pub trait Protocol: Send + Sync {
+    /// Render the currently resized and encoded data to the buffer.
     fn render(&self, area: Rect, buf: &mut Buffer);
+    /// Get the [ratatui::layout::Rect] of the image.
     fn rect(&self) -> Rect;
 }
 
 /// A resizing image protocol for the [crate::ResizeImage] widget.
 pub trait ResizeProtocol: Send + Sync + DynClone {
-    fn rect(&self) -> Rect;
-    fn render(
+    /// Resize and encode if necessary, and render immediately.
+    ///
+    /// This blocks the UI thread but requires neither threads nor async.
+    fn resize_encode_render(
         &mut self,
         resize: &Resize,
         background_color: Option<Rgb<u8>>,
         area: Rect,
         buf: &mut Buffer,
-    );
-    /// This method is optional.
-    fn reset(&mut self) {}
+    ) {
+        if let Some(rect) = self.needs_resize(resize, area) {
+            self.resize_encode(resize, background_color, rect);
+        }
+        self.render(area, buf);
+    }
+
+    /// Check if the current image state would need resizing (grow or shrink) for the given area.
+    ///
+    /// This can be called by the UI thread to check if this [ResizeProtocol] should be sent off to
+    /// some background thread/task to do the resizing and encoding, instead of rendering. The
+    /// thread should then return the [ResizeProtocol] so that it can be rendered.
+    fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect>;
+
+    /// Resize the image and encode it for rendering.
+    ///
+    /// This can be done in a background thread, and the result is stored in this [ResizeProtocol].
+    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect);
+
+    /// Render the currently resized and encoded data to the buffer.
+    fn render(&mut self, area: Rect, buf: &mut Buffer);
 }
 
 dyn_clone::clone_trait_object!(ResizeProtocol);
@@ -57,12 +79,13 @@ dyn_clone::clone_trait_object!(ResizeProtocol);
 /// ```
 ///
 pub struct ImageSource {
-    /// The original image without resizing
+    /// The original image without resizing.
     pub image: DynamicImage,
-    /// The font size of the terminal
+    /// The font size of the terminal.
     pub font_size: FontSize,
-    /// The area that the [`ImageSource::image`] covers, but not necessarily fills
+    /// The area that the [`ImageSource::image`] covers, but not necessarily fills.
     pub desired: Rect,
+    /// TODO: document this; when image changes but it doesn't need a resize, force a render.
     pub hash: u64,
 }
 
