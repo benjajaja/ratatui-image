@@ -202,6 +202,10 @@ impl ResizeImage {
 impl StatefulWidget for ResizeImage {
     type State = Box<dyn ResizeProtocol>;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
         state.resize_encode_render(&self.resize, self.background_color, area, buf)
     }
 }
