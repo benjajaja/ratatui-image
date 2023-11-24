@@ -5,11 +5,12 @@
 //! [`sixel-bytes`]: https://github.com/benjajaja/sixel-bytes
 //! [supports]: https://arewesixelyet.com
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel
+use icy_sixel::{
+    sixel_string, DiffusionMethod, MethodForLargest, MethodForRep, PixelFormat, Quality,
+};
 use image::{DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect};
-use sixel_bytes::{sixel_string, DiffusionMethod, PixelFormat, SixelError};
 use std::cmp::min;
-use std::io;
 
 use super::{Protocol, ResizeProtocol};
 use crate::{ImageSource, Resize, Result};
@@ -45,17 +46,15 @@ pub fn encode(img: DynamicImage) -> Result<String> {
 
     let data = sixel_string(
         bytes,
-        w as _,
-        h as _,
+        w as i32,
+        h as i32,
         PixelFormat::RGBA8888,
         DiffusionMethod::Stucki,
-    )
-    .map_err(sixel_err)?;
+        MethodForLargest::Auto,
+        MethodForRep::Auto,
+        Quality::HIGH,
+    )?;
     Ok(data)
-}
-
-fn sixel_err(err: SixelError) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, format!("{err:?}"))
 }
 
 impl Protocol for FixedSixel {

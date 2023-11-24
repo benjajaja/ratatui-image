@@ -469,6 +469,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
+name = "icy_sixel"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dc4d30216c3fc247730a4c6c74db2bd217a5454361ce24d70e504bda0cd345e"
+
+[[package]]
 name = "image"
 version = "0.24.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -565,12 +571,6 @@ name = "log"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b06a4cde4c0f271a446782e3eff8de789548ce57dbc8eca9292c27f4a42004b4"
-
-[[package]]
-name = "make-cmd"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8ca8afbe8af1785e09636acb5a41e08a765f5f0340568716c18a8700ba3c0d3"
 
 [[package]]
 name = "memchr"
@@ -897,12 +897,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pkg-config"
-version = "0.3.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
-
-[[package]]
 name = "png"
 version = "0.17.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -999,17 +993,17 @@ dependencies = [
 
 [[package]]
 name = "ratatui-image"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64",
  "crossterm 0.25.0",
  "dyn-clone",
+ "icy_sixel",
  "image",
  "rand",
  "ratatui",
  "rustix",
  "serde",
- "sixel-bytes",
  "termion",
  "termwiz",
 ]
@@ -1241,25 +1235,6 @@ name = "siphasher"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bd3e3206899af3f8b12af284fafc038cc1dc2b41d1b89dd17297221c5d225de"
-
-[[package]]
-name = "sixel-bytes"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45cad296a72571e80953823496e9a55caf893e264de9a7c5cfd29427fca720fc"
-dependencies = [
- "sixel-sys-static",
-]
-
-[[package]]
-name = "sixel-sys-static"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2988846c5099382a880a7dd385d38b203a60430710a9c22e538d500e6908f4f9"
-dependencies = [
- "make-cmd",
- "pkg-config",
-]
 
 [[package]]
 name = "smallvec"
