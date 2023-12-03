@@ -7,7 +7,6 @@ use rustix::termios::Winsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "sixel")]
 use crate::protocol::sixel::{FixedSixel, SixelState};
 
 use crate::{
@@ -36,7 +35,6 @@ pub struct Picker {
 )]
 pub enum ProtocolType {
     Halfblocks,
-    #[cfg(feature = "sixel")]
     Sixel,
     Kitty,
 }
@@ -44,11 +42,7 @@ pub enum ProtocolType {
 impl ProtocolType {
     pub fn next(&self) -> ProtocolType {
         match self {
-            #[cfg(not(feature = "sixel"))]
-            ProtocolType::Halfblocks => ProtocolType::Kitty,
-            #[cfg(feature = "sixel")]
             ProtocolType::Halfblocks => ProtocolType::Sixel,
-            #[cfg(feature = "sixel")]
             ProtocolType::Sixel => ProtocolType::Kitty,
             ProtocolType::Kitty => ProtocolType::Halfblocks,
         }
@@ -126,7 +120,6 @@ impl Picker {
                 self.background_color,
                 size,
             )?)),
-            #[cfg(feature = "sixel")]
             ProtocolType::Sixel => Ok(Box::new(FixedSixel::from_source(
                 &source,
                 resize,
@@ -151,7 +144,6 @@ impl Picker {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
             ProtocolType::Halfblocks => Box::new(HalfblocksState::new(source)),
-            #[cfg(feature = "sixel")]
             ProtocolType::Sixel => Box::new(SixelState::new(source)),
             ProtocolType::Kitty => {
                 self.kitty_counter += 1;
@@ -179,7 +171,6 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
 fn guess_protocol() -> ProtocolType {
     if let Ok(term) = std::env::var("TERM") {
         match term.as_str() {
-            #[cfg(feature = "sixel")]
             "mlterm" | "yaft-256color" => {
                 return ProtocolType::Sixel;
             }
@@ -191,7 +182,6 @@ fn guess_protocol() -> ProtocolType {
                 if term.contains("kitty") {
                     return ProtocolType::Kitty;
                 }
-                #[cfg(feature = "sixel")]
                 if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
                     if term_program == "MacTerm" {
                         return ProtocolType::Sixel;
@@ -258,14 +248,13 @@ fn check_device_attrs() -> Result<ProtocolType> {
     if buf.contains("_Gi=31;OK") {
         return Ok(ProtocolType::Kitty);
     }
-    #[cfg(feature = "sixel")]
     if buf.contains(";4;") || buf.contains("?4;") || buf.contains(";4c") || buf.contains("?4c") {
         return Ok(ProtocolType::Sixel);
     }
     Err("graphics support not detected".into())
 }
 
-#[cfg(all(test, feature = "rustix", feature = "sixel"))]
+#[cfg(all(test, feature = "rustix"))]
 mod tests {
     use std::assert_eq;
 
@@ -293,7 +282,6 @@ mod tests {
     #[test]
     fn test_cycle_protocol() {
         let mut picker = Picker::new((1, 1));
-        #[cfg(feature = "sixel")]
         assert_eq!(picker.cycle_protocols(), ProtocolType::Sixel);
         assert_eq!(picker.cycle_protocols(), ProtocolType::Kitty);
         assert_eq!(picker.cycle_protocols(), ProtocolType::Halfblocks);

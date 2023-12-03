@@ -1,11 +1,11 @@
 [package]
 name = "ratatui-image"
-version = "0.4.3"
+version = "0.5.0"
 edition = "2021"
 autoexamples = true
 authors = ["Benjamin Große <ste3ls@gmail.com>"]
 description = "An image widget for ratatui, supporting sixels and unicode-halfblocks"
-keywords = ["ratatui", "image", "sixel", "tui", "terminal"]
+keywords = ["ratatui", "image", "sixel", "kitty", "tui"]
 repository = "https://github.com/benjajaja/ratatui-image"
 homepage = "https://github.com/benjajaja/ratatui-image"
 readme = "README.md"
@@ -16,21 +16,20 @@ exclude = [
 rust-version = "1.65.0"
 
 [features]
-default = ["crossterm","rustix","sixel"]
+default = ["rustix"]
 crossterm = ["dep:crossterm", "ratatui/crossterm"]
 termion = ["dep:termion", "ratatui/termion"]
 termwiz = ["dep:termwiz", "ratatui/termwiz"]
-sixel = ["dep:icy_sixel"]
 serde = ["dep:serde"]
 rustix = ["dep:rustix"]
 
 [dependencies]
 dyn-clone = "1.0.11"
 image = { version = "0.24.5" }
-icy_sixel = { version = "0.1.1", optional = true }
-crossterm = { version = "0.25", optional = true }
-termion = { version = "2.0", optional = true }
-termwiz = { version = "0.20", optional = true }
+icy_sixel = { version = "0.1.1" }
+crossterm = { version = ">=0.25", optional = true }
+termion = { version = ">=2.0", optional = true }
+termwiz = { version = ">=0.20", optional = true }
 serde = { version = "^1.0", optional = true, features = ["derive"] }
 rustix = { version = "^0.38.4", optional = true, features = ["stdio", "termios"] }
 base64 = { version = "^0.21.2" }
@@ -49,8 +48,8 @@ doc-scrape-examples = true
 
 [[example]]
 name = "screenshot"
-required-features = ["crossterm", "sixel", "rustix"]
+required-features = ["crossterm", "rustix"]
 
 [[example]]
 name = "async"
-required-features = ["crossterm", "sixel", "rustix"]
+required-features = ["crossterm", "rustix"]

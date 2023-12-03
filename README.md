@@ -112,7 +112,7 @@ useful to save it in some user configuration.
 [Ratatui]: https://github.com/ratatui-org/ratatui
 [Sixel]: https://en.wikipedia.org/wiki/Sixel
 
-Current version: 0.4.3
+Current version: 0.5.0
 
 Sixel compatibility and QA:
 

@@ -15,7 +15,6 @@ use super::Resize;
 
 pub mod halfblocks;
 pub mod kitty;
-#[cfg(feature = "sixel")]
 pub mod sixel;
 
 /// A fixed image protocol for the [crate::FixedImage] widget.
