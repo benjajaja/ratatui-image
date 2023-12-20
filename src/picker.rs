@@ -127,7 +127,7 @@ impl Picker {
                 size,
             )?)),
             ProtocolType::Kitty => {
-                self.kitty_counter += 1;
+                self.kitty_counter = self.kitty_counter.saturating_add(1);
                 Ok(Box::new(FixedKitty::from_source(
                     &source,
                     resize,
@@ -146,7 +146,7 @@ impl Picker {
             ProtocolType::Halfblocks => Box::new(HalfblocksState::new(source)),
             ProtocolType::Sixel => Box::new(SixelState::new(source)),
             ProtocolType::Kitty => {
-                self.kitty_counter += 1;
+                self.kitty_counter = self.kitty_counter.saturating_add(1);
                 Box::new(KittyState::new(source, self.kitty_counter))
             }
         }
