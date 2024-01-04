@@ -9,8 +9,6 @@ Status](https://img.shields.io/github/actions/workflow/status/benjajaja/ratatui-
 
 {{readme}}
 
-Current version: {{version}}
-
 Sixel compatibility and QA:
 
 Terminal   | Fixed | Resize | Notes
