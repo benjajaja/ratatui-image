@@ -19,7 +19,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, StatefulWidget},
     Terminal,
 };
-use ratatui_image::{picker::Picker, protocol::ResizeProtocol, Resize};
+use ratatui_image::{picker::Picker, protocol::StatefulProtocol, Resize};
 
 struct App {
     async_state: ThreadProtocol,
@@ -27,7 +27,7 @@ struct App {
 
 enum AppEvent {
     KeyEvent(KeyEvent),
-    Redraw(Box<dyn ResizeProtocol>),
+    Redraw(Box<dyn StatefulProtocol>),
 }
 
 /// A widget that uses a custom ThreadProtocol as state to offload resizing and encoding to a
@@ -76,14 +76,14 @@ impl StatefulWidget for ThreadImage {
 /// Has `inner` [ResizeProtocol] that is sent off to the `tx` mspc channel to do the
 /// `resize_encode()` work.
 pub struct ThreadProtocol {
-    inner: Option<Box<dyn ResizeProtocol>>,
-    tx: Sender<(Box<dyn ResizeProtocol>, Resize, Rect)>,
+    inner: Option<Box<dyn StatefulProtocol>>,
+    tx: Sender<(Box<dyn StatefulProtocol>, Resize, Rect)>,
 }
 
 impl ThreadProtocol {
     pub fn new(
-        tx: Sender<(Box<dyn ResizeProtocol>, Resize, Rect)>,
-        inner: Box<dyn ResizeProtocol>,
+        tx: Sender<(Box<dyn StatefulProtocol>, Resize, Rect)>,
+        inner: Box<dyn StatefulProtocol>,
     ) -> ThreadProtocol {
         ThreadProtocol {
             inner: Some(inner),
@@ -107,7 +107,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
 
     // Send a [ResizeProtocol] to resize and encode it in a separate thread.
-    let (tx_worker, rec_worker) = mpsc::channel::<(Box<dyn ResizeProtocol>, Resize, Rect)>();
+    let (tx_worker, rec_worker) = mpsc::channel::<(Box<dyn StatefulProtocol>, Resize, Rect)>();
 
     // Send UI-events and the [ResizeProtocol] result back to main thread.
     let (tx_main, rec_main) = mpsc::channel();

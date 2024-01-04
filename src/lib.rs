@@ -1,32 +1,32 @@
 //! # Image widgets with multiple graphics protocol backends for [Ratatui]
+//! [Ratatui] is an immediate-mode TUI library that does 3 things:
 //!
-//! **⚠️ THIS CRATE IS EXPERIMENTAL, AND THE `TERMWIZ` RATATUI BACKEND DOES NOT WORK**
-//!
-//! Render images with graphics protocols in the terminal with [Ratatui].
-//!
-//! ### Query the terminal for available graphics protocols (or guess from `$TERM` or similar).
-//!
+//! 1. **Query the terminal for available graphics protocols** (or guess from `$TERM` or similar).
 //! Some terminals may implement one or more graphics protocols, such as Sixels or Kitty's
 //! graphics protocol. Query the terminal with some escape sequence. Fallback to "halfblocks" which
 //! uses some unicode half-block characters with fore- and background colors.
 //!
-//! ### Query the terminal for the font-size in pixels.
+//! 2. **Query the terminal for the font-size in pixels.**
 //! If there is an actual graphics protocol available, it is necessary to know the font-size to
 //! be able to map the image pixels to character cell area. The image can be resized, fit, or
 //! cropped to an area. Query the terminal for the window and columns/rows sizes, and derive the
 //! font-size.
 //!
-//! ### Render the image by the means of the guessed protocol.
-//! Usually that means outputting some escape sequence, but the details vary wildly.
+//! 3. **Render the image by the means of the guessed protocol.**
+//! Some protocols, like Sixels, are essentially "immediate-mode", but we still need to avoid the
+//! TUI from overwriting the image area, even with blank characters.  
+//!
+//! Other protocols, like Kitty, are essentially stateful, but at least provide a way to re-render
+//! an image that has been loaded, at a different or same position.
 //!
 //! # Quick start
 //! ```rust
 //! use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame};
-//! use ratatui_image::{picker::Picker, ResizeImage, protocol::ResizeProtocol};
+//! use ratatui_image::{picker::Picker, StatefulImage, protocol::StatefulProtocol};
 //!
 //! struct App {
 //!     // We need to hold the render state.
-//!     image: Box<dyn ResizeProtocol>,
+//!     image: Box<dyn StatefulProtocol>,
 //! }
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -48,7 +48,7 @@
 //! }
 //!
 //! fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-//!     let image = ResizeImage::new(None);
+//!     let image = StatefulImage::new(None);
 //!     f.render_stateful_widget(image, f.size(), &mut app.image);
 //! }
 //! ```
@@ -63,27 +63,27 @@
 //! columns+rows bound etc.
 //!
 //! # Widget choice
-//! The [ResizeImage] widget adapts to its render area, is more robust against overdraw bugs and
+//! * The [Image] widget does not adapt to rendering area (except not drawing at all if space
+//! is insufficient), may be a bit more bug prone (overdrawing or artifacts), and is not friendly
+//! with some of the protocols (e.g. the Kitty graphics protocol, which is stateful). Its big
+//! upside is that it is _stateless_ (in terms of ratatui, i.e. immediate-mode), and thus can never
+//! block the rendering thread/task. A lot of ratatui apps only use stateless widgets.
+//! * The [StatefulImage] widget adapts to its render area, is more robust against overdraw bugs and
 //! artifacts, and plays nicer with some of the graphics protocols.
 //! The resizing and encoding is blocking by default, but it is possible to offload this to another
-//! thread or async task (see `examples/async.rs`).
-//!
-//! The [FixedImage] widgets does not adapt to rendering area (except not drawing at all if space
-//! is insufficient), may be a bit more bug prone (overdrawing or artifacts), and is not friendly
-//! with some of the protocols (e.g. the Kitty graphics protocol, which is stateful). Its only
-//! upside is that it is stateless (in terms of ratatui), and thus can never block the rendering
-//! thread/task.
+//! thread or async task (see `examples/async.rs`). It must be rendered with
+//! [`render_stateful_widget`] (i.e. with some mutable state).
 //!
 //! # Examples
 //!
 //! `examples/demo.rs` is a fully fledged demo:
 //! * Guessing the graphics protocol and the terminal font-size.
-//! * Both [FixedImage] and [ResizeImage].
+//! * Both [Image] and [StatefulImage].
 //! * [Resize::Fit] and [Resize::Crop].
 //! * Reacts to resizes from terminal or widget layout.
 //! * Cycle through available graphics protocols at runtime.
 //! * Load different images.
-//! * Cycle toggling [FixedImage], [ResizeImage], or both, to demonstrate correct state after
+//! * Cycle toggling [Image], [StatefulImage], or both, to demonstrate correct state after
 //!   removal.
 //! * Works with crossterm and termion backends.
 //!
@@ -102,6 +102,7 @@
 //!
 //! [Ratatui]: https://github.com/ratatui-org/ratatui
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel
+//! [`render_stateful_widget`]: https://docs.rs/ratatui/latest/ratatui/terminal/struct.Frame.html#method.render_stateful_widget
 use std::{
     cmp::{max, min},
     error::Error,
@@ -111,7 +112,7 @@ use image::{
     imageops::{self, FilterType},
     DynamicImage, ImageBuffer, Rgb,
 };
-use protocol::{ImageSource, Protocol, ResizeProtocol};
+use protocol::{ImageSource, Protocol, StatefulProtocol};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -133,26 +134,26 @@ pub type FontSize = (u16, u16);
 ///
 /// ```rust
 /// # use ratatui::{backend::Backend, terminal::Frame};
-/// # use ratatui_image::{Resize, FixedImage, protocol::Protocol};
+/// # use ratatui_image::{Resize, Image, protocol::Protocol};
 /// struct App {
 ///     image_static: Box<dyn Protocol>,
 /// }
 /// fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-///     let image = FixedImage::new(app.image_static.as_ref());
+///     let image = Image::new(app.image_static.as_ref());
 ///     f.render_widget(image, f.size());
 /// }
 /// ```
-pub struct FixedImage<'a> {
+pub struct Image<'a> {
     image: &'a dyn Protocol,
 }
 
-impl<'a> FixedImage<'a> {
-    pub fn new(image: &'a dyn Protocol) -> FixedImage<'a> {
-        FixedImage { image }
+impl<'a> Image<'a> {
+    pub fn new(image: &'a dyn Protocol) -> Image<'a> {
+        Image { image }
     }
 }
 
-impl<'a> Widget for FixedImage<'a> {
+impl<'a> Widget for Image<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width == 0 || area.height == 0 {
             return;
@@ -162,18 +163,18 @@ impl<'a> Widget for FixedImage<'a> {
     }
 }
 
-/// Resizeable image widget that uses a [ResizeProtocol] state.
+/// Resizeable image widget that uses a [StatefulProtocol] state.
 ///
 /// This stateful widget reacts to area resizes and resizes its image data accordingly.
 ///
 /// ```rust
 /// # use ratatui::{backend::Backend, terminal::Frame};
-/// # use ratatui_image::{Resize, ResizeImage, protocol::{ResizeProtocol}};
+/// # use ratatui_image::{Resize, StatefulImage, protocol::{StatefulProtocol}};
 /// struct App {
-///     image_state: Box<dyn ResizeProtocol>,
+///     image_state: Box<dyn StatefulProtocol>,
 /// }
 /// fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-///     let image = ResizeImage::new(None).resize(Resize::Crop);
+///     let image = StatefulImage::new(None).resize(Resize::Crop);
 ///     f.render_stateful_widget(
 ///         image,
 ///         f.size(),
@@ -181,26 +182,26 @@ impl<'a> Widget for FixedImage<'a> {
 ///     );
 /// }
 /// ```
-pub struct ResizeImage {
+pub struct StatefulImage {
     resize: Resize,
     background_color: Option<Rgb<u8>>,
 }
 
-impl ResizeImage {
-    pub fn new(background_color: Option<Rgb<u8>>) -> ResizeImage {
-        ResizeImage {
+impl StatefulImage {
+    pub fn new(background_color: Option<Rgb<u8>>) -> StatefulImage {
+        StatefulImage {
             resize: Resize::Fit,
             background_color,
         }
     }
-    pub fn resize(mut self, resize: Resize) -> ResizeImage {
+    pub fn resize(mut self, resize: Resize) -> StatefulImage {
         self.resize = resize;
         self
     }
 }
 
-impl StatefulWidget for ResizeImage {
-    type State = Box<dyn ResizeProtocol>;
+impl StatefulWidget for StatefulImage {
+    type State = Box<dyn StatefulProtocol>;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         if area.width == 0 || area.height == 0 {
             return;
@@ -221,7 +222,7 @@ pub enum Resize {
     /// Crop to area.
     ///
     /// If the width or height is smaller than the area, the image will be cropped.
-    /// The behaviour is the same as using [`FixedImage`] widget with the overhead of resizing,
+    /// The behaviour is the same as using [`Image`] widget with the overhead of resizing,
     /// but some terminals might misbehave when overdrawing characters over graphics.
     /// For example, the sixel branch of Alacritty never draws text over a cell that is currently
     /// being rendered by some sixel sequence, not necessarily originating from the same cell.

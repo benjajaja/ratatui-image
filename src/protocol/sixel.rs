@@ -12,17 +12,17 @@ use image::{DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::cmp::min;
 
-use super::{Protocol, ResizeProtocol};
+use super::{Protocol, StatefulProtocol};
 use crate::{ImageSource, Resize, Result};
 
 // Fixed sixel protocol
 #[derive(Clone, Default)]
-pub struct FixedSixel {
+pub struct Sixel {
     pub data: String,
     pub rect: Rect,
 }
 
-impl FixedSixel {
+impl Sixel {
     pub fn from_source(
         source: &ImageSource,
         resize: Resize,
@@ -57,7 +57,7 @@ pub fn encode(img: DynamicImage) -> Result<String> {
     Ok(data)
 }
 
-impl Protocol for FixedSixel {
+impl Protocol for Sixel {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         render(self.rect, &self.data, area, buf, false)
     }
@@ -124,23 +124,23 @@ fn render_area(rect: Rect, area: Rect, overdraw: bool) -> Option<Rect> {
 }
 
 #[derive(Clone)]
-pub struct SixelState {
+pub struct StatefulSixel {
     source: ImageSource,
-    current: FixedSixel,
+    current: Sixel,
     hash: u64,
 }
 
-impl SixelState {
-    pub fn new(source: ImageSource) -> SixelState {
-        SixelState {
+impl StatefulSixel {
+    pub fn new(source: ImageSource) -> StatefulSixel {
+        StatefulSixel {
             source,
-            current: FixedSixel::default(),
+            current: Sixel::default(),
             hash: u64::default(),
         }
     }
 }
 
-impl ResizeProtocol for SixelState {
+impl StatefulProtocol for StatefulSixel {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.current.rect, area, false)
     }
@@ -159,7 +159,7 @@ impl ResizeProtocol for SixelState {
         ) {
             match encode(img) {
                 Ok(data) => {
-                    self.current = FixedSixel { data, rect };
+                    self.current = Sixel { data, rect };
                     self.hash = self.source.hash;
                 }
                 Err(_err) => {

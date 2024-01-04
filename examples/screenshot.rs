@@ -15,7 +15,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Terminal,
 };
-use ratatui_image::{picker::Picker, protocol::Protocol, FixedImage, Resize};
+use ratatui_image::{picker::Picker, protocol::Protocol, Image, Resize};
 struct App {
     image: Box<dyn Protocol>,
 }
@@ -71,7 +71,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         block.inner(area),
     );
 
-    let image = FixedImage::new(app.image.as_ref());
+    let image = Image::new(app.image.as_ref());
     f.render_widget(image, block.inner(area));
     f.render_widget(block, area);
 }

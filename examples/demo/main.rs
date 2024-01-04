@@ -26,8 +26,8 @@ use ratatui::{
 };
 use ratatui_image::{
     picker::Picker,
-    protocol::{ImageSource, Protocol, ResizeProtocol},
-    FixedImage, Resize, ResizeImage,
+    protocol::{ImageSource, Protocol, StatefulProtocol},
+    Image, Resize, StatefulImage,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -61,8 +61,8 @@ struct App<'a> {
     pub picker: Picker,
     pub image_source: ImageSource,
     pub image_static: Box<dyn Protocol>,
-    pub image_fit_state: Box<dyn ResizeProtocol>,
-    pub image_crop_state: Box<dyn ResizeProtocol>,
+    pub image_fit_state: Box<dyn StatefulProtocol>,
+    pub image_crop_state: Box<dyn StatefulProtocol>,
 }
 
 fn size() -> Rect {
@@ -229,7 +229,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.show_images {
         ShowImages::Resized => {}
         _ => {
-            let image = FixedImage::new(app.image_static.as_ref());
+            let image = Image::new(app.image_static.as_ref());
             f.render_widget(image, area);
         }
     }
@@ -248,7 +248,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.show_images {
         ShowImages::Fixed => {}
         _ => {
-            let image = ResizeImage::new(None).resize(Resize::Crop);
+            let image = StatefulImage::new(None).resize(Resize::Crop);
             f.render_stateful_widget(
                 image,
                 block_left_bottom.inner(chunks_left_bottom[0]),
@@ -276,7 +276,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.show_images {
         ShowImages::Fixed => {}
         _ => {
-            let image = ResizeImage::new(None).resize(Resize::Fit);
+            let image = StatefulImage::new(None).resize(Resize::Fit);
             f.render_stateful_widget(
                 image,
                 block_right_top.inner(right_chunks[0]),

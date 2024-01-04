@@ -4,12 +4,12 @@
 use image::{imageops::FilterType, DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
-use super::{Protocol, ResizeProtocol};
+use super::{Protocol, StatefulProtocol};
 use crate::{ImageSource, Resize, Result};
 
 // Fixed Halfblocks protocol
 #[derive(Clone, Default)]
-pub struct FixedHalfblocks {
+pub struct Halfblocks {
     data: Vec<HalfBlock>,
     rect: Rect,
 }
@@ -20,7 +20,7 @@ struct HalfBlock {
     lower: Color,
 }
 
-impl FixedHalfblocks {
+impl Halfblocks {
     /// Create a FixedHalfblocks from an image.
     ///
     /// The "resolution" is determined by the font size of the terminal. Smaller fonts will result
@@ -71,7 +71,7 @@ fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
     data
 }
 
-impl Protocol for FixedHalfblocks {
+impl Protocol for Halfblocks {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         for (i, hb) in self.data.iter().enumerate() {
             let x = i as u16 % self.rect.width;
@@ -93,23 +93,23 @@ impl Protocol for FixedHalfblocks {
 }
 
 #[derive(Clone)]
-pub struct HalfblocksState {
+pub struct StatefulHalfblocks {
     source: ImageSource,
-    current: FixedHalfblocks,
+    current: Halfblocks,
     hash: u64,
 }
 
-impl HalfblocksState {
-    pub fn new(source: ImageSource) -> HalfblocksState {
-        HalfblocksState {
+impl StatefulHalfblocks {
+    pub fn new(source: ImageSource) -> StatefulHalfblocks {
+        StatefulHalfblocks {
             source,
-            current: FixedHalfblocks::default(),
+            current: Halfblocks::default(),
             hash: u64::default(),
         }
     }
 }
 
-impl ResizeProtocol for HalfblocksState {
+impl StatefulProtocol for StatefulHalfblocks {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.current.rect, area, false)
     }
@@ -127,12 +127,12 @@ impl ResizeProtocol for HalfblocksState {
             force,
         ) {
             let data = encode(&img, rect);
-            let current = FixedHalfblocks { data, rect };
+            let current = Halfblocks { data, rect };
             self.current = current;
             self.hash = self.source.hash;
         }
     }
     fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        FixedHalfblocks::render(&self.current, area, buf);
+        Halfblocks::render(&self.current, area, buf);
     }
 }

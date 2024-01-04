@@ -7,17 +7,17 @@ use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::{ImageSource, Resize, Result};
 
-use super::{Protocol, ResizeProtocol};
+use super::{Protocol, StatefulProtocol};
 
 // Fixed Kitty protocol (transmits image data on every render!)
 #[derive(Clone, Default)]
-pub struct FixedKitty {
+pub struct Kitty {
     transmit_data: String,
     unique_id: u8,
     rect: Rect,
 }
 
-impl FixedKitty {
+impl Kitty {
     /// Create a FixedKitty from an image.
     ///
     /// The "resolution" is determined by the font size of the terminal. Smaller fonts will result
@@ -43,7 +43,7 @@ impl FixedKitty {
     }
 }
 
-impl Protocol for FixedKitty {
+impl Protocol for Kitty {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let mut seq = Some(self.transmit_data.clone());
         render(area, self.rect, buf, self.unique_id, &mut seq);
@@ -55,7 +55,7 @@ impl Protocol for FixedKitty {
 }
 
 #[derive(Clone)]
-pub struct KittyState {
+pub struct StatefulKitty {
     source: ImageSource,
     pub unique_id: u8,
     rect: Rect,
@@ -70,9 +70,9 @@ enum KittyProtoState {
     TransmitAndPlace(String),
 }
 
-impl KittyState {
-    pub fn new(source: ImageSource, id: u8) -> KittyState {
-        KittyState {
+impl StatefulKitty {
+    pub fn new(source: ImageSource, id: u8) -> StatefulKitty {
+        StatefulKitty {
             source,
             unique_id: id,
             rect: Rect::default(),
@@ -82,7 +82,7 @@ impl KittyState {
     }
 }
 
-impl ResizeProtocol for KittyState {
+impl StatefulProtocol for StatefulKitty {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.rect, area, false)
     }
