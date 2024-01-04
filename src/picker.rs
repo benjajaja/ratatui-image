@@ -7,13 +7,13 @@ use rustix::termios::Winsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::protocol::sixel::{FixedSixel, SixelState};
+use crate::protocol::sixel::{Sixel, StatefulSixel};
 
 use crate::{
     protocol::{
-        halfblocks::{FixedHalfblocks, HalfblocksState},
-        kitty::{FixedKitty, KittyState},
-        Protocol, ResizeProtocol,
+        halfblocks::{Halfblocks, StatefulHalfblocks},
+        kitty::{Kitty, StatefulKitty},
+        Protocol, StatefulProtocol,
     },
     FontSize, ImageSource, Resize, Result,
 };
@@ -105,7 +105,7 @@ impl Picker {
         self.protocol_type
     }
 
-    /// Returns a new protocol for [`crate::FixedImage`] widgets that fits into the given size.
+    /// Returns a new protocol for [`crate::Image`] widgets that fits into the given size.
     pub fn new_protocol(
         &mut self,
         image: DynamicImage,
@@ -114,13 +114,13 @@ impl Picker {
     ) -> Result<Box<dyn Protocol>> {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
-            ProtocolType::Halfblocks => Ok(Box::new(FixedHalfblocks::from_source(
+            ProtocolType::Halfblocks => Ok(Box::new(Halfblocks::from_source(
                 &source,
                 resize,
                 self.background_color,
                 size,
             )?)),
-            ProtocolType::Sixel => Ok(Box::new(FixedSixel::from_source(
+            ProtocolType::Sixel => Ok(Box::new(Sixel::from_source(
                 &source,
                 resize,
                 self.background_color,
@@ -128,7 +128,7 @@ impl Picker {
             )?)),
             ProtocolType::Kitty => {
                 self.kitty_counter = self.kitty_counter.saturating_add(1);
-                Ok(Box::new(FixedKitty::from_source(
+                Ok(Box::new(Kitty::from_source(
                     &source,
                     resize,
                     self.background_color,
@@ -139,15 +139,15 @@ impl Picker {
         }
     }
 
-    /// Returns a new *resize* protocol for [`crate::ResizeImage`] widgets.
-    pub fn new_resize_protocol(&mut self, image: DynamicImage) -> Box<dyn ResizeProtocol> {
+    /// Returns a new *resize* protocol for [`crate::StatefulImage`] widgets.
+    pub fn new_resize_protocol(&mut self, image: DynamicImage) -> Box<dyn StatefulProtocol> {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
-            ProtocolType::Halfblocks => Box::new(HalfblocksState::new(source)),
-            ProtocolType::Sixel => Box::new(SixelState::new(source)),
+            ProtocolType::Halfblocks => Box::new(StatefulHalfblocks::new(source)),
+            ProtocolType::Sixel => Box::new(StatefulSixel::new(source)),
             ProtocolType::Kitty => {
                 self.kitty_counter = self.kitty_counter.saturating_add(1);
-                Box::new(KittyState::new(source, self.kitty_counter))
+                Box::new(StatefulKitty::new(source, self.kitty_counter))
             }
         }
     }
