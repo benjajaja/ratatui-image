@@ -797,7 +797,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-image"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "base64",
  "crossterm 0.25.0",

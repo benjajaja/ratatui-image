@@ -113,20 +113,24 @@ useful to save it in some user configuration.
 [Sixel]: https://en.wikipedia.org/wiki/Sixel
 [`render_stateful_widget`]: https://docs.rs/ratatui/latest/ratatui/terminal/struct.Frame.html#method.render_stateful_widget
 
-Sixel compatibility and QA:
+### Compatibility matrix
 
-Terminal   | Fixed | Resize | Notes
------------|-------|--------|-------
-Xterm      | ✔️     | ✔️      |
-Foot       | ✔️     | ✔️      |
-kitty      | ✔️     | ✔️      |
-Alacritty  | ✔️     | ❌     | [with sixel patch](https://github.com/microo8/alacritty-sixel), but never clears graphics
-iTerm2     | ❔    | ❔     | Untested (needs apple hardware)
-konsole    | ❌    | ❌     | Does not clear graphics unless cells have a background style
-Contour    | ❌    | ❌     | Text over graphics
-Wezterm    | ❌    | ❌     | [Buggy](https://github.com/wez/wezterm/issues/217#issuecomment-1657075311)
-ctx        | ❌    | ❌     | Buggy
-Blackbox   | ❔    | ❔     | Untested
+Compatibility and QA:
+
+Terminal  | Protocol | Fixed | Resize | Notes
+----------|----------|-------|--------|-------
+Xterm     | `Sixel`  | ✔️     | ✔️      |
+Foot      | `Sixel`  | ✔️     | ✔️      |
+kitty     | `Kitty`  | ✔️     | ✔️      |
+Wezterm   | `iTerm2` | ✔️     | ✔️      | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
+Alacritty | `Sixel`  | ✔️     | ❌     | [only with sixel patch](https://github.com/microo8/alacritty-sixel), but does not clears graphics.
+iTerm2    | `iTerm2` | ❔    | ❔     | Untested (needs apple hardware), however should be the same as WezTerm.
+konsole   | `Sixel`  | ❌    | ❌     | [Wontfix: does not clear graphics](https://bugs.kde.org/show_bug.cgi?id=456354), other artifacts.
+Contour   | `Sixel`  | ❌    | ❌     | Does not clear graphics.
+ctx       | `Sixel`  | ❌    | ❌     | Buggy.
+Blackbox  | `Sixel`  | ❔    | ❔     | Untested.
+
+Here, "Fixed" means the `Image` widget, and "Resize" is the `StatefulWidget`.
 
 Latest Xterm testing screenshot:  
 ![Testing screenshot](./assets/test_screenshot.png)
@@ -144,7 +148,8 @@ Halfblocks should work in all terminals.
   Not a library but a terminal file manager that implementes many graphics protocols and lets you
   preview images in the filesystem.
 * [Überzug++](https://github.com/jstkdng/ueberzugpp)
-  CLI utility that draws images on terminals by using X11/wayland child windows, sixels, kitty
-  and/or iterm2 protocols. There exists several wrapper or bindings crates.
+  CLI utility that draws images on terminals by using X11/wayland child windows, sixels, kitty,
+  and/or iterm2 protocols (any means necessary). There exists several wrapper or bindings crates.
+  More battle-tested but essentially stateful, which can make it awkward to use with immediate-mode.
 
 License: MIT
