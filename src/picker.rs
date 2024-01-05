@@ -7,12 +7,12 @@ use rustix::termios::Winsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::protocol::sixel::{Sixel, StatefulSixel};
-
 use crate::{
     protocol::{
         halfblocks::{Halfblocks, StatefulHalfblocks},
+        iterm2::{FixedIterm2, Iterm2State},
         kitty::{Kitty, StatefulKitty},
+        sixel::{Sixel, StatefulSixel},
         Protocol, StatefulProtocol,
     },
     FontSize, ImageSource, Resize, Result,
@@ -37,6 +37,7 @@ pub enum ProtocolType {
     Halfblocks,
     Sixel,
     Kitty,
+    Iterm2,
 }
 
 impl ProtocolType {
@@ -44,7 +45,8 @@ impl ProtocolType {
         match self {
             ProtocolType::Halfblocks => ProtocolType::Sixel,
             ProtocolType::Sixel => ProtocolType::Kitty,
-            ProtocolType::Kitty => ProtocolType::Halfblocks,
+            ProtocolType::Kitty => ProtocolType::Iterm2,
+            ProtocolType::Iterm2 => ProtocolType::Halfblocks,
         }
     }
 }
@@ -136,6 +138,12 @@ impl Picker {
                     self.kitty_counter,
                 )?))
             }
+            ProtocolType::Iterm2 => Ok(Box::new(FixedIterm2::from_source(
+                &source,
+                resize,
+                self.background_color,
+                size,
+            )?)),
         }
     }
 
@@ -149,6 +157,7 @@ impl Picker {
                 self.kitty_counter = self.kitty_counter.saturating_add(1);
                 Box::new(StatefulKitty::new(source, self.kitty_counter))
             }
+            ProtocolType::Iterm2 => Box::new(Iterm2State::new(source)),
         }
     }
 }
@@ -169,25 +178,30 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
 
 // Guess what protocol should be used, with termios stdin/out queries.
 fn guess_protocol() -> ProtocolType {
+    #[cfg(all(feature = "rustix", unix))]
+    if let Ok(t) = check_device_attrs() {
+        return t;
+    }
+
     if let Ok(term) = std::env::var("TERM") {
-        match term.as_str() {
-            "mlterm" | "yaft-256color" => {
-                return ProtocolType::Sixel;
-            }
-            _ => {
-                #[cfg(all(feature = "rustix", unix))]
-                if let Ok(t) = check_device_attrs() {
-                    return t;
-                }
-                if term.contains("kitty") {
-                    return ProtocolType::Kitty;
-                }
-                if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
-                    if term_program == "MacTerm" {
-                        return ProtocolType::Sixel;
-                    }
-                }
-            }
+        if term == "mlterm" || term == "yaft-256color" {
+            return ProtocolType::Sixel;
+        }
+        if term.contains("kitty") {
+            return ProtocolType::Kitty;
+        }
+    }
+    if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
+        if term_program == "MacTerm" {
+            return ProtocolType::Sixel;
+        }
+        if term_program.contains("iTerm") {
+            return ProtocolType::Iterm2;
+        }
+    }
+    if let Ok(lc_term) = std::env::var("LC_TERMINAL") {
+        if lc_term.contains("iTerm") {
+            return ProtocolType::Iterm2;
         }
     }
     ProtocolType::Halfblocks
@@ -284,6 +298,7 @@ mod tests {
         let mut picker = Picker::new((1, 1));
         assert_eq!(picker.cycle_protocols(), ProtocolType::Sixel);
         assert_eq!(picker.cycle_protocols(), ProtocolType::Kitty);
+        assert_eq!(picker.cycle_protocols(), ProtocolType::Iterm2);
         assert_eq!(picker.cycle_protocols(), ProtocolType::Halfblocks);
     }
 }
