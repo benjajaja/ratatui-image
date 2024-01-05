@@ -178,11 +178,6 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
 
 // Guess what protocol should be used, with termios stdin/out queries.
 fn guess_protocol() -> ProtocolType {
-    #[cfg(all(feature = "rustix", unix))]
-    if let Ok(t) = check_device_attrs() {
-        return t;
-    }
-
     if let Ok(term) = std::env::var("TERM") {
         if term == "mlterm" || term == "yaft-256color" {
             return ProtocolType::Sixel;
@@ -195,7 +190,7 @@ fn guess_protocol() -> ProtocolType {
         if term_program == "MacTerm" {
             return ProtocolType::Sixel;
         }
-        if term_program.contains("iTerm") {
+        if term_program.contains("iTerm") || term_program.contains("WezTerm") {
             return ProtocolType::Iterm2;
         }
     }
@@ -204,6 +199,13 @@ fn guess_protocol() -> ProtocolType {
             return ProtocolType::Iterm2;
         }
     }
+
+    // No hardcoded stuff worked, try querying the terminal now.
+    #[cfg(all(feature = "rustix", unix))]
+    if let Ok(t) = check_device_attrs() {
+        return t;
+    }
+
     ProtocolType::Halfblocks
 }
 
