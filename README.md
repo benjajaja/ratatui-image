@@ -120,8 +120,8 @@ Terminal   | Fixed | Resize | Notes
 Xterm      | ✔️     | ✔️      |
 Foot       | ✔️     | ✔️      |
 kitty      | ✔️     | ✔️      |
-Alacritty  | ✔️     | ❌     | [with sixel patch](https://github.com/microo8/alacritty-sixel), but never clears graphics.
-iTerm2     | ❌    | ❌     | Unimplemented, has a protocolo [similar to sixel](https://iterm2.com/documentation-images.html)
+Alacritty  | ✔️     | ❌     | [with sixel patch](https://github.com/microo8/alacritty-sixel), but never clears graphics
+iTerm2     | ❔    | ❔     | Untested (needs apple hardware)
 konsole    | ❌    | ❌     | Does not clear graphics unless cells have a background style
 Contour    | ❌    | ❌     | Text over graphics
 Wezterm    | ❌    | ❌     | [Buggy](https://github.com/wez/wezterm/issues/217#issuecomment-1657075311)
@@ -143,5 +143,8 @@ Halfblocks should work in all terminals.
 * [yazi](https://github.com/sxyazi/yazi)
   Not a library but a terminal file manager that implementes many graphics protocols and lets you
   preview images in the filesystem.
+* [Überzug++](https://github.com/jstkdng/ueberzugpp)
+  CLI utility that draws images on terminals by using X11/wayland child windows, sixels, kitty
+  and/or iterm2 protocols. There exists several wrapper or bindings crates.
 
 License: MIT
