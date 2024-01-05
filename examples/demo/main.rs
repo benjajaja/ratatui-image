@@ -135,18 +135,7 @@ impl<'a> App<'a> {
             }
             'i' => {
                 self.picker.cycle_protocols();
-
-                self.image_static = self
-                    .picker
-                    .new_protocol(self.image_source.image.clone(), size(), Resize::Fit)
-                    .unwrap();
-
-                self.image_fit_state = self
-                    .picker
-                    .new_resize_protocol(self.image_source.image.clone());
-                self.image_crop_state = self
-                    .picker
-                    .new_resize_protocol(self.image_source.image.clone());
+                self.reset_images();
             }
             'o' => {
                 let path = match self.image_source_path.to_str() {
@@ -155,12 +144,8 @@ impl<'a> App<'a> {
                 };
                 let dyn_img = image::io::Reader::open(path).unwrap().decode().unwrap();
                 self.image_source = ImageSource::new(dyn_img.clone(), self.picker.font_size);
-
-                self.image_static = self
-                    .picker
-                    .new_protocol(dyn_img, size(), Resize::Fit)
-                    .unwrap();
                 self.image_source_path = path.into();
+                self.reset_images();
             }
             'H' => {
                 if self.split_percent >= 10 {
@@ -190,6 +175,20 @@ impl<'a> App<'a> {
             }
             _ => {}
         }
+    }
+
+    fn reset_images(&mut self) {
+        self.image_static = self
+            .picker
+            .new_protocol(self.image_source.image.clone(), size(), Resize::Fit)
+            .unwrap();
+
+        self.image_fit_state = self
+            .picker
+            .new_resize_protocol(self.image_source.image.clone());
+        self.image_crop_state = self
+            .picker
+            .new_resize_protocol(self.image_source.image.clone());
     }
 
     pub fn on_tick(&mut self) {}
