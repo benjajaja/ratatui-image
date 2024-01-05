@@ -36,6 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut picker = Picker::from_termios()?;
+    picker.guess_protocol();
     picker.background_color = Some(Rgb::<u8>([255, 0, 255]));
     assert_eq!(
         ASSERT_FONT_SIZE, picker.font_size,

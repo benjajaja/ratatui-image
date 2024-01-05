@@ -72,7 +72,7 @@ args = [
   "build",
   "--example",
   "screenshot",
-  "--features", "sixel,rustix,crossterm",
+  "--features", "rustix,crossterm",
 ]
 
 [tasks.demo-build]
@@ -81,7 +81,7 @@ args = [
   "build",
   "--example",
   "demo",
-  "--features", "sixel,rustix,crossterm",
+  "--features", "rustix,crossterm",
 ]
 
 
@@ -149,6 +149,6 @@ args = [
 
 [tasks.xterm-stderr]
 script = '''
-cargo make screenshot-spawn-xterm -e "cargo run --example demo --features sixel,rustix,crossterm 2>$(tty)"
+cargo make screenshot-spawn-xterm -e "cargo run --example demo --features rustix,crossterm 2>$(tty)"
 '''
 
