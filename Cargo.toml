@@ -16,8 +16,9 @@ exclude = [
 rust-version = "1.65.0"
 
 [features]
-default = ["rustix"]
+default = ["image-defaults", "rustix"]
 crossterm = ["dep:crossterm", "ratatui/crossterm"]
+image-defaults = ["image/default"]
 termion = ["dep:termion", "ratatui/termion"]
 termwiz = ["dep:termwiz", "ratatui/termwiz"]
 serde = ["dep:serde"]
@@ -25,7 +26,7 @@ rustix = ["dep:rustix"]
 
 [dependencies]
 dyn-clone = "1.0.11"
-image = { version = "0.24.5", default-features = false, features = ["gif", "jpeg", "png", "webp", "pnm", "tga", "tiff", "bmp"] }
+image = { version = "0.24.5", default-features = false, features = ["jpeg"] }
 icy_sixel = { version = "0.1.1" }
 crossterm = { version = ">=0.25", optional = true }
 termion = { version = ">=2.0", optional = true }
