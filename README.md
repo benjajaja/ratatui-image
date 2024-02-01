@@ -108,6 +108,10 @@ The lib also includes a binary that renders an image file.
 working correctly with ratatu-image.
 * `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
 useful to save it in some user configuration.
+* `image-defaults` (default) just enables `image/defaults` (`image` has `default-features =
+false`). To only support a selection of image formats and cut down dependencies, disable this
+feature, add `image` to your crate, and enable its features/formats as desired. See
+https://doc.rust-lang.org/cargo/reference/features.html#feature-unification.
 
 [Ratatui]: https://github.com/ratatui-org/ratatui
 [Sixel]: https://en.wikipedia.org/wiki/Sixel
