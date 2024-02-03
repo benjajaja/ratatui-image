@@ -39,7 +39,7 @@ pub struct ThreadImage {
 impl ThreadImage {
     pub fn new() -> ThreadImage {
         ThreadImage {
-            resize: Resize::Fit,
+            resize: Resize::Fit(None),
         }
     }
 
@@ -178,7 +178,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         block.inner(area),
     );
 
-    let image = ThreadImage::new().resize(Resize::Fit);
+    let image = ThreadImage::new().resize(Resize::Fit(None));
     f.render_stateful_widget(image, block.inner(area), &mut app.async_state);
     f.render_widget(block, area);
 }

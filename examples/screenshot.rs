@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image = picker.new_protocol(
         dyn_img,
         Rect::new(0, 0, SCREEN_SIZE.0 - 10, SCREEN_SIZE.1 - 4),
-        Resize::Fit,
+        Resize::Fit(None),
     )?;
     let mut app = App { image };
 

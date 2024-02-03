@@ -131,7 +131,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(block_top, chunks[0]);
 
     let block_bottom = Block::default().borders(Borders::ALL).title("image");
-    let image = StatefulImage::new(None).resize(Resize::Fit);
+    let image = StatefulImage::new(None).resize(Resize::Fit(None));
     f.render_stateful_widget(image, block_bottom.inner(chunks[1]), &mut app.image_state);
     f.render_widget(block_bottom, chunks[1]);
 }

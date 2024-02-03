@@ -78,7 +78,7 @@ impl<'a> App<'a> {
         picker.guess_protocol();
 
         let image_static = picker
-            .new_protocol(dyn_img.clone(), size(), Resize::Fit)
+            .new_protocol(dyn_img.clone(), size(), Resize::Fit(None))
             .unwrap();
 
         let image_source = ImageSource::new(dyn_img.clone(), picker.font_size);
@@ -180,7 +180,7 @@ impl<'a> App<'a> {
     fn reset_images(&mut self) {
         self.image_static = self
             .picker
-            .new_protocol(self.image_source.image.clone(), size(), Resize::Fit)
+            .new_protocol(self.image_source.image.clone(), size(), Resize::Fit(None))
             .unwrap();
 
         self.image_fit_state = self
@@ -275,7 +275,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.show_images {
         ShowImages::Fixed => {}
         _ => {
-            let image = StatefulImage::new(None).resize(Resize::Fit);
+            let image = StatefulImage::new(None).resize(Resize::Fit(None));
             f.render_stateful_widget(
                 image,
                 block_right_top.inner(right_chunks[0]),
