@@ -9,6 +9,8 @@ use rustix::termios::Winsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+static READ_STDIN_TIMEOUT_MS: u64 = 1000;
+
 use crate::{
     protocol::{
         halfblocks::{Halfblocks, StatefulHalfblocks},
@@ -268,7 +270,7 @@ fn check_device_attrs() -> Result<ProtocolType> {
         b"\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c",
     )?;
 
-    let buf = read_stdin_timeout(move |charbuf| {
+    let buf = read_stdin_timeout(READ_STDIN_TIMEOUT_MS, move |charbuf| {
         let _ = rustix::io::read(stdin, charbuf);
     })?;
 
@@ -294,11 +296,6 @@ fn read_stdin(mut read: impl FnMut(&mut [u8; 1])) -> String {
         }
         buf.push(char::from(charbuf[0]));
         // TODO: The response to the first kitty query could potentially be something like `<ESC>_Gi=31;error message containing a "c"<ESC>\ and we would then not detect sixel support correctly.
-        if charbuf[0] == 27 {
-            eprintln!("char: {} (<ESC>)", charbuf[0]);
-        } else {
-            eprintln!("char: {} ({})", charbuf[0], char::from(charbuf[0]));
-        }
         if charbuf[0] == b'c' {
             break;
         }
@@ -306,13 +303,16 @@ fn read_stdin(mut read: impl FnMut(&mut [u8; 1])) -> String {
     buf
 }
 
-fn read_stdin_timeout(read: impl FnMut(&mut [u8; 1]) + Send + 'static) -> Result<String> {
+pub fn read_stdin_timeout(
+    timeout_ms: u64,
+    read: impl FnMut(&mut [u8; 1]) + Send + 'static,
+) -> Result<String> {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
         let output = read_stdin(read);
         let _ = sender.send(output);
     });
-    match receiver.recv_timeout(Duration::from_millis(1000)) {
+    match receiver.recv_timeout(Duration::from_millis(timeout_ms)) {
         Ok(s) => Ok(s),
         Err(err) => Err(Box::new(io::Error::new(io::ErrorKind::TimedOut, err))),
     }
@@ -373,10 +373,21 @@ mod tests {
 
     #[test]
     fn test_read_stdin_timeout() {
-        assert_eq!("abc", read_stdin_timeout(read_like_stdin("abc")).unwrap(),);
+        assert_eq!(
+            "abc",
+            read_stdin_timeout(1, read_like_stdin("abc")).unwrap(),
+        );
+        assert_eq!(
+            "abc",
+            read_stdin_timeout(1, read_like_stdin("abc abc")).unwrap(),
+        );
         assert_eq!(
             true,
-            read_stdin_timeout(read_like_stdin("hello without end")).is_err()
+            read_stdin_timeout(
+                1,
+                read_like_stdin("this string does not kontain the third letter of the alphabet")
+            )
+            .is_err()
         );
     }
 }
