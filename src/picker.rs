@@ -1,5 +1,7 @@
 //! Helper module to build a protocol, and swap protocols at runtime
 
+use std::{env, io, sync::mpsc, thread, time::Duration};
+
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
 #[cfg(all(feature = "rustix", unix))]
@@ -209,6 +211,28 @@ fn guess_protocol() -> ProtocolType {
     ProtocolType::Halfblocks
 }
 
+#[allow(unused)]
+fn guess_protocol_magic_env_vars() -> ProtocolType {
+    let vars = [
+        ("KITTY_WINDOW_ID", ProtocolType::Kitty),
+        ("ITERM_SESSION_ID", ProtocolType::Iterm2),
+        ("WEZTERM_EXECUTABLE", ProtocolType::Iterm2),
+    ];
+    match vars.into_iter().find(|v| env_exists(v.0)) {
+        Some(v) => return v.1,
+        None => {
+            eprintln!("no special environment variables detected");
+        }
+    }
+
+    ProtocolType::Halfblocks
+}
+
+#[inline]
+pub fn env_exists(name: &str) -> bool {
+    env::var_os(name).is_some_and(|s| !s.is_empty())
+}
+
 #[cfg(all(feature = "rustix", unix))]
 /// Check for kitty or sixel terminal support.
 /// see https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Sixel-Graphics
@@ -244,20 +268,10 @@ fn check_device_attrs() -> Result<ProtocolType> {
         b"\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c",
     )?;
 
-    let mut buf = String::new();
+    let buf = read_stdin_timeout(move |charbuf| {
+        let _ = rustix::io::read(stdin, charbuf);
+    })?;
 
-    loop {
-        let mut charbuf = [0; 1];
-        rustix::io::read(stdin, &mut charbuf)?;
-        if charbuf[0] == 0 {
-            continue;
-        }
-        buf.push(char::from(charbuf[0]));
-        // TODO: The response to the first kitty query could potentially be something like `<ESC>_Gi=31;error message containing a "c"<ESC>\ and we would then not detect sixel support correctly.
-        if charbuf[0] == b'c' {
-            break;
-        }
-    }
     // Reset to previous attrs
     rustix::termios::tcsetattr(stdin, OptionalActions::Now, &termios_original)?;
 
@@ -270,12 +284,48 @@ fn check_device_attrs() -> Result<ProtocolType> {
     Err("graphics support not detected".into())
 }
 
+fn read_stdin(mut read: impl FnMut(&mut [u8; 1])) -> String {
+    let mut buf = String::with_capacity(200);
+    loop {
+        let mut charbuf: [u8; 1] = [0; 1];
+        read(&mut charbuf);
+        if charbuf == [0] {
+            continue;
+        }
+        buf.push(char::from(charbuf[0]));
+        // TODO: The response to the first kitty query could potentially be something like `<ESC>_Gi=31;error message containing a "c"<ESC>\ and we would then not detect sixel support correctly.
+        if charbuf[0] == 27 {
+            eprintln!("char: {} (<ESC>)", charbuf[0]);
+        } else {
+            eprintln!("char: {} ({})", charbuf[0], char::from(charbuf[0]));
+        }
+        if charbuf[0] == b'c' {
+            break;
+        }
+    }
+    buf
+}
+
+fn read_stdin_timeout(read: impl FnMut(&mut [u8; 1]) + Send + 'static) -> Result<String> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let output = read_stdin(read);
+        let _ = sender.send(output);
+    });
+    match receiver.recv_timeout(Duration::from_millis(1000)) {
+        Ok(s) => Ok(s),
+        Err(err) => Err(Box::new(io::Error::new(io::ErrorKind::TimedOut, err))),
+    }
+}
+
 #[cfg(all(test, feature = "rustix"))]
 mod tests {
     use std::assert_eq;
 
-    use crate::picker::{font_size, Picker, ProtocolType};
+    use crate::picker::{font_size, read_stdin_timeout, Picker, ProtocolType};
     use rustix::termios::Winsize;
+
+    use super::read_stdin;
 
     #[test]
     fn test_font_size() {
@@ -302,5 +352,31 @@ mod tests {
         assert_eq!(picker.cycle_protocols(), ProtocolType::Kitty);
         assert_eq!(picker.cycle_protocols(), ProtocolType::Iterm2);
         assert_eq!(picker.cycle_protocols(), ProtocolType::Halfblocks);
+    }
+
+    /// Return a closure that reads into the argument, one char at a time.
+    fn read_like_stdin(data: &str) -> impl FnMut(&mut [u8; 1]) + '_ {
+        let mut chars = data.chars();
+        move |charbuf| {
+            if let Some(c) = chars.next() {
+                charbuf[0] = c as u8;
+            } else {
+                loop {}
+            }
+        }
+    }
+
+    #[test]
+    fn test_read_stdin() {
+        assert_eq!("abc", read_stdin(read_like_stdin("abc")));
+    }
+
+    #[test]
+    fn test_read_stdin_timeout() {
+        assert_eq!("abc", read_stdin_timeout(read_like_stdin("abc")).unwrap(),);
+        assert_eq!(
+            true,
+            read_stdin_timeout(read_like_stdin("hello without end")).is_err()
+        );
     }
 }
