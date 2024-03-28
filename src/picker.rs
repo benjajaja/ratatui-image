@@ -1,5 +1,7 @@
 //! Helper module to build a protocol, and swap protocols at runtime
 
+use std::{env, io, time::Instant};
+
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
 #[cfg(all(feature = "rustix", unix))]
@@ -209,6 +211,28 @@ fn guess_protocol() -> ProtocolType {
     ProtocolType::Halfblocks
 }
 
+#[allow(unused)]
+fn guess_protocol_magic_env_vars() -> ProtocolType {
+    let vars = [
+        ("KITTY_WINDOW_ID", ProtocolType::Kitty),
+        ("ITERM_SESSION_ID", ProtocolType::Iterm2),
+        ("WEZTERM_EXECUTABLE", ProtocolType::Iterm2),
+    ];
+    match vars.into_iter().find(|v| env_exists(v.0)) {
+        Some(v) => return v.1,
+        None => {
+            eprintln!("no special environment variables detected");
+        }
+    }
+
+    ProtocolType::Halfblocks
+}
+
+#[inline]
+pub fn env_exists(name: &str) -> bool {
+    env::var_os(name).is_some_and(|s| !s.is_empty())
+}
+
 #[cfg(all(feature = "rustix", unix))]
 /// Check for kitty or sixel terminal support.
 /// see https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Sixel-Graphics
@@ -229,36 +253,36 @@ fn check_device_attrs() -> Result<ProtocolType> {
     let stdin = rustix::stdio::stdin();
     let termios_original = rustix::termios::tcgetattr(stdin)?;
     let mut termios = termios_original.clone();
-    // Disable canonical mode to read without waiting for Enter, disable echoing
+    // Disable canonical mode to read without waiting for Enter, disable echoing.
     termios.local_modes &= !LocalModes::ICANON;
     termios.local_modes &= !LocalModes::ECHO;
     rustix::termios::tcsetattr(stdin, OptionalActions::Drain, &termios)?;
+
+    // Enable nonblocking mode for reads, so that this works even if the terminal emulator doesn't
+    // reply at all or replies with unexpected data.
+    let fd_flags_original = rustix::fs::fcntl_getfl(stdin)?;
+    let mut fd_flags = fd_flags_original;
+    fd_flags.insert(rustix::fs::OFlags::NONBLOCK);
+    rustix::fs::fcntl_setfl(stdin, fd_flags)?;
 
     rustix::io::write(
         rustix::stdio::stdout(),
         // Queries first for kitty support with `_Gi=...<ESC>\` and then for "graphics attributes"
         // (sixel) with `<ESC>[c`.
-        // The query for kitty might not produce any response at all and we'd be stuck reading from
-        // stdin forever. But the second query should always get some kind of response.
         // See https://sw.kovidgoyal.net/kitty/graphics-protocol/#querying-support-and-available-transmission-mediums
         b"\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c",
     )?;
 
-    let mut buf = String::new();
+    let buf = read_stdin(1000, move || {
+        let mut charbuf: [u8; 1] = [0];
+        match rustix::io::read(stdin, &mut charbuf) {
+            Ok(_) => Ok(charbuf[0]),
+            Err(err) => Err(err.into()),
+        }
+    })?;
 
-    loop {
-        let mut charbuf = [0; 1];
-        rustix::io::read(stdin, &mut charbuf)?;
-        if charbuf[0] == 0 {
-            continue;
-        }
-        buf.push(char::from(charbuf[0]));
-        // TODO: The response to the first kitty query could potentially be something like `<ESC>_Gi=31;error message containing a "c"<ESC>\ and we would then not detect sixel support correctly.
-        if charbuf[0] == b'c' {
-            break;
-        }
-    }
-    // Reset to previous attrs
+    // Reset to previous mode and status, and termios attributes.
+    rustix::fs::fcntl_setfl(stdin, fd_flags_original)?;
     rustix::termios::tcsetattr(stdin, OptionalActions::Now, &termios_original)?;
 
     if buf.contains("_Gi=31;OK") {
@@ -270,11 +294,52 @@ fn check_device_attrs() -> Result<ProtocolType> {
     Err("graphics support not detected".into())
 }
 
+pub fn read_stdin(
+    timeout_ms: u128,
+    mut read: impl FnMut() -> io::Result<u8>,
+) -> io::Result<String> {
+    let start = Instant::now();
+    let mut buf = String::with_capacity(200);
+    loop {
+        let result = read();
+        if Instant::now().duration_since(start).as_millis() > timeout_ms {
+            // Always timeout, otherwise the terminal could potentially keep sending data forever.
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                match result {
+                    Err(err) => err.to_string(),
+                    Ok(_) => "timed out while reading data".to_string(),
+                },
+            ));
+        }
+        match result {
+            Ok(ch) => {
+                buf.push(char::from(ch));
+            }
+            Err(err) => {
+                if err.kind() == io::ErrorKind::WouldBlock {
+                    if buf.is_empty() {
+                        // No data yet, keep polling.
+                        continue;
+                    }
+                    // We've read some data.
+                    return Ok(buf);
+                }
+                // Some other kind of read error.
+                return Err(err);
+            }
+        }
+    }
+}
+
 #[cfg(all(test, feature = "rustix"))]
 mod tests {
-    use std::assert_eq;
+    use std::{
+        assert_eq,
+        io::{self},
+    };
 
-    use crate::picker::{font_size, Picker, ProtocolType};
+    use crate::picker::{font_size, read_stdin, Picker, ProtocolType};
     use rustix::termios::Winsize;
 
     #[test]
@@ -302,5 +367,60 @@ mod tests {
         assert_eq!(picker.cycle_protocols(), ProtocolType::Kitty);
         assert_eq!(picker.cycle_protocols(), ProtocolType::Iterm2);
         assert_eq!(picker.cycle_protocols(), ProtocolType::Halfblocks);
+    }
+
+    #[derive(Clone)]
+    struct TestStdin<'a> {
+        wouldblock_count: u32,
+        data: &'a str,
+    }
+
+    fn test_stdin(wouldblock_count: u32, data: &str) -> TestStdin {
+        TestStdin {
+            wouldblock_count,
+            data,
+        }
+    }
+
+    fn read(stdin: &mut TestStdin) -> io::Result<u8> {
+        if stdin.wouldblock_count > 0 {
+            stdin.wouldblock_count -= 1;
+            return Err(io::Error::new(io::ErrorKind::WouldBlock, "waiting"));
+        }
+        match stdin.data {
+            "" => Err(io::Error::new(io::ErrorKind::WouldBlock, "done")),
+            data => {
+                stdin.data = &stdin.data[1..];
+                Ok(data.chars().next().unwrap() as u8)
+            }
+        }
+    }
+
+    #[test]
+    fn test_read_stdin() {
+        let mut stdin = test_stdin(10, "abcabc");
+        assert_eq!("abcabc", read_stdin(20, || read(&mut stdin)).unwrap());
+    }
+
+    #[test]
+    fn test_read_stdin_timeout() {
+        let mut stdin = test_stdin(u32::MAX, "abc");
+        let err = read_stdin(1, || read(&mut stdin)).unwrap_err();
+        assert_eq!(io::ErrorKind::TimedOut, err.kind());
+    }
+
+    #[test]
+    fn test_read_stdin_timeout_empty() {
+        let mut stdin = test_stdin(0, "");
+        let err = read_stdin(1, || read(&mut stdin)).unwrap_err();
+        assert_eq!(io::ErrorKind::TimedOut, err.kind());
+    }
+
+    #[test]
+    fn test_read_stdin_timeout_neverending_data() {
+        let data: String = "a".repeat(10000000);
+        let mut stdin = test_stdin(1, &data);
+        let err = read_stdin(1, || read(&mut stdin)).unwrap_err();
+        assert_eq!(io::ErrorKind::TimedOut, err.kind());
     }
 }
