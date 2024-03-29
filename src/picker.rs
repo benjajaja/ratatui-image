@@ -178,54 +178,65 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
     Ok((x / cols, y / rows))
 }
 
-// Guess what protocol should be used, with termios stdin/out queries.
+// Guess what protocol should be used, first from some program-specific magical env vars, then with
+// the typical $TERM* env vars, and then with termios stdin/out queries.
 fn guess_protocol() -> ProtocolType {
-    if let Ok(term) = std::env::var("TERM") {
+    // Start with some basic env vars.
+    let mut is_tmux = false;
+    if let Ok(term) = env::var("TERM") {
         if term == "mlterm" || term == "yaft-256color" {
             return ProtocolType::Sixel;
         }
         if term.contains("kitty") {
             return ProtocolType::Kitty;
         }
+        if term.starts_with("tmux") {
+            is_tmux = true;
+        }
     }
-    if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
+    if let Ok(term_program) = env::var("TERM_PROGRAM") {
         if term_program == "MacTerm" {
             return ProtocolType::Sixel;
         }
         if term_program.contains("iTerm") || term_program.contains("WezTerm") {
             return ProtocolType::Iterm2;
         }
+        if term_program == "tmux" {
+            is_tmux = true;
+        }
     }
-    if let Ok(lc_term) = std::env::var("LC_TERMINAL") {
+    if let Ok(lc_term) = env::var("LC_TERMINAL") {
         if lc_term.contains("iTerm") {
             return ProtocolType::Iterm2;
         }
     }
 
-    // No hardcoded stuff worked, try querying the terminal now.
-    #[cfg(all(feature = "rustix", unix))]
-    if let Ok(t) = check_device_attrs() {
-        return t;
+    if is_tmux {
+        // Only if we're in tmux, risk it.
+        if let Some(proto) = guess_protocol_magic_env_var_exist() {
+            return proto;
+        }
     }
 
+    // No hardcoded stuff worked, try querying the terminal now.
+    #[cfg(all(feature = "rustix", unix))]
+    if let Ok(proto) = check_device_attrs(is_tmux) {
+        return proto;
+    }
+
+    // Fall back.
     ProtocolType::Halfblocks
 }
 
-#[allow(unused)]
-fn guess_protocol_magic_env_vars() -> ProtocolType {
+/// Guess based on some magic program specific env vars.
+/// Produces false positives, for example xterm started from kitty inherits KITTY_WINDOW_ID.
+fn guess_protocol_magic_env_var_exist() -> Option<ProtocolType> {
     let vars = [
         ("KITTY_WINDOW_ID", ProtocolType::Kitty),
         ("ITERM_SESSION_ID", ProtocolType::Iterm2),
         ("WEZTERM_EXECUTABLE", ProtocolType::Iterm2),
     ];
-    match vars.into_iter().find(|v| env_exists(v.0)) {
-        Some(v) => return v.1,
-        None => {
-            eprintln!("no special environment variables detected");
-        }
-    }
-
-    ProtocolType::Halfblocks
+    vars.into_iter().find(|v| env_exists(v.0)).map(|v| v.1)
 }
 
 #[inline]
@@ -235,6 +246,7 @@ pub fn env_exists(name: &str) -> bool {
 
 #[cfg(all(feature = "rustix", unix))]
 /// Check for kitty or sixel terminal support.
+/// Sadly, iterm2 has no spec for querying support.
 /// see https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Sixel-Graphics
 /// and https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h4-Functions-using-CSI-_-ordered-by-the-final-character-lparen-s-rparen:CSI-Ps-c.1CA3
 /// and https://vt100.net/docs/vt510-rm/DA1.html
@@ -247,7 +259,16 @@ pub fn env_exists(name: &str) -> bool {
 /// * foot
 /// * konsole (kitty protocol)
 /// NOTE: "tested" means that it guesses correctly, not necessarily rendering correctly.
-fn check_device_attrs() -> Result<ProtocolType> {
+fn check_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
+    if is_tmux {
+        let _ = std::process::Command::new("tmux")
+            .args(["set", "-p", "allow-passthrough", "on"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .and_then(|mut child| child.wait());
+    }
     use rustix::termios::{LocalModes, OptionalActions};
 
     let stdin = rustix::stdio::stdin();
@@ -265,12 +286,17 @@ fn check_device_attrs() -> Result<ProtocolType> {
     fd_flags.insert(rustix::fs::OFlags::NONBLOCK);
     rustix::fs::fcntl_setfl(stdin, fd_flags)?;
 
+    let (start, escape, end) = if is_tmux {
+        ("\x1bPtmux;\x1b\x1b", "\x1b\x1b", "\x1b\\")
+    } else {
+        ("\x1b", "\x1b", "")
+    };
     rustix::io::write(
         rustix::stdio::stdout(),
         // Queries first for kitty support with `_Gi=...<ESC>\` and then for "graphics attributes"
         // (sixel) with `<ESC>[c`.
         // See https://sw.kovidgoyal.net/kitty/graphics-protocol/#querying-support-and-available-transmission-mediums
-        b"\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c",
+        format!("{start}_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA{escape}\\{escape}[c{end}").as_bytes(),
     )?;
 
     let buf = read_stdin(1000, move || {
@@ -280,6 +306,9 @@ fn check_device_attrs() -> Result<ProtocolType> {
             Err(err) => Err(err.into()),
         }
     })?;
+    if buf.is_empty() {
+        return Err("no reply to graphics support query".into());
+    }
 
     // Reset to previous mode and status, and termios attributes.
     rustix::fs::fcntl_setfl(stdin, fd_flags_original)?;
