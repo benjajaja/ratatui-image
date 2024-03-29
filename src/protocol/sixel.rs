@@ -38,13 +38,17 @@ impl Sixel {
     }
 }
 
+static START: &str = "\x1bPtmux;\x1b\x1b";
+static ESCAPE: &str = "\x1b\x1b";
+static CLOSE: &str = "\x1b\\";
+
 // TODO: change E to sixel_rs::status::Error and map when calling
 pub fn encode(img: DynamicImage) -> Result<String> {
     let (w, h) = (img.width(), img.height());
     let img_rgba8 = img.to_rgba8();
     let bytes = img_rgba8.as_raw();
 
-    let data = sixel_string(
+    let mut data = sixel_string(
         bytes,
         w as i32,
         h as i32,
@@ -54,6 +58,15 @@ pub fn encode(img: DynamicImage) -> Result<String> {
         MethodForRep::Auto,
         Quality::HIGH,
     )?;
+    //let f = data.chars().nth(0).unwrap() as u8;
+    //eprintln!("sixel first char: {f}");
+    data.strip_prefix("\x1b")
+        .expect("sixel string did not start with escape");
+    data = format!("{START}{data}");
+    //data.replace_range(..1, START);
+    data.strip_suffix("\x1b\\")
+        .expect("sixel string did not end with escape and slash");
+    data.push_str(&format!("{ESCAPE}\\{CLOSE}"));
     Ok(data)
 }
 

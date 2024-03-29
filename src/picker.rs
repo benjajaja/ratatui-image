@@ -181,7 +181,15 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
 // Guess what protocol should be used, first from some program-specific magical env vars, then with
 // the typical $TERM* env vars, and then with termios stdin/out queries.
 fn guess_protocol() -> ProtocolType {
+    _ = std::process::Command::new("tmux")
+        .args(["set", "-p", "allow-passthrough", "on"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+
     if let Some(proto) = guess_protocol_magic_env_vars() {
+        eprintln!("magic: {proto:?}");
         return proto;
     }
     if let Ok(term) = env::var("TERM") {

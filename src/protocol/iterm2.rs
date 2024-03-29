@@ -30,18 +30,22 @@ impl FixedIterm2 {
     }
 }
 
-// TODO: change E to sixel_rs::status::Error and map when calling
+static START: &str = "\x1bPtmux;\x1b\x1b";
+static CLOSE: &str = "\x1b\\";
+
 pub fn encode(img: DynamicImage) -> Result<String> {
     let mut jpg = vec![];
     JpegEncoder::new_with_quality(&mut jpg, 75).encode_image(&img)?;
     let data = general_purpose::STANDARD.encode(&jpg);
 
     Ok(format!(
-        "\x1b]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07",
+        "{}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07{}",
+        START,
         jpg.len(),
         img.width(),
         img.height(),
         data,
+        CLOSE,
     ))
 }
 
