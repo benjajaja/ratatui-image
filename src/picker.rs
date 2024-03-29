@@ -178,9 +178,13 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
     Ok((x / cols, y / rows))
 }
 
-// Guess what protocol should be used, with termios stdin/out queries.
+// Guess what protocol should be used, first from some program-specific magical env vars, then with
+// the typical $TERM* env vars, and then with termios stdin/out queries.
 fn guess_protocol() -> ProtocolType {
-    if let Ok(term) = std::env::var("TERM") {
+    if let Some(proto) = guess_protocol_magic_env_vars() {
+        return proto;
+    }
+    if let Ok(term) = env::var("TERM") {
         if term == "mlterm" || term == "yaft-256color" {
             return ProtocolType::Sixel;
         }
@@ -188,7 +192,7 @@ fn guess_protocol() -> ProtocolType {
             return ProtocolType::Kitty;
         }
     }
-    if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
+    if let Ok(term_program) = env::var("TERM_PROGRAM") {
         if term_program == "MacTerm" {
             return ProtocolType::Sixel;
         }
@@ -196,7 +200,7 @@ fn guess_protocol() -> ProtocolType {
             return ProtocolType::Iterm2;
         }
     }
-    if let Ok(lc_term) = std::env::var("LC_TERMINAL") {
+    if let Ok(lc_term) = env::var("LC_TERMINAL") {
         if lc_term.contains("iTerm") {
             return ProtocolType::Iterm2;
         }
@@ -211,21 +215,16 @@ fn guess_protocol() -> ProtocolType {
     ProtocolType::Halfblocks
 }
 
-#[allow(unused)]
-fn guess_protocol_magic_env_vars() -> ProtocolType {
+fn guess_protocol_magic_env_vars() -> Option<ProtocolType> {
     let vars = [
         ("KITTY_WINDOW_ID", ProtocolType::Kitty),
         ("ITERM_SESSION_ID", ProtocolType::Iterm2),
         ("WEZTERM_EXECUTABLE", ProtocolType::Iterm2),
     ];
     match vars.into_iter().find(|v| env_exists(v.0)) {
-        Some(v) => return v.1,
-        None => {
-            eprintln!("no special environment variables detected");
-        }
+        Some(v) => return Some(v.1),
+        None => None,
     }
-
-    ProtocolType::Halfblocks
 }
 
 #[inline]
