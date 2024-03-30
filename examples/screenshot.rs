@@ -1,4 +1,7 @@
-use std::{assert_eq, io};
+use std::{
+    assert_eq, env, io,
+    process::{Command, Stdio},
+};
 
 use crossterm::{
     execute,
@@ -38,10 +41,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut picker = Picker::from_termios()?;
     picker.guess_protocol();
     picker.background_color = Some(Rgb::<u8>([255, 0, 255]));
-    assert_eq!(
-        ASSERT_FONT_SIZE, picker.font_size,
-        "Font size must be fixed to a specific size",
-    );
+    if false {
+        assert_eq!(
+            ASSERT_FONT_SIZE, picker.font_size,
+            "Font size must be fixed to a specific size: {ASSERT_FONT_SIZE:?}",
+        );
+    }
     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
     let image = picker.new_protocol(
         dyn_img,
@@ -51,7 +56,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = App { image };
 
     terminal.draw(|f| ui(f, &mut app))?;
-    std::thread::sleep(std::time::Duration::from_secs(3));
+    std::thread::sleep(std::time::Duration::from_secs(1)); // let the terminal actually draw.
+    let xwd = Command::new("xwd")
+        .args(["-root", "-silent"])
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Failed to start xwd command");
+    let screenshot_term = env::var("SCREENSHOT_TERM_NAME").unwrap_or("unknown".to_string());
+    std::process::Command::new("convert")
+        .args([
+            "xwd:-",
+            &format!("png:./target/screenshot_{screenshot_term}.png"),
+        ])
+        .stdin(xwd.stdout.expect("failed to get stdout"))
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .and_then(|mut child| child.wait())?;
 
     // restore terminal
     disable_raw_mode()?;

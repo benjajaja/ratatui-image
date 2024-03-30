@@ -14,6 +14,7 @@ concurrency:
   cancel-in-progress: true
 env:
   CLICOLOR_FORCE: 1
+
 jobs:
   ci:
     name: CI
@@ -65,3 +66,38 @@ jobs:
         run: cargo make readme
       - name: Ensure no changes
         run: git diff --exit-code .
+
+  xvfb:
+    name: Xvfb
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - uses: davidB/rust-cargo-make@v1
+      - name: Install terminals and tools
+        # xwd is in x11-apps, convert seems to be installed
+        run: sudo apt-get install -y x11-apps xterm
+      - name: Screenshot
+        run: cargo make screenshot-xvfb
+      - name: Upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot.png
+          path: target/**/screenshot_*.png
+          if-no-files-found: error
+      - name: Diff
+        run: |
+          cargo install dify
+          cargo make screenshot-diff
+      - name: Upload diff
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: diff.png
+          path: target/**/diff_*.png

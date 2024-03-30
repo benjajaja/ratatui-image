@@ -131,7 +131,7 @@ Compatibility and QA:
 
 Terminal  | Protocol | Fixed | Resize | Notes
 ----------|----------|-------|--------|-------
-Xterm     | `Sixel`  | ✔️     | ✔️      | Run with `-ti 340` to make sure sixel support is enabled.
+Xterm     | `Sixel`  | ✔️     | ✔️      | Run with `-ti 340` to make sure sixel support is enabled. [Latest Xvfb test screenshot](./assets/screenshot_xterm.png).
 Foot      | `Sixel`  | ✔️     | ✔️      | Wayland.
 kitty     | `Kitty`  | ✔️     | ✔️      |
 Wezterm   | `iTerm2` | ✔️     | ✔️      | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
@@ -143,6 +143,8 @@ ctx       | `Sixel`  | ❌    | ❌     | Buggy.
 Blackbox  | `Sixel`  | ❔    | ❔     | Untested.
 
 Here, "Fixed" means the `Image` widget, and "Resize" is the `StatefulWidget`.
+
+A basic screenshot test is run with xterm on Xvfb in the CI (or `cargo make screenshot-xvfb && cargo make screenshot-diff`).
 
 Halfblocks should work in all terminals.
 
