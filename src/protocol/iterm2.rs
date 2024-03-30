@@ -12,6 +12,7 @@ use crate::{ImageSource, Resize, Result};
 pub struct FixedIterm2 {
     pub data: String,
     pub rect: Rect,
+    pub is_tmux: bool,
 }
 
 impl FixedIterm2 {
@@ -19,26 +20,33 @@ impl FixedIterm2 {
         source: &ImageSource,
         resize: Resize,
         background_color: Option<Rgb<u8>>,
+        is_tmux: bool,
         area: Rect,
     ) -> Result<Self> {
         let (img, rect) = resize
             .resize(source, Rect::default(), area, background_color, false)
             .unwrap_or_else(|| (source.image.clone(), source.desired));
 
-        let data = encode(img)?;
-        Ok(Self { data, rect })
+        let data = encode(img, is_tmux)?;
+        Ok(Self {
+            data,
+            rect,
+            is_tmux,
+        })
     }
 }
 
 // TODO: change E to sixel_rs::status::Error and map when calling
-pub fn encode(img: DynamicImage) -> Result<String> {
+fn encode(img: DynamicImage, is_tmux: bool) -> Result<String> {
     let mut jpg = vec![];
     JpegEncoder::new_with_quality(&mut jpg, 75).encode_image(&img)?;
     let data = general_purpose::STANDARD.encode(&jpg);
 
-    // TODO: get is_tmux flag, even though this seems to work in any case.
-    let start = "\x1bPtmux;\x1b\x1b";
-    let end = "\x1b\\";
+    let (start, end) = if is_tmux {
+        ("\x1bPtmux;\x1b\x1b", "\x1b\\")
+    } else {
+        ("\x1b", "")
+    };
     Ok(format!(
         "{start}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07{end}",
         jpg.len(),
@@ -110,10 +118,13 @@ pub struct Iterm2State {
 }
 
 impl Iterm2State {
-    pub fn new(source: ImageSource) -> Iterm2State {
+    pub fn new(source: ImageSource, is_tmux: bool) -> Iterm2State {
         Iterm2State {
             source,
-            current: FixedIterm2::default(),
+            current: FixedIterm2 {
+                is_tmux,
+                ..FixedIterm2::default()
+            },
             hash: u64::default(),
         }
     }
@@ -136,9 +147,14 @@ impl StatefulProtocol for Iterm2State {
             background_color,
             force,
         ) {
-            match encode(img) {
+            let is_tmux = self.current.is_tmux;
+            match encode(img, is_tmux) {
                 Ok(data) => {
-                    self.current = FixedIterm2 { data, rect };
+                    self.current = FixedIterm2 {
+                        data,
+                        rect,
+                        is_tmux,
+                    };
                     self.hash = self.source.hash;
                 }
                 Err(_err) => {

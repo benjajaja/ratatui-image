@@ -147,6 +147,7 @@ impl Picker {
                 &source,
                 resize,
                 self.background_color,
+                self.is_tmux,
                 size,
             )?)),
         }
@@ -162,7 +163,7 @@ impl Picker {
                 self.kitty_counter = self.kitty_counter.saturating_add(1);
                 Box::new(StatefulKitty::new(source, self.kitty_counter))
             }
-            ProtocolType::Iterm2 => Box::new(Iterm2State::new(source)),
+            ProtocolType::Iterm2 => Box::new(Iterm2State::new(source, self.is_tmux)),
         }
     }
 }
