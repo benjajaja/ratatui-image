@@ -25,6 +25,7 @@ pub struct Picker {
     pub font_size: FontSize,
     pub background_color: Option<Rgb<u8>>,
     pub protocol_type: ProtocolType,
+    pub is_tmux: bool,
     kitty_counter: u8,
 }
 
@@ -92,6 +93,7 @@ impl Picker {
             font_size,
             background_color: None,
             protocol_type: ProtocolType::Halfblocks,
+            is_tmux: false,
             kitty_counter: 0,
         }
     }
@@ -99,7 +101,7 @@ impl Picker {
     /// Guess the best protocol for the current terminal by issuing some escape sequences to
     /// stdout.
     pub fn guess_protocol(&mut self) -> ProtocolType {
-        self.protocol_type = guess_protocol();
+        (self.protocol_type, self.is_tmux) = guess_protocol();
         self.protocol_type
     }
 
@@ -128,6 +130,7 @@ impl Picker {
                 &source,
                 resize,
                 self.background_color,
+                self.is_tmux,
                 size,
             )?)),
             ProtocolType::Kitty => {
@@ -154,7 +157,7 @@ impl Picker {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
             ProtocolType::Halfblocks => Box::new(StatefulHalfblocks::new(source)),
-            ProtocolType::Sixel => Box::new(StatefulSixel::new(source)),
+            ProtocolType::Sixel => Box::new(StatefulSixel::new(source, self.is_tmux)),
             ProtocolType::Kitty => {
                 self.kitty_counter = self.kitty_counter.saturating_add(1);
                 Box::new(StatefulKitty::new(source, self.kitty_counter))
@@ -180,15 +183,15 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
 
 // Guess what protocol should be used, first from some program-specific magical env vars, then with
 // the typical $TERM* env vars, and then with termios stdin/out queries.
-fn guess_protocol() -> ProtocolType {
+fn guess_protocol() -> (ProtocolType, bool) {
     // Start with some basic env vars.
     let mut is_tmux = false;
     if let Ok(term) = env::var("TERM") {
         if term == "mlterm" || term == "yaft-256color" {
-            return ProtocolType::Sixel;
+            return (ProtocolType::Sixel, is_tmux);
         }
         if term.contains("kitty") {
-            return ProtocolType::Kitty;
+            return (ProtocolType::Kitty, is_tmux);
         }
         if term.starts_with("tmux") {
             is_tmux = true;
@@ -196,10 +199,10 @@ fn guess_protocol() -> ProtocolType {
     }
     if let Ok(term_program) = env::var("TERM_PROGRAM") {
         if term_program == "MacTerm" {
-            return ProtocolType::Sixel;
+            return (ProtocolType::Sixel, is_tmux);
         }
         if term_program.contains("iTerm") || term_program.contains("WezTerm") {
-            return ProtocolType::Iterm2;
+            return (ProtocolType::Iterm2, is_tmux);
         }
         if term_program == "tmux" {
             is_tmux = true;
@@ -207,29 +210,40 @@ fn guess_protocol() -> ProtocolType {
     }
     if let Ok(lc_term) = env::var("LC_TERMINAL") {
         if lc_term.contains("iTerm") {
-            return ProtocolType::Iterm2;
+            return (ProtocolType::Iterm2, is_tmux);
         }
     }
 
     if is_tmux {
-        // Only if we're in tmux, risk it.
+        let _ = std::process::Command::new("tmux")
+            .args(["set", "-p", "allow-passthrough", "on"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .and_then(|mut child| child.wait()); // wait(), for check_device_attrs.
+
+        // Only if we're in tmux, take a risky guess because $TERM has been overwritten.
+        // The core issue is that iterm2 support cannot be queried, like kitty or sixel.
         if let Some(proto) = guess_protocol_magic_env_var_exist() {
-            return proto;
+            return (proto, is_tmux);
         }
     }
 
     // No hardcoded stuff worked, try querying the terminal now.
     #[cfg(all(feature = "rustix", unix))]
     if let Ok(proto) = check_device_attrs(is_tmux) {
-        return proto;
+        return (proto, is_tmux);
     }
 
-    // Fall back.
-    ProtocolType::Halfblocks
+    // Fallback.
+    (ProtocolType::Halfblocks, is_tmux)
 }
 
-/// Guess based on some magic program specific env vars.
+/// Crude guess based on the *existance* of some magic program specific env vars.
 /// Produces false positives, for example xterm started from kitty inherits KITTY_WINDOW_ID.
+/// Furthermore, tmux shares env vars from the first session, for example tmux started in xterm
+/// after a previous tmux session started in kitty, inherits KITTY_WINDOW_ID.
 fn guess_protocol_magic_env_var_exist() -> Option<ProtocolType> {
     let vars = [
         ("KITTY_WINDOW_ID", ProtocolType::Kitty),
@@ -260,15 +274,6 @@ pub fn env_exists(name: &str) -> bool {
 /// * konsole (kitty protocol)
 /// NOTE: "tested" means that it guesses correctly, not necessarily rendering correctly.
 fn check_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
-    if is_tmux {
-        let _ = std::process::Command::new("tmux")
-            .args(["set", "-p", "allow-passthrough", "on"])
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .and_then(|mut child| child.wait());
-    }
     use rustix::termios::{LocalModes, OptionalActions};
 
     let stdin = rustix::stdio::stdin();

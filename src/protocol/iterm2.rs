@@ -36,8 +36,11 @@ pub fn encode(img: DynamicImage) -> Result<String> {
     JpegEncoder::new_with_quality(&mut jpg, 75).encode_image(&img)?;
     let data = general_purpose::STANDARD.encode(&jpg);
 
+    // TODO: get is_tmux flag, even though this seems to work in any case.
+    let start = "\x1bPtmux;\x1b\x1b";
+    let end = "\x1b\\";
     Ok(format!(
-        "\x1b]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07",
+        "{start}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07{end}",
         jpg.len(),
         img.width(),
         img.height(),

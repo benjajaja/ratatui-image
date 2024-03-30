@@ -20,6 +20,7 @@ use crate::{ImageSource, Resize, Result};
 pub struct Sixel {
     pub data: String,
     pub rect: Rect,
+    pub is_tmux: bool,
 }
 
 impl Sixel {
@@ -27,19 +28,26 @@ impl Sixel {
         source: &ImageSource,
         resize: Resize,
         background_color: Option<Rgb<u8>>,
+        is_tmux: bool,
         area: Rect,
     ) -> Result<Self> {
         let (img, rect) = resize
             .resize(source, Rect::default(), area, background_color, false)
             .unwrap_or_else(|| (source.image.clone(), source.desired));
 
-        let data = encode(img)?;
-        Ok(Self { data, rect })
+        let data = encode(img, is_tmux)?;
+        Ok(Self {
+            data,
+            rect,
+            is_tmux,
+        })
     }
 }
 
+static TMUX_START: &str = "\x1bPtmux;";
+
 // TODO: change E to sixel_rs::status::Error and map when calling
-pub fn encode(img: DynamicImage) -> Result<String> {
+fn encode(img: DynamicImage, is_tmux: bool) -> Result<String> {
     let (w, h) = (img.width(), img.height());
     let img_rgba8 = img.to_rgba8();
     let bytes = img_rgba8.as_raw();
@@ -54,6 +62,22 @@ pub fn encode(img: DynamicImage) -> Result<String> {
         MethodForRep::Auto,
         Quality::HIGH,
     )?;
+    if is_tmux {
+        if data.strip_prefix('\x1b').is_none() {
+            return Err("sixel string did not start with escape".into());
+        }
+
+        let mut data_tmux = TMUX_START.to_string();
+        for ch in data.chars() {
+            if ch == '\x1b' {
+                data_tmux.push('\x1b');
+            }
+            data_tmux.push(ch);
+        }
+        data_tmux.push('\x1b');
+        data_tmux.push('\\');
+        return Ok(data_tmux);
+    }
     Ok(data)
 }
 
@@ -131,10 +155,13 @@ pub struct StatefulSixel {
 }
 
 impl StatefulSixel {
-    pub fn new(source: ImageSource) -> StatefulSixel {
+    pub fn new(source: ImageSource, is_tmux: bool) -> StatefulSixel {
         StatefulSixel {
             source,
-            current: Sixel::default(),
+            current: Sixel {
+                is_tmux,
+                ..Sixel::default()
+            },
             hash: u64::default(),
         }
     }
@@ -157,9 +184,14 @@ impl StatefulProtocol for StatefulSixel {
             background_color,
             force,
         ) {
-            match encode(img) {
+            let is_tmux = self.current.is_tmux;
+            match encode(img, is_tmux) {
                 Ok(data) => {
-                    self.current = Sixel { data, rect };
+                    self.current = Sixel {
+                        data,
+                        rect,
+                        is_tmux,
+                    };
                     self.hash = self.source.hash;
                 }
                 Err(_err) => {
