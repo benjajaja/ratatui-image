@@ -233,7 +233,7 @@ fn guess_protocol() -> (ProtocolType, bool) {
 
     // No hardcoded stuff worked, try querying the terminal now.
     #[cfg(all(feature = "rustix", unix))]
-    if let Ok(proto) = check_device_attrs(is_tmux) {
+    if let Ok(proto) = query_device_attrs(is_tmux) {
         return (proto, is_tmux);
     }
 
@@ -274,7 +274,7 @@ pub fn env_exists(name: &str) -> bool {
 /// * foot
 /// * konsole (kitty protocol)
 /// NOTE: "tested" means that it guesses correctly, not necessarily rendering correctly.
-fn check_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
+fn query_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
     use rustix::termios::{LocalModes, OptionalActions};
 
     let stdin = rustix::stdio::stdin();
@@ -287,10 +287,11 @@ fn check_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
 
     // Enable nonblocking mode for reads, so that this works even if the terminal emulator doesn't
     // reply at all or replies with unexpected data.
-    let fd_flags_original = rustix::fs::fcntl_getfl(stdin)?;
-    let mut fd_flags = fd_flags_original;
-    fd_flags.insert(rustix::fs::OFlags::NONBLOCK);
-    rustix::fs::fcntl_setfl(stdin, fd_flags)?;
+    let fd_flags_original = rustix::fs::fcntl_getfl(stdin).and_then(|fd_flags_original| {
+        let mut fd_flags = fd_flags_original;
+        fd_flags.insert(rustix::fs::OFlags::NONBLOCK);
+        rustix::fs::fcntl_setfl(stdin, fd_flags).map(|_| fd_flags_original)
+    });
 
     let (start, escape, end) = if is_tmux {
         ("\x1bPtmux;\x1b\x1b", "\x1b\x1b", "\x1b\\")
@@ -305,19 +306,25 @@ fn check_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
         format!("{start}_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA{escape}\\{escape}[c{end}").as_bytes(),
     )?;
 
-    let buf = read_stdin(1000, move || {
-        let mut charbuf: [u8; 1] = [0];
-        match rustix::io::read(stdin, &mut charbuf) {
-            Ok(_) => Ok(charbuf[0]),
-            Err(err) => Err(err.into()),
-        }
-    })?;
+    let buf = read_stdin(
+        1000,
+        move || {
+            let mut charbuf: [u8; 1] = [0];
+            match rustix::io::read(stdin, &mut charbuf) {
+                Ok(_) => Ok(charbuf[0]),
+                Err(err) => Err(err.into()),
+            }
+        },
+        fd_flags_original.is_ok(),
+    )?;
     if buf.is_empty() {
         return Err("no reply to graphics support query".into());
     }
 
     // Reset to previous mode and status, and termios attributes.
-    rustix::fs::fcntl_setfl(stdin, fd_flags_original)?;
+    if let Ok(fd_flags_original) = fd_flags_original {
+        rustix::fs::fcntl_setfl(stdin, fd_flags_original)?;
+    }
     rustix::termios::tcsetattr(stdin, OptionalActions::Now, &termios_original)?;
 
     if buf.contains("_Gi=31;OK") {
@@ -332,6 +339,7 @@ fn check_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
 pub fn read_stdin(
     timeout_ms: u128,
     mut read: impl FnMut() -> io::Result<u8>,
+    is_nonblocking: bool,
 ) -> io::Result<String> {
     let start = Instant::now();
     let mut buf = String::with_capacity(200);
@@ -350,6 +358,14 @@ pub fn read_stdin(
         match result {
             Ok(ch) => {
                 buf.push(char::from(ch));
+                if !is_nonblocking && ch == b'c' {
+                    // If we couldn't put stdin into nonblocking mode, exit on first 'c', which is
+                    // the end of the Send Device Attributes query. However, a 'c' could also
+                    // appear in the response to the kitty support query, which could contain any
+                    // error message string. But if there is no more data, then read() will block
+                    // forever.
+                    return Ok(buf);
+                }
             }
             Err(err) => {
                 if err.kind() == io::ErrorKind::WouldBlock {
@@ -434,20 +450,20 @@ mod tests {
     #[test]
     fn test_read_stdin() {
         let mut stdin = test_stdin(10, "abcabc");
-        assert_eq!("abcabc", read_stdin(20, || read(&mut stdin)).unwrap());
+        assert_eq!("abcabc", read_stdin(20, || read(&mut stdin), true).unwrap());
     }
 
     #[test]
     fn test_read_stdin_timeout() {
         let mut stdin = test_stdin(u32::MAX, "abc");
-        let err = read_stdin(1, || read(&mut stdin)).unwrap_err();
+        let err = read_stdin(1, || read(&mut stdin), true).unwrap_err();
         assert_eq!(io::ErrorKind::TimedOut, err.kind());
     }
 
     #[test]
     fn test_read_stdin_timeout_empty() {
         let mut stdin = test_stdin(0, "");
-        let err = read_stdin(1, || read(&mut stdin)).unwrap_err();
+        let err = read_stdin(1, || read(&mut stdin), true).unwrap_err();
         assert_eq!(io::ErrorKind::TimedOut, err.kind());
     }
 
@@ -455,7 +471,13 @@ mod tests {
     fn test_read_stdin_timeout_neverending_data() {
         let data: String = "a".repeat(10000000);
         let mut stdin = test_stdin(1, &data);
-        let err = read_stdin(1, || read(&mut stdin)).unwrap_err();
+        let err = read_stdin(1, || read(&mut stdin), true).unwrap_err();
         assert_eq!(io::ErrorKind::TimedOut, err.kind());
+    }
+
+    #[test]
+    fn test_read_stdin_blocking() {
+        let mut stdin = test_stdin(10, "abcabc");
+        assert_eq!("abc", read_stdin(20, || read(&mut stdin), false).unwrap());
     }
 }
