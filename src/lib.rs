@@ -1,10 +1,14 @@
-//! # Image widgets with multiple graphics protocol backends for [Ratatui]
-//! [Ratatui] is an immediate-mode TUI library that does 3 things:
+//! # Image widgets with multiple graphics protocol backends for [ratatui]
 //!
-//! 1. **Query the terminal for available graphics protocols** (or guess from `$TERM` or similar).
-//! Some terminals may implement one or more graphics protocols, such as Sixels or Kitty's
-//! graphics protocol. Query the terminal with some escape sequence. Fallback to "halfblocks" which
-//! uses some unicode half-block characters with fore- and background colors.
+//! [ratatui] is an immediate-mode TUI library.
+//! ratatui-image tackles 3 general problems when rendering images with an immediate-mode TUI:
+//!
+//! 1. **Query the terminal for available graphics protocols**.
+//! Some terminals may implement one or more graphics protocols, such as Sixels, or the iTerm2 or
+//! Kitty graphics protocols. Guess by env vars. If that fails, query the terminal with some
+//! control sequences.
+//! Fallback to "halfblocks" which uses some unicode half-block characters with fore- and
+//! background colors.
 //!
 //! 2. **Query the terminal for the font-size in pixels.**
 //! If there is an actual graphics protocol available, it is necessary to know the font-size to
@@ -14,8 +18,7 @@
 //!
 //! 3. **Render the image by the means of the guessed protocol.**
 //! Some protocols, like Sixels, are essentially "immediate-mode", but we still need to avoid the
-//! TUI from overwriting the image area, even with blank characters.  
-//!
+//! TUI from overwriting the image area, even with blank characters.
 //! Other protocols, like Kitty, are essentially stateful, but at least provide a way to re-render
 //! an image that has been loaded, at a different or same position.
 //!
@@ -33,12 +36,18 @@
 //!     let backend = TestBackend::new(80, 30);
 //!     let mut terminal = Terminal::new(backend)?;
 //!
-//!     // Should use Picker::from_termios(), but we can't put that here because that would break doctests!
+//!     // Should use Picker::from_termios(), to get the font size,
+//!     // but we can't put that here because that would break doctests!
 //!     let mut picker = Picker::new((8, 12));
+//!     // Guess the protocol.
 //!     picker.guess_protocol();
 //!
+//!     // Load an image with the image crate.
 //!     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
+//!
+//!     // Create the Protocol which will be used by the widget.
 //!     let image = picker.new_resize_protocol(dyn_img);
+//!
 //!     let mut app = App { image };
 //!
 //!     // This would be your typical `loop {` in a real app:
@@ -48,19 +57,16 @@
 //! }
 //!
 //! fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+//!     // The image widget.
 //!     let image = StatefulImage::new(None);
+//!     // Render with the protocol state.
 //!     f.render_stateful_widget(image, f.size(), &mut app.image);
 //! }
 //! ```
 //!
-//! # Graphics protocols in terminals
-//! Different terminals support different graphics protocols such as sixels,
-//! kitty-graphics-protocol, or iTerm2-graphics-protocol. If no such protocol is supported, it is
-//! still possible to render images with unicode "halfblocks" that have fore- and background color.
-//!
-//! The [picker::Picker] helper is there to do all this graphics-protocol guessing, and also to map
-//! character-cell-size to pixel size so that we can e.g. "fit" an image inside a desired
-//! columns+rows bound etc.
+//! The [picker::Picker] helper is there to do all this font-size and graphics-protocol guessing,
+//! and also to map character-cell-size to pixel size so that we can e.g. "fit" an image inside
+//! a desired columns+rows bound, and so on.
 //!
 //! # Widget choice
 //! * The [Image] widget does not adapt to rendering area (except not drawing at all if space
@@ -76,21 +82,11 @@
 //!
 //! # Examples
 //!
-//! `examples/demo.rs` is a fully fledged demo:
-//! * Guessing the graphics protocol and the terminal font-size.
-//! * Both [Image] and [StatefulImage].
-//! * [Resize::Fit] and [Resize::Crop].
-//! * Reacts to resizes from terminal or widget layout.
-//! * Cycle through available graphics protocols at runtime.
-//! * Load different images.
-//! * Cycle toggling [Image], [StatefulImage], or both, to demonstrate correct state after
-//!   removal.
-//! * Works with crossterm and termion backends.
-//!
-//! `examples/async.rs` shows how to offload resize and encoding to another thread, to avoid
+//! * `examples/demo.rs` is a fully fledged demo.
+//! * `examples/async.rs` shows how to offload resize and encoding to another thread, to avoid
 //! blocking the UI thread.
 //!
-//! The lib also includes a binary that renders an image file.
+//! The lib also includes a binary that renders an image file, but it is focused on testing.
 //!
 //! # Features
 //! * `rustix` (default) enables much better guessing of graphics protocols with `rustix::termios::tcgetattr`.
@@ -103,8 +99,8 @@
 //! feature, add `image` to your crate, and enable its features/formats as desired. See
 //! https://doc.rust-lang.org/cargo/reference/features.html#feature-unification.
 //!
-//! [Ratatui]: https://github.com/ratatui-org/ratatui
-//! [Sixel]: https://en.wikipedia.org/wiki/Sixel
+//! [ratatui]: https://github.com/ratatui-org/ratatui
+//! [sixel]: https://en.wikipedia.org/wiki/Sixel
 //! [`render_stateful_widget`]: https://docs.rs/ratatui/latest/ratatui/terminal/struct.Frame.html#method.render_stateful_widget
 use std::{
     cmp::{max, min},

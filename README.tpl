@@ -23,11 +23,11 @@ Compatibility and QA:
 
 Terminal  | Protocol | Fixed | Resize | Notes
 ----------|----------|-------|--------|-------
-Xterm     | `Sixel`  | ✔️     | ✔️      | Run with `-ti 340` to make sure sixel support is enabled. [Latest Xvfb test screenshot](./assets/screenshot_xterm.png).
+Xterm     | `Sixel`  | ✔️     | ✔️      | Run with `-ti 340` to make sure sixel support is enabled.
 Foot      | `Sixel`  | ✔️     | ✔️      | Wayland.
 kitty     | `Kitty`  | ✔️     | ✔️      |
 Wezterm   | `iTerm2` | ✔️     | ✔️      | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
-Alacritty | `Sixel`  | ✔️     | ❌     | [only with sixel patch](https://github.com/microo8/alacritty-sixel), but does not clear graphics. Will not be merged in the foreseeable future.
+Alacritty | `Sixel`  | ❌    | ❌     | [There is a sixel fork](https://github.com/microo8/alacritty-sixel), but it's stale and does not clear graphics.
 iTerm2    | `iTerm2` | ❔    | ❔     | Untested (needs apple hardware), however should be the same as WezTerm.
 konsole   | `Sixel`  | ❌    | ❌     | [Wontfix: does not clear graphics](https://bugs.kde.org/show_bug.cgi?id=456354), other artifacts.
 Contour   | `Sixel`  | ❌    | ❌     | Does not clear graphics.
@@ -36,7 +36,7 @@ Blackbox  | `Sixel`  | ❔    | ❔     | Untested.
 
 Here, "Fixed" means the `Image` widget, and "Resize" is the `StatefulWidget`.
 
-A basic screenshot test is run with xterm on Xvfb in the CI (or `cargo make screenshot-xvfb && cargo make screenshot-diff`).
+A basic [screenshot test](./assets/screenshot_xterm.png) is run with xterm on Xvfb in the CI (or `cargo make screenshot-xvfb && cargo make screenshot-diff`).
 
 Halfblocks should work in all terminals.
 
