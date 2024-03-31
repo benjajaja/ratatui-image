@@ -93,7 +93,6 @@
 //! The lib also includes a binary that renders an image file.
 //!
 //! # Features
-//! * `sixel` (default) compiles with libsixel.
 //! * `rustix` (default) enables much better guessing of graphics protocols with `rustix::termios::tcgetattr`.
 //! * `crossterm` or `termion` should match your ratatui backend. `termwiz` is available, but not
 //! working correctly with ratatu-image.

@@ -111,16 +111,14 @@ The lib also includes a binary that renders an image file.
 
 ## Features
 * `rustix` (default) enables much better guessing of graphics protocols with `rustix::termios::tcgetattr`.
-* `crossterm` or `termion` should match your ratatui backend. `termwiz` is available, but does not
-work correctly with ratatu-image.
+* `crossterm` or `termion` should match your ratatui backend. `termwiz` is available, but not
+working correctly with ratatu-image.
 * `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
 useful to save it in some user configuration.
 * `image-defaults` (default) just enables `image/defaults` (`image` has `default-features =
 false`). To only support a selection of image formats and cut down dependencies, disable this
 feature, add `image` to your crate, and enable its features/formats as desired. See
 https://doc.rust-lang.org/cargo/reference/features.html#feature-unification.
-
-The sixel implementation is now native: [icy_sixel](https://github.com/mkrueger/icy_sixel).
 
 [Ratatui]: https://github.com/ratatui-org/ratatui
 [Sixel]: https://en.wikipedia.org/wiki/Sixel
@@ -149,7 +147,16 @@ A basic screenshot test is run with xterm on Xvfb in the CI (or `cargo make scre
 
 Halfblocks should work in all terminals.
 
-### Comparison:
+### Projects that use ratatui-image
+
+* [iamb](https://github.com/ulyssa/iamb)
+  A matrix client with vim keybindings.
+* [joshuto](https://github.com/kamiyaa/joshuto)
+  A terminal file manager that can preview images.
+* [Aerostream](https://github.com/shigepon7/aerostream)
+  A Bluesky client using EventStream.
+
+### Comparison
 
 * [viuer](https://crates.io/crates/viuer)
   Renders graphics in different terminals/protocols, but "dumps" the image, making it difficult to

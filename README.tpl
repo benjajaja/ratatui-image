@@ -23,7 +23,7 @@ Compatibility and QA:
 
 Terminal  | Protocol | Fixed | Resize | Notes
 ----------|----------|-------|--------|-------
-Xterm     | `Sixel`  | ✔️     | ✔️      | Run with `-ti 340` to make sure sixel support is enabled.
+Xterm     | `Sixel`  | ✔️     | ✔️      | Run with `-ti 340` to make sure sixel support is enabled. [Latest Xvfb test screenshot](./assets/screenshot_xterm.png).
 Foot      | `Sixel`  | ✔️     | ✔️      | Wayland.
 kitty     | `Kitty`  | ✔️     | ✔️      |
 Wezterm   | `iTerm2` | ✔️     | ✔️      | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
@@ -36,9 +36,20 @@ Blackbox  | `Sixel`  | ❔    | ❔     | Untested.
 
 Here, "Fixed" means the `Image` widget, and "Resize" is the `StatefulWidget`.
 
+A basic screenshot test is run with xterm on Xvfb in the CI (or `cargo make screenshot-xvfb && cargo make screenshot-diff`).
+
 Halfblocks should work in all terminals.
 
-### Comparison:
+### Projects that use ratatui-image
+
+* [iamb](https://github.com/ulyssa/iamb)
+  A matrix client with vim keybindings.
+* [joshuto](https://github.com/kamiyaa/joshuto)
+  A terminal file manager that can preview images.
+* [Aerostream](https://github.com/shigepon7/aerostream)
+  A Bluesky client using EventStream.
+
+### Comparison
 
 * [viuer](https://crates.io/crates/viuer)
   Renders graphics in different terminals/protocols, but "dumps" the image, making it difficult to
