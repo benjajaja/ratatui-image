@@ -1279,6 +1279,7 @@ dependencies = [
  "ratatui",
  "rustix",
  "serde",
+ "thiserror",
  "windows",
 ]
 

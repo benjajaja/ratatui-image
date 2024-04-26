@@ -102,10 +102,7 @@
 //! [ratatui]: https://github.com/ratatui-org/ratatui
 //! [sixel]: https://en.wikipedia.org/wiki/Sixel
 //! [`render_stateful_widget`]: https://docs.rs/ratatui/latest/ratatui/terminal/struct.Frame.html#method.render_stateful_widget
-use std::{
-    cmp::{max, min},
-    error::Error,
-};
+use std::cmp::{max, min};
 
 use image::{imageops, DynamicImage, ImageBuffer, Rgb};
 use protocol::{ImageSource, Protocol, StatefulProtocol};
@@ -115,12 +112,13 @@ use ratatui::{
     widgets::{StatefulWidget, Widget},
 };
 
+pub mod errors;
 pub mod picker;
 pub mod protocol;
 pub mod thread;
 pub use image::imageops::FilterType;
 
-type Result<T> = std::result::Result<T, Box<dyn Error>>;
+type Result<T> = std::result::Result<T, errors::Errors>;
 
 /// The terminal's font size in `(width, height)`
 pub type FontSize = (u16, u16);
