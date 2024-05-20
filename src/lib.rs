@@ -24,7 +24,7 @@
 //!
 //! # Quick start
 //! ```rust
-//! use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame};
+//! use ratatui::{backend::TestBackend, Terminal, terminal::Frame};
 //! use ratatui_image::{picker::Picker, StatefulImage, protocol::StatefulProtocol};
 //!
 //! struct App {
@@ -56,7 +56,7 @@
 //!     Ok(())
 //! }
 //!
-//! fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+//! fn ui(f: &mut Frame<'_>, app: &mut App) {
 //!     // The image widget.
 //!     let image = StatefulImage::new(None);
 //!     // Render with the protocol state.
@@ -130,12 +130,12 @@ pub type FontSize = (u16, u16);
 /// Its advantage lies in that the [Protocol] needs only one initial resize.
 ///
 /// ```rust
-/// # use ratatui::{backend::Backend, terminal::Frame};
+/// # use ratatui::terminal::Frame;
 /// # use ratatui_image::{Resize, Image, protocol::Protocol};
 /// struct App {
 ///     image_static: Box<dyn Protocol>,
 /// }
-/// fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+/// fn ui(f: &mut Frame<'_>, app: &mut App) {
 ///     let image = Image::new(app.image_static.as_ref());
 ///     f.render_widget(image, f.size());
 /// }
@@ -165,12 +165,12 @@ impl<'a> Widget for Image<'a> {
 /// This stateful widget reacts to area resizes and resizes its image data accordingly.
 ///
 /// ```rust
-/// # use ratatui::{backend::Backend, terminal::Frame};
+/// # use ratatui::terminal::Frame;
 /// # use ratatui_image::{Resize, StatefulImage, protocol::{StatefulProtocol}};
 /// struct App {
 ///     image_state: Box<dyn StatefulProtocol>,
 /// }
-/// fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+/// fn ui(f: &mut Frame<'_>, app: &mut App) {
 ///     let image = StatefulImage::new(None).resize(Resize::Crop);
 ///     f.render_stateful_widget(
 ///         image,

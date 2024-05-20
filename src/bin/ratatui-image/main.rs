@@ -12,7 +12,6 @@ use image::Rgb;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    prelude::Backend,
     text::Line,
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
@@ -102,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn ui(f: &mut Frame<'_>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(6), Constraint::Min(1)].as_ref())

@@ -13,7 +13,6 @@ use image::Rgb;
 use ratatui::{
     backend::CrosstermBackend,
     layout::Rect,
-    prelude::Backend,
     terminal::Frame,
     widgets::{Block, Borders, Paragraph},
     Terminal,
@@ -82,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn ui(f: &mut Frame<'_>, app: &mut App) {
     let area = Rect::new(0, 0, SCREEN_SIZE.0, SCREEN_SIZE.1);
     let block = Block::default()
         .borders(Borders::ALL)
