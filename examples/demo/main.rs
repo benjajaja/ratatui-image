@@ -194,7 +194,7 @@ impl<'a> App<'a> {
     pub fn on_tick(&mut self) {}
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn ui(f: &mut Frame<'_>, app: &mut App) {
     let outer_block = Block::default().borders(Borders::TOP).title(app.title);
 
     let chunks = Layout::default()

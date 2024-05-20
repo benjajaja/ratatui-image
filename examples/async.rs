@@ -14,7 +14,7 @@ use image::Rgb;
 use ratatui::{
     backend::CrosstermBackend,
     layout::Rect,
-    prelude::{Backend, Buffer},
+    prelude::Buffer,
     terminal::Frame,
     widgets::{Block, Borders, Paragraph, StatefulWidget},
     Terminal,
@@ -37,7 +37,7 @@ pub struct ThreadImage {
 }
 
 impl ThreadImage {
-    pub fn new() -> ThreadImage {
+    fn new() -> ThreadImage {
         ThreadImage {
             resize: Resize::Fit(None),
         }
@@ -167,7 +167,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn ui(f: &mut Frame<'_>, app: &mut App) {
     let area = f.size();
     let block = Block::default()
         .borders(Borders::ALL)
