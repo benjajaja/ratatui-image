@@ -41,7 +41,7 @@ an image that has been loaded, at a different or same position.
 
 ## Quick start
 ```rust
-use ratatui::{backend::{Backend, TestBackend}, Terminal, terminal::Frame};
+use ratatui::{backend::TestBackend, Terminal, terminal::Frame};
 use ratatui_image::{picker::Picker, StatefulImage, protocol::StatefulProtocol};
 
 struct App {
@@ -73,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn ui(f: &mut Frame<'_>, app: &mut App) {
     // The image widget.
     let image = StatefulImage::new(None);
     // Render with the protocol state.

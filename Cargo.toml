@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-image"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 autoexamples = true
 authors = ["Benjamin Große <ste3ls@gmail.com>"]
@@ -13,7 +13,7 @@ license = "MIT"
 exclude = [
   "assets/*",
 ]
-rust-version = "1.70.0"
+rust-version = "1.74.0"
 
 [features]
 default = ["image-defaults", "rustix"]

@@ -29,8 +29,8 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
-          profile: minimal
+          toolchain: 1.74.0
+          profile: default
           override: true
       - uses: davidB/rust-cargo-make@v1
       - name: CI
@@ -58,8 +58,8 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
-          profile: minimal
+          toolchain: 1.74.0
+          profile: default
           override: true
       - uses: davidB/rust-cargo-make@v1
       - name: Make readme
@@ -76,8 +76,8 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
-          profile: minimal
+          toolchain: 1.74.0
+          profile: default
           override: true
       - uses: davidB/rust-cargo-make@v1
       - name: Install terminals and tools

@@ -14,7 +14,7 @@
         # We only need the nightly overlay in the devShell because .rs files are formatted with nightly.
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
-        rust = pkgs.rust-bin.stable.latest.default;
+        rust = pkgs.rust-bin.stable."1.74.0".default;
       in 
       with pkgs;
       {
