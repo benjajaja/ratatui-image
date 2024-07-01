@@ -171,7 +171,7 @@ impl<'a> Widget for Image<'a> {
 ///     image_state: Box<dyn StatefulProtocol>,
 /// }
 /// fn ui(f: &mut Frame<'_>, app: &mut App) {
-///     let image = StatefulImage::new(None).resize(Resize::Crop);
+///     let image = StatefulImage::new(None).resize(Resize::Crop(None));
 ///     f.render_stateful_widget(
 ///         image,
 ///         f.size(),
@@ -225,7 +225,18 @@ pub enum Resize {
     /// but some terminals might misbehave when overdrawing characters over graphics.
     /// For example, the sixel branch of Alacritty never draws text over a cell that is currently
     /// being rendered by some sixel sequence, not necessarily originating from the same cell.
-    Crop,
+    ///
+    /// The [CropOptions] defaults to clipping the bottom and the right sides.
+    Crop(Option<CropOptions>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// Specifies which sides to be clipped when cropping an image.
+pub struct CropOptions {
+    /// If `true`, the top side should be clipped.
+    pub clip_top: bool,
+    /// If `true`, the left side should be clipped.
+    pub clip_left: bool,
 }
 
 impl Resize {
@@ -282,13 +293,30 @@ impl Resize {
 
     fn resize_image(&self, source: &ImageSource, width: u32, height: u32) -> DynamicImage {
         static DEFAULT_FILTER_TYPE: FilterType = FilterType::Nearest;
+        static DEFAULT_CROP_OPTIONS: CropOptions = CropOptions {
+            clip_top: false,
+            clip_left: false,
+        };
         match self {
             Self::Fit(filter_type) => {
                 source
                     .image
                     .resize(width, height, filter_type.unwrap_or(DEFAULT_FILTER_TYPE))
             }
-            Self::Crop => source.image.crop_imm(0, 0, width, height),
+            Self::Crop(options) => {
+                let options = options.as_ref().unwrap_or(&DEFAULT_CROP_OPTIONS);
+                let y = if options.clip_top {
+                    source.image.height().saturating_sub(height)
+                } else {
+                    0
+                };
+                let x = if options.clip_left {
+                    source.image.width().saturating_sub(width)
+                } else {
+                    0
+                };
+                source.image.crop_imm(x, y, width, height)
+            }
         }
     }
 
@@ -303,7 +331,7 @@ impl Resize {
                 );
                 Rect::new(0, 0, width, height)
             }
-            Self::Crop => Rect::new(
+            Self::Crop(_) => Rect::new(
                 0,
                 0,
                 min(desired.width, area.width),
@@ -393,7 +421,7 @@ mod tests {
 
     #[test]
     fn needs_resize_crop() {
-        let resize = Resize::Crop;
+        let resize = Resize::Crop(None);
 
         let to = resize.needs_resize(&s(100, 100), r(10, 10), r(10, 10), false);
         assert_eq!(None, to);

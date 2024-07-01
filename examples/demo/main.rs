@@ -247,7 +247,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     match app.show_images {
         ShowImages::Fixed => {}
         _ => {
-            let image = StatefulImage::new(None).resize(Resize::Crop);
+            let image = StatefulImage::new(None).resize(Resize::Crop(None));
             f.render_stateful_widget(
                 image,
                 block_left_bottom.inner(chunks_left_bottom[0]),
