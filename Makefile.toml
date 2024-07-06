@@ -32,11 +32,11 @@ args = ["clippy", "--tests", "--all-features", "--", "-D", "warnings"]
 
 [tasks.check]
 command = "cargo"
-args = ["check", "--all-features", "--all-targets"]
+args = ["check", "--all-features"]
 
 [tasks.test]
 command = "cargo"
-args = ["test", "--all-features", "--all-targets"]
+args = ["test", "--all-features"]
 
 [tasks.readme]
 command = "cargo"

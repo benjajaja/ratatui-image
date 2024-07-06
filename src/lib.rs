@@ -117,6 +117,7 @@ use ratatui::{
 
 pub mod picker;
 pub mod protocol;
+pub mod thread;
 pub use image::imageops::FilterType;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;

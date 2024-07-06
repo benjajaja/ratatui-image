@@ -1,6 +1,6 @@
 use std::{
     io,
-    sync::mpsc::{self, Sender},
+    sync::mpsc::{self},
     thread,
     time::Duration,
 };
@@ -14,12 +14,16 @@ use image::Rgb;
 use ratatui::{
     backend::CrosstermBackend,
     layout::Rect,
-    prelude::Buffer,
     terminal::Frame,
-    widgets::{Block, Borders, Paragraph, StatefulWidget},
+    widgets::{Block, Borders, Paragraph},
     Terminal,
 };
-use ratatui_image::{picker::Picker, protocol::StatefulProtocol, Resize};
+use ratatui_image::{
+    picker::Picker,
+    protocol::StatefulProtocol,
+    thread::{ThreadImage, ThreadProtocol},
+    Resize,
+};
 
 struct App {
     async_state: ThreadProtocol,
@@ -28,68 +32,6 @@ struct App {
 enum AppEvent {
     KeyEvent(KeyEvent),
     Redraw(Box<dyn StatefulProtocol>),
-}
-
-/// A widget that uses a custom ThreadProtocol as state to offload resizing and encoding to a
-/// background thread.
-pub struct ThreadImage {
-    resize: Resize,
-}
-
-impl ThreadImage {
-    fn new() -> ThreadImage {
-        ThreadImage {
-            resize: Resize::Fit(None),
-        }
-    }
-
-    pub fn resize(mut self, resize: Resize) -> ThreadImage {
-        self.resize = resize;
-        self
-    }
-}
-
-impl StatefulWidget for ThreadImage {
-    type State = ThreadProtocol;
-
-    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        state.inner = match state.inner.take() {
-            // We have the `protocol` and should either resize or render.
-            Some(mut protocol) => {
-                // If it needs resizing (grow or shrink) then send it away instead of rendering.
-                if let Some(rect) = protocol.needs_resize(&self.resize, area) {
-                    state.tx.send((protocol, self.resize, rect)).unwrap();
-                    None
-                } else {
-                    protocol.render(area, buf);
-                    Some(protocol)
-                }
-            }
-            // We are waiting to get back the protocol.
-            None => None,
-        };
-    }
-}
-
-/// The state of a ThreadImage.
-///
-/// Has `inner` [ResizeProtocol] that is sent off to the `tx` mspc channel to do the
-/// `resize_encode()` work.
-pub struct ThreadProtocol {
-    inner: Option<Box<dyn StatefulProtocol>>,
-    tx: Sender<(Box<dyn StatefulProtocol>, Resize, Rect)>,
-}
-
-impl ThreadProtocol {
-    pub fn new(
-        tx: Sender<(Box<dyn StatefulProtocol>, Resize, Rect)>,
-        inner: Box<dyn StatefulProtocol>,
-    ) -> ThreadProtocol {
-        ThreadProtocol {
-            inner: Some(inner),
-            tx,
-        }
-    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -102,7 +44,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut picker = Picker::from_termios()?;
     picker.guess_protocol();
-    // picker.protocol_type = ProtocolType::Halfblocks;
     picker.background_color = Some(Rgb::<u8>([255, 0, 255]));
     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
 
@@ -153,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 AppEvent::Redraw(protocol) => {
-                    app.async_state.inner = Some(protocol);
+                    app.async_state.set_protocol(protocol);
                 }
             }
         }
@@ -169,16 +110,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn ui(f: &mut Frame<'_>, app: &mut App) {
     let area = f.size();
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title("Screenshot test");
+    let block = Block::default().borders(Borders::ALL).title("Async test");
 
     f.render_widget(
         Paragraph::new("PartiallyHiddenScreenshotParagraphBackground\n".repeat(10)),
         block.inner(area),
     );
 
-    let image = ThreadImage::new().resize(Resize::Fit(None));
+    let image = ThreadImage::default().resize(Resize::Fit(None));
     f.render_stateful_widget(image, block.inner(area), &mut app.async_state);
     f.render_widget(block, area);
 }
