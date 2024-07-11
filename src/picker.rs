@@ -20,7 +20,7 @@ use crate::{
     FontSize, ImageSource, Resize, Result,
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Picker {
     pub font_size: FontSize,
     pub background_color: Option<Rgb<u8>>,
