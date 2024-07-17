@@ -202,7 +202,13 @@ fn guess_protocol() -> (ProtocolType, bool) {
         if term_program == "MacTerm" {
             return (ProtocolType::Sixel, is_tmux);
         }
-        if term_program.contains("iTerm") || term_program.contains("WezTerm") {
+        if term_program.contains("iTerm")
+            || term_program.contains("WezTerm")
+            || term_program.contains("mintty")
+            || term_program.contains("vscode")
+            || term_program.contains("Tabby")
+            || term_program.contains("Hyper")
+        {
             return (ProtocolType::Iterm2, is_tmux);
         }
         if term_program == "tmux" {
