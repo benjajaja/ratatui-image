@@ -58,7 +58,8 @@ impl ProtocolType {
 impl Picker {
     /// Query terminal for font-size with some escape sequence.
     ///
-    /// This writes and reads from stdin momentarily.
+    /// This writes and reads from stdin momentarily. WARNING: this method should be called after
+    /// entering alternate screen but before reading terminal events.
     ///
     /// # Example
     /// ```rust
@@ -100,6 +101,9 @@ impl Picker {
 
     /// Guess the best protocol for the current terminal by issuing some escape sequences to
     /// stdout.
+    ///
+    /// WARNING: this method should be called after entering alternate screen but before reading
+    /// terminal events.
     pub fn guess_protocol(&mut self) -> ProtocolType {
         (self.protocol_type, self.is_tmux) = guess_protocol();
         self.protocol_type
