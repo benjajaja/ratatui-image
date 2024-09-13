@@ -145,6 +145,7 @@ impl Picker {
                     self.background_color,
                     size,
                     self.kitty_counter,
+                    self.is_tmux,
                 )?))
             }
             ProtocolType::Iterm2 => Ok(Box::new(FixedIterm2::from_source(
@@ -165,7 +166,7 @@ impl Picker {
             ProtocolType::Sixel => Box::new(StatefulSixel::new(source, self.is_tmux)),
             ProtocolType::Kitty => {
                 self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
-                Box::new(StatefulKitty::new(source, self.kitty_counter))
+                Box::new(StatefulKitty::new(source, self.kitty_counter, self.is_tmux))
             }
             ProtocolType::Iterm2 => Box::new(Iterm2State::new(source, self.is_tmux)),
         }

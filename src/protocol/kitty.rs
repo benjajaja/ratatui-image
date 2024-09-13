@@ -29,12 +29,13 @@ impl Kitty {
         background_color: Option<Rgb<u8>>,
         area: Rect,
         id: u32,
+        is_tmux: bool,
     ) -> Result<Self> {
         let (image, desired) = resize
             .resize(source, Rect::default(), area, background_color, false)
             .unwrap_or_else(|| (source.image.clone(), source.desired));
 
-        let transmit_data = transmit_virtual(&image, id);
+        let transmit_data = transmit_virtual(&image, id, is_tmux);
         Ok(Self {
             transmit_data,
             unique_id: id,
@@ -61,6 +62,7 @@ pub struct StatefulKitty {
     rect: Rect,
     hash: u64,
     proto_state: KittyProtoState,
+    is_tmux: bool,
 }
 
 #[derive(Default, Clone, PartialEq)]
@@ -71,13 +73,14 @@ enum KittyProtoState {
 }
 
 impl StatefulKitty {
-    pub fn new(source: ImageSource, id: u32) -> StatefulKitty {
+    pub fn new(source: ImageSource, id: u32, is_tmux: bool) -> StatefulKitty {
         StatefulKitty {
             source,
             unique_id: id,
             rect: Rect::default(),
             hash: u64::default(),
             proto_state: KittyProtoState::default(),
+            is_tmux,
         }
     }
 }
@@ -95,7 +98,7 @@ impl StatefulProtocol for StatefulKitty {
         if let Some((img, rect)) =
             resize.resize(&self.source, self.rect, area, background_color, force)
         {
-            let data = transmit_virtual(&img, self.unique_id);
+            let data = transmit_virtual(&img, self.unique_id, self.is_tmux);
             self.hash = self.source.hash;
             self.rect = rect;
             self.proto_state = KittyProtoState::TransmitAndPlace(data);
@@ -150,7 +153,7 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<St
 /// A "virtual placement" (U=1) is created so that we can place it using unicode placeholders.
 /// Removing the placements when the unicode placeholder is no longer there is being handled
 /// automatically by kitty.
-fn transmit_virtual(img: &DynamicImage, id: u32) -> String {
+fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
     let (w, h) = (img.width(), img.height());
     let img_rgb8 = img.to_rgb8();
     let bytes = img_rgb8.as_raw();
@@ -162,24 +165,38 @@ fn transmit_virtual(img: &DynamicImage, id: u32) -> String {
     let chunk_count = chunks.len();
     for (i, chunk) in chunks.enumerate() {
         payload = general_purpose::STANDARD.encode(chunk);
+        // tmux seems to only allow a limited amount of data in each passthrough sequence, since
+        // we're already chunking the data for the kitty protocol that's a good enough chunk size to
+        // use for the passthrough chunks too
+        if is_tmux {
+            str.push_str("\x1bPtmux;\x1b\x1b");
+        } else {
+            str.push('\x1b');
+        }
         match i {
             0 => {
                 // Transmit and virtual-place but keep sending chunks
                 let more = if chunk_count > 1 { 1 } else { 0 };
                 str.push_str(&format!(
-                    "\x1b_Gq=2,i={id},a=T,U=1,f=24,t=d,s={w},v={h},m={more};{payload}\x1b\\"
+                    "_Gq=2,i={id},a=T,U=1,f=24,t=d,s={w},v={h},m={more};{payload}"
                 ));
             }
             n if n + 1 == chunk_count => {
                 // m=0 means over
-                str.push_str(&format!("\x1b_Gq=2,i={id},m=0;{payload}\x1b\\"));
+                str.push_str(&format!("_Gq=2,i={id},m=0;{payload}"));
             }
             _ => {
                 // Keep adding chunks
-                str.push_str(&format!("\x1b_Gq=2,i={id},m=1;{payload}\x1b\\"));
+                str.push_str(&format!("_Gq=2,i={id},m=1;{payload}"));
             }
         }
+        if is_tmux {
+            str.push_str("\x1b\x1b\\\x1b\\");
+        } else {
+            str.push_str("\x1b\\");
+        }
     }
+
     str
 }
 
