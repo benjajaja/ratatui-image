@@ -1,5 +1,5 @@
 /// https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholders
-use std::format;
+use std::fmt::Write;
 
 use base64::{engine::general_purpose, Engine};
 use image::{DynamicImage, Rgb};
@@ -178,17 +178,19 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
             0 => {
                 // Transmit and virtual-place but keep sending chunks
                 let more = if chunk_count > 1 { 1 } else { 0 };
-                str.push_str(&format!(
+                write!(
+                    str,
                     "_Gq=2,i={id},a=T,U=1,f=24,t=d,s={w},v={h},m={more};{payload}"
-                ));
+                )
+                .unwrap();
             }
             n if n + 1 == chunk_count => {
                 // m=0 means over
-                str.push_str(&format!("_Gq=2,m=0;{payload}"));
+                write!(str, "_Gq=2,m=0;{payload}").unwrap();
             }
             _ => {
                 // Keep adding chunks
-                str.push_str(&format!("_Gq=2,m=1;{payload}"));
+                write!(str, "_Gq=2,m=1;{payload}").unwrap();
             }
         }
         if is_tmux {
