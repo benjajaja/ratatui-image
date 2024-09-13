@@ -160,11 +160,11 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
 
     let mut str = String::new();
 
-    let mut payload: String;
-    let chunks = bytes.chunks(4000);
+    // Max chunk size is 4096 bytes of base64 encoded data
+    let chunks = bytes.chunks(4096 / 4 * 3);
     let chunk_count = chunks.len();
     for (i, chunk) in chunks.enumerate() {
-        payload = general_purpose::STANDARD.encode(chunk);
+        let payload = general_purpose::STANDARD.encode(chunk);
         // tmux seems to only allow a limited amount of data in each passthrough sequence, since
         // we're already chunking the data for the kitty protocol that's a good enough chunk size to
         // use for the passthrough chunks too
