@@ -183,11 +183,11 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
             }
             n if n + 1 == chunk_count => {
                 // m=0 means over
-                str.push_str(&format!("_Gq=2,i={id},m=0;{payload}"));
+                str.push_str(&format!("_Gq=2,m=0;{payload}"));
             }
             _ => {
                 // Keep adding chunks
-                str.push_str(&format!("_Gq=2,i={id},m=1;{payload}"));
+                str.push_str(&format!("_Gq=2,m=1;{payload}"));
             }
         }
         if is_tmux {
