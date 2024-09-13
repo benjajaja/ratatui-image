@@ -13,7 +13,7 @@ use super::{Protocol, StatefulProtocol};
 #[derive(Clone, Default)]
 pub struct Kitty {
     transmit_data: String,
-    unique_id: u8,
+    unique_id: u32,
     rect: Rect,
 }
 
@@ -28,7 +28,7 @@ impl Kitty {
         resize: Resize,
         background_color: Option<Rgb<u8>>,
         area: Rect,
-        id: u8,
+        id: u32,
     ) -> Result<Self> {
         let (image, desired) = resize
             .resize(source, Rect::default(), area, background_color, false)
@@ -57,7 +57,7 @@ impl Protocol for Kitty {
 #[derive(Clone)]
 pub struct StatefulKitty {
     source: ImageSource,
-    pub unique_id: u8,
+    pub unique_id: u32,
     rect: Rect,
     hash: u64,
     proto_state: KittyProtoState,
@@ -71,7 +71,7 @@ enum KittyProtoState {
 }
 
 impl StatefulKitty {
-    pub fn new(source: ImageSource, id: u8) -> StatefulKitty {
+    pub fn new(source: ImageSource, id: u32) -> StatefulKitty {
         StatefulKitty {
             source,
             unique_id: id,
@@ -116,7 +116,10 @@ impl StatefulProtocol for StatefulKitty {
     }
 }
 
-fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u8, seq: &mut Option<String>) {
+fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<String>) {
+    let [id_extra, id_r, id_g, id_b] = id.to_be_bytes();
+    let id_color = format!("\x1b[38;2;{id_r};{id_g};{id_b}m");
+
     // Draw each line of unicode placeholders but all into the first cell.
     // I couldn't work out actually drawing into each cell of the buffer so
     // that `.set_skip(true)` would be made unnecessary. Maybe some other escape
@@ -127,12 +130,12 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u8, seq: &mut Option<Str
         let mut symbol = seq.take().unwrap_or_default();
 
         // Start unicode placeholder sequence
-        symbol.push_str(&format!("\x1b[38;5;{id}m"));
-        add_placeholder(&mut symbol, 0, y);
+        symbol.push_str(&id_color);
+        add_placeholder(&mut symbol, 0, y, id_extra);
 
         for x in 1..(area.width.min(rect.width)) {
             // Add entire row with positions
-            add_placeholder(&mut symbol, x, y);
+            add_placeholder(&mut symbol, x, y, id_extra);
             // Skip or something may overwrite it
             buf.get_mut(area.left() + x, area.top() + y).set_skip(true);
         }
@@ -147,7 +150,7 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u8, seq: &mut Option<Str
 /// A "virtual placement" (U=1) is created so that we can place it using unicode placeholders.
 /// Removing the placements when the unicode placeholder is no longer there is being handled
 /// automatically by kitty.
-fn transmit_virtual(img: &DynamicImage, id: u8) -> String {
+fn transmit_virtual(img: &DynamicImage, id: u32) -> String {
     let (w, h) = (img.width(), img.height());
     let img_rgb8 = img.to_rgb8();
     let bytes = img_rgb8.as_raw();
@@ -180,10 +183,11 @@ fn transmit_virtual(img: &DynamicImage, id: u8) -> String {
     str
 }
 
-fn add_placeholder(str: &mut String, x: u16, y: u16) {
+fn add_placeholder(str: &mut String, x: u16, y: u16, id_extra: u8) {
     str.push('\u{10EEEE}');
     str.push(diacritic(y));
     str.push(diacritic(x));
+    str.push(diacritic(id_extra as u16));
 }
 
 /// From https://sw.kovidgoyal.net/kitty/_downloads/1792bad15b12979994cd6ecc54c967a6/rowcolumn-diacritics.txt

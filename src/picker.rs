@@ -26,7 +26,7 @@ pub struct Picker {
     pub background_color: Option<Rgb<u8>>,
     pub protocol_type: ProtocolType,
     pub is_tmux: bool,
-    kitty_counter: u8,
+    kitty_counter: u32,
 }
 
 /// Serde-friendly protocol-type enum for [Picker].
@@ -95,7 +95,7 @@ impl Picker {
             background_color: None,
             protocol_type: ProtocolType::Halfblocks,
             is_tmux: false,
-            kitty_counter: 0,
+            kitty_counter: rand::random(),
         }
     }
 
@@ -138,7 +138,7 @@ impl Picker {
                 size,
             )?)),
             ProtocolType::Kitty => {
-                self.kitty_counter = self.kitty_counter.saturating_add(1);
+                self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
                 Ok(Box::new(Kitty::from_source(
                     &source,
                     resize,
@@ -164,7 +164,7 @@ impl Picker {
             ProtocolType::Halfblocks => Box::new(StatefulHalfblocks::new(source)),
             ProtocolType::Sixel => Box::new(StatefulSixel::new(source, self.is_tmux)),
             ProtocolType::Kitty => {
-                self.kitty_counter = self.kitty_counter.saturating_add(1);
+                self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
                 Box::new(StatefulKitty::new(source, self.kitty_counter))
             }
             ProtocolType::Iterm2 => Box::new(Iterm2State::new(source, self.is_tmux)),
