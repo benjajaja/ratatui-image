@@ -138,7 +138,8 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<St
 
         for x in 1..(area.width.min(rect.width)) {
             // Add entire row with positions
-            add_placeholder(&mut symbol, x, y, id_extra);
+            // Use inherited diacritic values
+            symbol.push('\u{10EEEE}');
             // Skip or something may overwrite it
             buf.get_mut(area.left() + x, area.top() + y).set_skip(true);
         }
