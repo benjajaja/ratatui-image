@@ -3,19 +3,18 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crossterm::{
-    execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetSize,
-    },
-};
 use image::Rgb;
 use ratatui::{
     backend::CrosstermBackend,
+    crossterm::{
+        execute,
+        terminal::{
+            disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetSize,
+        },
+    },
     layout::Rect,
-    terminal::Frame,
     widgets::{Block, Borders, Paragraph},
-    Terminal,
+    Frame, Terminal,
 };
 use ratatui_image::{picker::Picker, protocol::Protocol, Image, Resize};
 struct App {

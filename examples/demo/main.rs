@@ -206,8 +206,8 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
             ]
             .as_ref(),
         )
-        .split(outer_block.inner(f.size()));
-    f.render_widget(outer_block, f.size());
+        .split(outer_block.inner(f.area()));
+    f.render_widget(outer_block, f.area());
 
     let left_chunks = Layout::default()
         .direction(Direction::Vertical)

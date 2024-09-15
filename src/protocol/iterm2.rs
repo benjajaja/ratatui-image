@@ -78,8 +78,7 @@ fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) 
         Some(r) => r,
     };
 
-    buf.get_mut(render_area.left(), render_area.top())
-        .set_symbol(data);
+    buf.cell_mut(render_area).map(|cell| cell.set_symbol(data));
     let mut skip_first = false;
 
     // Skip entire area
@@ -89,7 +88,7 @@ fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) 
                 skip_first = true;
                 continue;
             }
-            buf.get_mut(x, y).set_skip(true);
+            buf.cell_mut((x, y)).map(|cell| cell.set_skip(true));
         }
     }
 }

@@ -38,7 +38,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: make
-          args: ci
+          args: ci-all
       - name: Build
         if: matrix.platform != 'ubuntu-latest'
         uses: actions-rs/cargo@v1
@@ -93,7 +93,7 @@ jobs:
           if-no-files-found: error
       - name: Diff
         run: |
-          cargo install dify
+          cargo install dify@0.6.0
           cargo make screenshot-diff
       - name: Upload diff
         if: ${{ failure() }}

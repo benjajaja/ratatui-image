@@ -5,18 +5,17 @@ use std::{
     time::Duration,
 };
 
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
 use image::Rgb;
 use ratatui::{
     backend::CrosstermBackend,
+    crossterm::{
+        event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+        execute,
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    },
     layout::Rect,
-    terminal::Frame,
     widgets::{Block, Borders, Paragraph},
-    Terminal,
+    Frame, Terminal,
 };
 use ratatui_image::{
     picker::Picker,
@@ -69,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tx_main_events = tx_main.clone();
     thread::spawn(move || -> Result<(), std::io::Error> {
         loop {
-            if crossterm::event::poll(Duration::from_millis(1000))? {
+            if ratatui::crossterm::event::poll(Duration::from_millis(1000))? {
                 if let Event::Key(key) = event::read()? {
                     tx_main_events.send(AppEvent::KeyEvent(key)).unwrap();
                 }
@@ -109,7 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn ui(f: &mut Frame<'_>, app: &mut App) {
-    let area = f.size();
+    let area = f.area();
     let block = Block::default().borders(Borders::ALL).title("Async test");
 
     f.render_widget(

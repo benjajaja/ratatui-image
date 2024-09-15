@@ -1,6 +1,12 @@
 [env]
 SCREENSHOT_TERM = "xterm -ti vt340 -fa DejaVu -fs 7 -bg black -fg white"
 SCREENSHOT_TERM_NAME = "xterm"
+BACKEND = "crossterm"
+
+[env.termion]
+BACKEND = "termion"
+[env.termwiz]
+BACKEND = "termwiz"
 
 [tasks.default]
 alias = "ci"
@@ -44,7 +50,7 @@ args = ["readme", "-o", "README.md"]
 
 [tasks.build]
 command = "cargo"
-args = ["build"]
+args = ["build", "--features", "${BACKEND}"]
 
 
 [tasks.run-example]

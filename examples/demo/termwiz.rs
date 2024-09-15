@@ -4,8 +4,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use ratatui::{backend::TermwizBackend, Terminal};
-use termwiz::{input::*, terminal::Terminal as TermwizTerminal};
+use ratatui::{
+    backend::TermwizBackend,
+    termwiz::{input::*, terminal::Terminal as TermwizTerminal},
+    Terminal,
+};
 
 use crate::{ui, App};
 

@@ -141,10 +141,12 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<St
             // Use inherited diacritic values
             symbol.push('\u{10EEEE}');
             // Skip or something may overwrite it
-            buf.get_mut(area.left() + x, area.top() + y).set_skip(true);
+            buf.cell_mut((area.left() + x, area.top() + y))
+                .map(|cell| cell.set_skip(true));
         }
         symbol.push_str("\x1b[0m"); // Stop messing with styles now.
-        buf.get_mut(area.left(), area.top() + y).set_symbol(&symbol);
+        buf.cell_mut((area.left(), area.top() + y))
+            .map(|cell| cell.set_symbol(&symbol));
     }
 }
 

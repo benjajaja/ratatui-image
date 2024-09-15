@@ -41,7 +41,7 @@ an image that has been loaded, at a different or same position.
 
 ## Quick start
 ```rust
-use ratatui::{backend::TestBackend, Terminal, terminal::Frame};
+use ratatui::{backend::TestBackend, Terminal, Frame};
 use ratatui_image::{picker::Picker, StatefulImage, protocol::StatefulProtocol};
 
 struct App {
