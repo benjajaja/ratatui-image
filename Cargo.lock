@@ -112,12 +112,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "604178f6c5c21f02dc555784810edfb88d34ac2c73b2eae109655649ee73ce3d"
 
 [[package]]
-name = "base64"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
-
-[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1273,7 +1267,7 @@ dependencies = [
 name = "ratatui-image"
 version = "1.0.5"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "crossterm",
  "dyn-clone",
  "icy_sixel",
@@ -1732,7 +1726,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a75313e21da5d4406ea31402035b3b97aa74c04356bdfafa5d1043ab4e551d1"
 dependencies = [
  "anyhow",
- "base64 0.21.2",
+ "base64",
  "bitflags 2.3.3",
  "fancy-regex",
  "filedescriptor",
