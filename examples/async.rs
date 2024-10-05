@@ -42,7 +42,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
+    #[cfg(all(feature = "rustix", unix))]
     let mut picker = Picker::from_termios()?;
+    #[cfg(not(all(feature = "rustix", unix)))]
+    let mut picker = {
+        let font_size = (8, 16);
+        Picker::new(font_size)
+    };
     picker.guess_protocol();
     picker.background_color = Some(Rgb::<u8>([255, 0, 255]));
     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;

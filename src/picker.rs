@@ -394,7 +394,7 @@ pub fn read_stdin(
     }
 }
 
-#[cfg(all(test, feature = "rustix"))]
+#[cfg(all(test, feature = "rustix", unix))]
 mod tests {
     use std::{
         assert_eq,
