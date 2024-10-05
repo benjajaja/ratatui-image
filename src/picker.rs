@@ -6,8 +6,12 @@ use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
 #[cfg(all(feature = "rustix", unix))]
 use rustix::termios::Winsize;
+#[cfg(windows)]
+use semver::Version;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+#[cfg(windows)]
+use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
 use crate::{
     protocol::{
@@ -225,6 +229,11 @@ fn guess_protocol() -> (ProtocolType, bool) {
             return (ProtocolType::Iterm2, is_tmux);
         }
     }
+    // WT_SESSION see https://github.com/microsoft/terminal/pull/897
+    #[cfg(windows)]
+    if env::var("WT_SESSION").is_ok() && support_sixels().is_ok_and(|flag| flag) {
+        return (ProtocolType::Sixel, is_tmux);
+    }
 
     if is_tmux {
         let _ = std::process::Command::new("tmux")
@@ -250,6 +259,46 @@ fn guess_protocol() -> (ProtocolType, bool) {
 
     // Fallback.
     (ProtocolType::Halfblocks, is_tmux)
+}
+
+// Since only the latest preview version of Windows Terminal supports Sixels,
+// it is necessary to get the version and determine whether it supports Sixels or not.
+#[cfg(windows)]
+fn support_sixels() -> Result<bool> {
+    let mut support_sixels = false;
+    // The earliest version of Windows Terminal to support Sixels
+    // https://github.com/microsoft/terminal/releases/tag/v1.22.2362.0
+    let base_version = Version::parse("1.22.2362").unwrap();
+
+    let system = System::new_with_specifics(
+        RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
+    );
+
+    // TODO Since there is no easy way to get the Windows Terminal version,
+    // here the file version of the running Windows Terminal process is detected.
+    // When two or more different versions of Windows Terminal are running at the same time,
+    // the version detection may not be correct.
+    // Need to find a better way to implement this.
+    for process in system.processes_by_exact_name("WindowsTerminal.exe".as_ref()) {
+        if let Some(exe) = process.exe() {
+            let file_map = pelite::FileMap::open(exe)?;
+            let image = pelite::PeFile::from_bytes(file_map.as_ref())?;
+            let resources = image.resources()?;
+
+            if let Some(fixed) = resources.version_info()?.file_info().fixed {
+                let version = Version::parse(&format!(
+                    "{}.{}.{}",
+                    fixed.dwFileVersion.Major, fixed.dwFileVersion.Minor, fixed.dwFileVersion.Patch,
+                ))?;
+
+                if version >= base_version {
+                    support_sixels = true;
+                }
+            }
+        }
+    }
+
+    Ok(support_sixels)
 }
 
 /// Crude guess based on the *existance* of some magic program specific env vars.
