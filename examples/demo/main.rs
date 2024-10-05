@@ -74,7 +74,13 @@ impl<'a> App<'a> {
         let ada = "./assets/Ada.png";
         let dyn_img = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
+        #[cfg(all(feature = "rustix", unix))]
         let mut picker = Picker::from_termios().unwrap();
+        #[cfg(not(all(feature = "rustix", unix)))]
+        let mut picker = {
+            let font_size = (8, 16);
+            Picker::new(font_size)
+        };
         picker.guess_protocol();
 
         let image_static = picker

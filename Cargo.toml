@@ -37,6 +37,11 @@ base64 = { version = "^0.22.1" }
 rand = { version = "0.8.5" }
 ratatui = { version = ">=0.23", default-features = false, features = [] }
 
+[target.'cfg(windows)'.dependencies]
+semver = "1.0"
+pelite = "0.10.0"
+sysinfo = { version = "0.31.4", default-features = false, features = ["system"] }
+
 [[bin]]
 name = "ratatui-image"
 path = "./src/bin/ratatui-image/main.rs" # cargo readme needs this for some reason
