@@ -42,13 +42,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image = image::io::Reader::open(&filename)?.decode()?;
 
     #[cfg(all(feature = "rustix", unix))]
-    let mut picker = Picker::from_termios()?;
+    let mut picker = Picker::from_query_stdio()?;
     #[cfg(not(all(feature = "rustix", unix)))]
     let mut picker = {
         let font_size = (8, 16);
         Picker::new(font_size)
     };
-    picker.guess_protocol();
+    picker.query_stdio();
     picker.background_color = Some(Rgb::<u8>([255, 0, 255]));
 
     let image_source = ImageSource::new(image.clone(), picker.font_size);

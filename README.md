@@ -56,11 +56,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = TestBackend::new(80, 30);
     let mut terminal = Terminal::new(backend)?;
 
-    // Should use Picker::from_termios(), to get the font size,
+    // Should use Picker::from_query_stdio() to get the font size and protocol,
     // but we can't put that here because that would break doctests!
     let mut picker = Picker::new((8, 12));
-    // Guess the protocol.
-    picker.guess_protocol();
 
     // Load an image with the image crate.
     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;

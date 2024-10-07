@@ -74,8 +74,8 @@ impl<'a> App<'a> {
         let ada = "./assets/Ada.png";
         let dyn_img = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
-        let mut picker = Picker::from_termios().unwrap();
-        picker.guess_protocol();
+        let mut picker = Picker::from_query_stdio().unwrap();
+        picker.query_stdio();
 
         let image_static = picker
             .new_protocol(dyn_img.clone(), size(), Resize::Fit(None))

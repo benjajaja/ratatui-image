@@ -5,7 +5,10 @@ use std::{env, io, time::Instant};
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
 #[cfg(all(feature = "rustix", unix))]
-use rustix::termios::Winsize;
+use rustix::{
+    stdio::stdout,
+    termios::{tcgetwinsize, Winsize},
+};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -56,28 +59,34 @@ impl ProtocolType {
 
 /// Helper for building widgets
 impl Picker {
-    /// Query terminal for font-size with some escape sequence.
+    /// Query terminal stdio for graphics capabilities and font-size with some escape sequences.
     ///
-    /// This writes and reads from stdin momentarily. WARNING: this method should be called after
+    /// This writes and reads from stdio momentarily. WARNING: this method should be called after
     /// entering alternate screen but before reading terminal events.
     ///
     /// # Example
     /// ```rust
     /// use ratatui_image::picker::Picker;
-    /// let mut picker = Picker::from_termios();
+    /// let mut picker = Picker::from_query_stdio();
     /// ```
     #[cfg(all(feature = "rustix", unix))]
-    pub fn from_termios() -> Result<Picker> {
-        use rustix::{stdio::stdout, termios::tcgetwinsize};
+    pub fn from_query_stdio() -> Result<Picker> {
+        let (protocol_type, font_size, is_tmux) = query_stdio();
 
-        let stdout = stdout();
-        let font_size = font_size(tcgetwinsize(stdout)?)?;
-        Ok(Picker::new(font_size))
+        if let Some(font_size) = font_size {
+            Ok(Picker {
+                font_size,
+                background_color: None,
+                protocol_type,
+                is_tmux,
+                kitty_counter: rand::random(),
+            })
+        } else {
+            Err("could not query font size".into())
+        }
     }
 
-    /// Create a picker from a given terminal [FontSize] and [ProtocolType].
-    /// This is useful to allow overriding the best-guess of [Picker::from_termios], for example
-    /// from some user configuration.
+    /// Create a picker from a given terminal [FontSize].
     ///
     /// # Example
     /// ```rust
@@ -99,14 +108,14 @@ impl Picker {
         }
     }
 
-    /// Guess the best protocol for the current terminal by issuing some escape sequences to
-    /// stdout.
+    /// Query terminal stdio for graphics capabilities and font-size with some escape sequences.
     ///
-    /// WARNING: this method should be called after entering alternate screen but before reading
-    /// terminal events.
-    pub fn guess_protocol(&mut self) -> ProtocolType {
+    /// This writes and reads from stdio momentarily. WARNING: this method should be called after
+    /// entering alternate screen but before reading terminal events.
+    ///
+    pub fn query_stdio(&mut self) -> ProtocolType {
         let font_size;
-        (self.protocol_type, font_size, self.is_tmux) = guess_capabilities();
+        (self.protocol_type, font_size, self.is_tmux) = query_stdio();
         if let Some(font_size) = font_size {
             self.font_size = font_size;
         }
@@ -178,7 +187,7 @@ impl Picker {
 }
 
 #[cfg(all(feature = "rustix", unix))]
-pub fn font_size(winsize: Winsize) -> Result<FontSize> {
+pub fn from_winsize(winsize: Winsize) -> Result<FontSize> {
     let Winsize {
         ws_xpixel: x,
         ws_ypixel: y,
@@ -191,9 +200,7 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
     Ok((x / cols, y / rows))
 }
 
-// Guess what protocol should be used, first from some program-specific magical env vars, then with
-// the typical $TERM* env vars, and then with termios stdin/out queries.
-fn guess_capabilities() -> (ProtocolType, Option<FontSize>, bool) {
+fn query_stdio() -> (ProtocolType, Option<FontSize>, bool) {
     let mut proto = ProtocolType::Halfblocks;
     let mut font_size = None;
     let mut is_tmux = false;
@@ -231,7 +238,11 @@ fn guess_capabilities() -> (ProtocolType, Option<FontSize>, bool) {
         if let Some(cap_proto) = cap_proto {
             proto = cap_proto;
         }
-        font_size = cap_font_size;
+        font_size = cap_font_size.or_else(|| {
+            // Couldn't get font size by query, use tcgetwinsize.
+            let winsize = tcgetwinsize(stdout()).ok()?;
+            from_winsize(winsize).ok()
+        })
     }
 
     // Ideally the capabilities should be the best indication. In practice, some protocols
@@ -268,7 +279,7 @@ fn guess_capabilities() -> (ProtocolType, Option<FontSize>, bool) {
     (proto, font_size, is_tmux)
 }
 
-/// Crude guess based on the *existance* of some magic program specific env vars.
+/// Crude guess based on the *existence* of some magic program specific env vars.
 /// Produces false positives, for example xterm started from kitty inherits KITTY_WINDOW_ID.
 /// Furthermore, tmux shares env vars from the first session, for example tmux started in xterm
 /// after a previous tmux session started in kitty, inherits KITTY_WINDOW_ID.
@@ -287,21 +298,6 @@ pub fn env_exists(name: &str) -> bool {
 }
 
 #[cfg(all(feature = "rustix", unix))]
-/// Check for kitty or sixel terminal support.
-/// Sadly, iterm2 has no spec for querying support.
-/// see https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Sixel-Graphics
-/// and https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h4-Functions-using-CSI-_-ordered-by-the-final-character-lparen-s-rparen:CSI-Ps-c.1CA3
-/// and https://vt100.net/docs/vt510-rm/DA1.html
-/// Tested with:
-/// * patched alactritty (positive)
-/// * unpatched alactritty (negative)
-/// * xterm -ti vt340
-/// * kitty
-/// * wezterm
-/// * foot
-/// * konsole (kitty protocol)
-///
-/// NOTE: "tested" means that it guesses correctly, not necessarily rendering correctly.
 fn query_device_attrs(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
     use rustix::termios::{LocalModes, OptionalActions};
 
@@ -389,14 +385,13 @@ fn parse_response(buf: String) -> Vec<ParsedResponse> {
         state: ParseState,
         data: String,
     }
-    let mut chars = buf.chars();
     let mut state = Parser {
         state: ParseState::Empty,
         data: String::new(),
     };
 
     let mut capabilities = vec![];
-    while let Some(c) = chars.next() {
+    for c in buf.chars() {
         match state.state {
             ParseState::Empty => {
                 if c == '\x1b' {
@@ -464,14 +459,14 @@ fn parse_sequence(data: &str) -> ParsedResponse {
     }
     if data.starts_with("6;") && data.ends_with('t') {
         let inner: &Vec<&str> = &data[2..data.len() - 1].split(';').collect();
-        match inner[..] {
-            [h, w] => {
-                if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
+        if let [h, w] = inner[..] {
+            if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
+                if w > 0 && h > 0 {
                     return ParsedResponse::FontSize(w, h);
                 }
             }
-            _ => {}
         }
+        return ParsedResponse::Unknown(data.to_owned());
     }
     if data == "0n" {
         return ParsedResponse::Status;
@@ -533,19 +528,19 @@ mod tests {
         io::{self},
     };
 
-    use crate::picker::{font_size, read_stdin, Picker, ProtocolType};
+    use crate::picker::{from_winsize, read_stdin, Picker, ProtocolType};
     use rustix::termios::Winsize;
 
     #[test]
     fn test_font_size() {
-        assert!(font_size(Winsize {
+        assert!(from_winsize(Winsize {
             ws_row: 0,
             ws_col: 0,
             ws_xpixel: 10,
             ws_ypixel: 10
         })
         .is_err());
-        assert!(font_size(Winsize {
+        assert!(from_winsize(Winsize {
             ws_row: 10,
             ws_col: 10,
             ws_xpixel: 0,

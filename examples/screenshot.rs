@@ -36,8 +36,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut picker = Picker::from_termios()?;
-    picker.guess_protocol();
+    let mut picker = Picker::from_query_stdio()?;
+    picker.query_stdio();
     picker.background_color = Some(Rgb::<u8>([255, 0, 255]));
     if false {
         assert_eq!(
