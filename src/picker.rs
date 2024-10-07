@@ -105,7 +105,11 @@ impl Picker {
     /// WARNING: this method should be called after entering alternate screen but before reading
     /// terminal events.
     pub fn guess_protocol(&mut self) -> ProtocolType {
-        (self.protocol_type, self.is_tmux) = guess_protocol();
+        let font_size;
+        (self.protocol_type, font_size, self.is_tmux) = guess_capabilities();
+        if let Some(font_size) = font_size {
+            self.font_size = font_size;
+        }
         self.protocol_type
     }
 
@@ -189,40 +193,20 @@ pub fn font_size(winsize: Winsize) -> Result<FontSize> {
 
 // Guess what protocol should be used, first from some program-specific magical env vars, then with
 // the typical $TERM* env vars, and then with termios stdin/out queries.
-fn guess_protocol() -> (ProtocolType, bool) {
-    // Start with some basic env vars.
+fn guess_capabilities() -> (ProtocolType, Option<FontSize>, bool) {
+    let mut proto = ProtocolType::Halfblocks;
+    let mut font_size = None;
     let mut is_tmux = false;
+
+    // Check if we're inside tmux.
     if let Ok(term) = env::var("TERM") {
-        if term == "mlterm" || term == "yaft-256color" {
-            return (ProtocolType::Sixel, is_tmux);
-        }
-        if term.contains("kitty") {
-            return (ProtocolType::Kitty, is_tmux);
-        }
         if term.starts_with("tmux") {
             is_tmux = true;
         }
     }
     if let Ok(term_program) = env::var("TERM_PROGRAM") {
-        if term_program == "MacTerm" {
-            return (ProtocolType::Sixel, is_tmux);
-        }
-        if term_program.contains("iTerm")
-            || term_program.contains("WezTerm")
-            || term_program.contains("mintty")
-            || term_program.contains("vscode")
-            || term_program.contains("Tabby")
-            || term_program.contains("Hyper")
-        {
-            return (ProtocolType::Iterm2, is_tmux);
-        }
         if term_program == "tmux" {
             is_tmux = true;
-        }
-    }
-    if let Ok(lc_term) = env::var("LC_TERMINAL") {
-        if lc_term.contains("iTerm") {
-            return (ProtocolType::Iterm2, is_tmux);
         }
     }
 
@@ -237,19 +221,51 @@ fn guess_protocol() -> (ProtocolType, bool) {
 
         // Only if we're in tmux, take a risky guess because $TERM has been overwritten.
         // The core issue is that iterm2 support cannot be queried, like kitty or sixel.
-        if let Some(proto) = guess_protocol_magic_env_var_exist() {
-            return (proto, is_tmux);
+        if let Some(magic_proto) = guess_protocol_magic_env_var_exist() {
+            proto = magic_proto
         }
     }
 
-    // No hardcoded stuff worked, try querying the terminal now.
     #[cfg(all(feature = "rustix", unix))]
-    if let Ok(proto) = query_device_attrs(is_tmux) {
-        return (proto, is_tmux);
+    if let Ok((cap_proto, cap_font_size)) = query_device_attrs(is_tmux) {
+        if let Some(cap_proto) = cap_proto {
+            proto = cap_proto;
+        }
+        font_size = cap_font_size;
+    }
+
+    // Ideally the capabilities should be the best indication. In practice, some protocols
+    // are buggy on specific terminals, and we can pick another one that works better.
+    if let Ok(term) = env::var("TERM") {
+        if term == "mlterm" || term == "yaft-256color" {
+            proto = ProtocolType::Sixel;
+        }
+        if term.contains("kitty") {
+            proto = ProtocolType::Kitty;
+        }
+    }
+    if let Ok(term_program) = env::var("TERM_PROGRAM") {
+        if term_program == "MacTerm" {
+            proto = ProtocolType::Sixel;
+        }
+        if term_program.contains("iTerm")
+            || term_program.contains("WezTerm")
+            || term_program.contains("mintty")
+            || term_program.contains("vscode")
+            || term_program.contains("Tabby")
+            || term_program.contains("Hyper")
+        {
+            proto = ProtocolType::Iterm2;
+        }
+    }
+    if let Ok(lc_term) = env::var("LC_TERMINAL") {
+        if lc_term.contains("iTerm") {
+            proto = ProtocolType::Iterm2;
+        }
     }
 
     // Fallback.
-    (ProtocolType::Halfblocks, is_tmux)
+    (proto, font_size, is_tmux)
 }
 
 /// Crude guess based on the *existance* of some magic program specific env vars.
@@ -286,7 +302,7 @@ pub fn env_exists(name: &str) -> bool {
 /// * konsole (kitty protocol)
 ///
 /// NOTE: "tested" means that it guesses correctly, not necessarily rendering correctly.
-fn query_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
+fn query_device_attrs(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
     use rustix::termios::{LocalModes, OptionalActions};
 
     let stdin = rustix::stdio::stdin();
@@ -306,17 +322,20 @@ fn query_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
     });
 
     let (start, escape, end) = if is_tmux {
-        ("\x1bPtmux;\x1b\x1b", "\x1b\x1b", "\x1b\\")
+        ("\x1bPtmux;", "\x1b\x1b", "\x1b\\")
     } else {
-        ("\x1b", "\x1b", "")
+        ("", "\x1b", "")
     };
-    rustix::io::write(
-        rustix::stdio::stdout(),
-        // Queries first for kitty support with `_Gi=...<ESC>\` and then for "graphics attributes"
-        // (sixel) with `<ESC>[c`.
-        // See https://sw.kovidgoyal.net/kitty/graphics-protocol/#querying-support-and-available-transmission-mediums
-        format!("{start}_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA{escape}\\{escape}[c{end}").as_bytes(),
-    )?;
+
+    // Send several control sequences at once:
+    // `_Gi=...`: Kitty graphics support.
+    // `[c`: Capabilities including sixels.
+    // `[16t`: Cell-size (perhaps we should also do `[14t`).
+    // `[1337n`: iTerm2 (some terminals implement the protocol but sadly not this custom CSI)
+    // `[5n`: Device Status Report, implemented by all terminals, ensure that there is some
+    // response and we don't hang reading forever.
+    let query = format!("{start}{escape}_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA{escape}\\{escape}[c{escape}[16t{escape}[1337n{escape}[5n{end}");
+    rustix::io::write(rustix::stdio::stdout(), query.as_bytes())?;
 
     let buf = read_stdin(
         1000,
@@ -339,13 +358,125 @@ fn query_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
     }
     rustix::termios::tcsetattr(stdin, OptionalActions::Now, &termios_original)?;
 
-    if buf.contains("_Gi=31;OK") {
-        return Ok(ProtocolType::Kitty);
+    let capabilities = parse_response(buf);
+
+    let protocol = if capabilities.contains(&ParsedResponse::Kitty(true)) {
+        Some(ProtocolType::Kitty)
+    } else if capabilities.contains(&ParsedResponse::Sixel(true)) {
+        Some(ProtocolType::Sixel)
+    } else {
+        None
+    };
+
+    let mut font_size = None;
+    for cap in capabilities {
+        if let ParsedResponse::FontSize(w, h) = cap {
+            font_size = Some((w, h));
+        }
     }
-    if buf.contains(";4;") || buf.contains("?4;") || buf.contains(";4c") || buf.contains("?4c") {
-        return Ok(ProtocolType::Sixel);
+    Ok((protocol, font_size))
+}
+
+fn parse_response(buf: String) -> Vec<ParsedResponse> {
+    enum ParseState {
+        Empty,
+        EscapeStart,
+        Reading,
+        KittyReading,
+        KittyClosing,
     }
-    Err("graphics support not detected".into())
+    struct Parser {
+        state: ParseState,
+        data: String,
+    }
+    let mut chars = buf.chars();
+    let mut state = Parser {
+        state: ParseState::Empty,
+        data: String::new(),
+    };
+
+    let mut capabilities = vec![];
+    while let Some(c) = chars.next() {
+        match state.state {
+            ParseState::Empty => {
+                if c == '\x1b' {
+                    state.state = ParseState::EscapeStart;
+                }
+            }
+            ParseState::EscapeStart => {
+                if c == '[' {
+                    state.state = ParseState::Reading;
+                } else if c == '_' {
+                    state.state = ParseState::KittyReading;
+                }
+                state.data = String::new();
+            }
+            ParseState::Reading => {
+                if c == '\x1b' {
+                    state.state = ParseState::EscapeStart;
+                    capabilities.push(parse_sequence(&state.data));
+                } else {
+                    state.data.push(c);
+                }
+            }
+            ParseState::KittyReading => {
+                if c == '\x1b' {
+                    state.state = ParseState::KittyClosing;
+                } else {
+                    state.data.push(c);
+                }
+            }
+            ParseState::KittyClosing => {
+                if c == '\\' {
+                    state.state = ParseState::EscapeStart;
+                    capabilities.push(parse_sequence(&state.data));
+                }
+            }
+        }
+    }
+    if let ParseState::Reading = state.state {
+        capabilities.push(parse_sequence(&state.data));
+    }
+    capabilities
+}
+
+#[derive(Debug, PartialEq)]
+enum ParsedResponse {
+    Unknown(String),
+    Kitty(bool),
+    Sixel(bool),
+    FontSize(u16, u16),
+    Status,
+}
+
+fn parse_sequence(data: &str) -> ParsedResponse {
+    if data.starts_with("Gi=31;") {
+        return ParsedResponse::Kitty(data.ends_with("OK"));
+    }
+    if data.starts_with('?') && data.ends_with('c') {
+        return ParsedResponse::Sixel(
+            // This is just easier than actually parsing the string.
+            data.contains(";4;")
+                || data.contains("?4;")
+                || data.contains(";4c")
+                || data.contains("?4c"),
+        );
+    }
+    if data.starts_with("6;") && data.ends_with('t') {
+        let inner: &Vec<&str> = &data[2..data.len() - 1].split(';').collect();
+        match inner[..] {
+            [h, w] => {
+                if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
+                    return ParsedResponse::FontSize(w, h);
+                }
+            }
+            _ => {}
+        }
+    }
+    if data == "0n" {
+        return ParsedResponse::Status;
+    }
+    ParsedResponse::Unknown(data.to_owned())
 }
 
 pub fn read_stdin(
