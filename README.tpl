@@ -9,7 +9,7 @@
 [Crate Badge]: https://img.shields.io/crates/v/ratatui-image?logo=rust&style=flat-square
 [Crate]: https://crates.io/crates/ratatui-image
 [Docs Badge]: https://img.shields.io/docsrs/ratatui-image?logo=rust&style=flat-square
-[Docs]: https://docs.rs/ratatui-image/0.8.0/ratatui_image/
+[Docs]: https://docs.rs/ratatui-image/latest/ratatui_image/index.html
 
 ### Showcase:
 

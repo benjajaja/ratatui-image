@@ -3,20 +3,23 @@
 //! [ratatui] is an immediate-mode TUI library.
 //! ratatui-image tackles 3 general problems when rendering images with an immediate-mode TUI:
 //!
-//! 1. **Query the terminal for available graphics protocols**.
+//! **Query the terminal for available graphics protocols**
+//!
 //! Some terminals may implement one or more graphics protocols, such as Sixels, or the iTerm2 or
 //! Kitty graphics protocols. Guess by env vars. If that fails, query the terminal with some
 //! control sequences.
 //! Fallback to "halfblocks" which uses some unicode half-block characters with fore- and
 //! background colors.
 //!
-//! 2. **Query the terminal for the font-size in pixels.**
+//! **Query the terminal for the font-size in pixels.**
+//!
 //! If there is an actual graphics protocol available, it is necessary to know the font-size to
 //! be able to map the image pixels to character cell area. The image can be resized, fit, or
 //! cropped to an area. Query the terminal for the window and columns/rows sizes, and derive the
 //! font-size.
 //!
-//! 3. **Render the image by the means of the guessed protocol.**
+//! **Render the image by the means of the guessed protocol.**
+//!
 //! Some protocols, like Sixels, are essentially "immediate-mode", but we still need to avoid the
 //! TUI from overwriting the image area, even with blank characters.
 //! Other protocols, like Kitty, are essentially stateful, but at least provide a way to re-render
@@ -70,34 +73,34 @@
 //!
 //! # Widget choice
 //! * The [Image] widget does not adapt to rendering area (except not drawing at all if space
-//! is insufficient), may be a bit more bug prone (overdrawing or artifacts), and is not friendly
-//! with some of the protocols (e.g. the Kitty graphics protocol, which is stateful). Its big
-//! upside is that it is _stateless_ (in terms of ratatui, i.e. immediate-mode), and thus can never
-//! block the rendering thread/task. A lot of ratatui apps only use stateless widgets.
+//!   is insufficient), may be a bit more bug prone (overdrawing or artifacts), and is not friendly
+//!   with some of the protocols (e.g. the Kitty graphics protocol, which is stateful). Its big
+//!   upside is that it is _stateless_ (in terms of ratatui, i.e. immediate-mode), and thus can never
+//!   block the rendering thread/task. A lot of ratatui apps only use stateless widgets.
 //! * The [StatefulImage] widget adapts to its render area, is more robust against overdraw bugs and
-//! artifacts, and plays nicer with some of the graphics protocols.
-//! The resizing and encoding is blocking by default, but it is possible to offload this to another
-//! thread or async task (see `examples/async.rs`). It must be rendered with
-//! [`render_stateful_widget`] (i.e. with some mutable state).
+//!   artifacts, and plays nicer with some of the graphics protocols.
+//!   The resizing and encoding is blocking by default, but it is possible to offload this to another
+//!   thread or async task (see `examples/async.rs`). It must be rendered with
+//!   [`render_stateful_widget`] (i.e. with some mutable state).
 //!
 //! # Examples
 //!
 //! * `examples/demo.rs` is a fully fledged demo.
 //! * `examples/async.rs` shows how to offload resize and encoding to another thread, to avoid
-//! blocking the UI thread.
+//!   blocking the UI thread.
 //!
 //! The lib also includes a binary that renders an image file, but it is focused on testing.
 //!
 //! # Features
 //! * `rustix` (default) enables much better guessing of graphics protocols with `rustix::termios::tcgetattr`.
 //! * `crossterm` or `termion` should match your ratatui backend. `termwiz` is available, but not
-//! working correctly with ratatu-image.
+//!   working correctly with ratatu-image.
 //! * `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
-//! useful to save it in some user configuration.
+//!   useful to save it in some user configuration.
 //! * `image-defaults` (default) just enables `image/defaults` (`image` has `default-features =
 //! false`). To only support a selection of image formats and cut down dependencies, disable this
-//! feature, add `image` to your crate, and enable its features/formats as desired. See
-//! https://doc.rust-lang.org/cargo/reference/features.html#feature-unification.
+//!   feature, add `image` to your crate, and enable its features/formats as desired. See
+//!   https://doc.rust-lang.org/cargo/reference/features.html#feature-unification.
 //!
 //! [ratatui]: https://github.com/ratatui-org/ratatui
 //! [sixel]: https://en.wikipedia.org/wiki/Sixel

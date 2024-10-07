@@ -284,6 +284,7 @@ pub fn env_exists(name: &str) -> bool {
 /// * wezterm
 /// * foot
 /// * konsole (kitty protocol)
+///
 /// NOTE: "tested" means that it guesses correctly, not necessarily rendering correctly.
 fn query_device_attrs(is_tmux: bool) -> Result<ProtocolType> {
     use rustix::termios::{LocalModes, OptionalActions};

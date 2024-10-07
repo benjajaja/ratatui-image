@@ -1270,7 +1270,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-image"
-version = "1.0.5"
+version = "2.0.0"
 dependencies = [
  "base64",
  "dyn-clone",
