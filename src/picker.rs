@@ -1,6 +1,6 @@
 //! Helper module to build a protocol, and swap protocols at runtime
 
-use std::{env, io, time::Instant};
+use std::{env, io};
 
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
@@ -171,7 +171,7 @@ impl Picker {
         }
     }
 
-    /// Returns a new *resize* protocol for [`crate::StatefulImage`] widgets.
+    /// Returns a new *stateful* protocol for [`crate::StatefulImage`] widgets.
     pub fn new_resize_protocol(&mut self, image: DynamicImage) -> Box<dyn StatefulProtocol> {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
@@ -309,14 +309,6 @@ fn query_device_attrs(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<Fon
     termios.local_modes &= !LocalModes::ECHO;
     rustix::termios::tcsetattr(stdin, OptionalActions::Drain, &termios)?;
 
-    // Enable nonblocking mode for reads, so that this works even if the terminal emulator doesn't
-    // reply at all or replies with unexpected data.
-    let fd_flags_original = rustix::fs::fcntl_getfl(stdin).and_then(|fd_flags_original| {
-        let mut fd_flags = fd_flags_original;
-        fd_flags.insert(rustix::fs::OFlags::NONBLOCK);
-        rustix::fs::fcntl_setfl(stdin, fd_flags).map(|_| fd_flags_original)
-    });
-
     let (start, escape, end) = if is_tmux {
         ("\x1bPtmux;", "\x1b\x1b", "\x1b\\")
     } else {
@@ -333,28 +325,44 @@ fn query_device_attrs(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<Fon
     let query = format!("{start}{escape}_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA{escape}\\{escape}[c{escape}[16t{escape}[1337n{escape}[5n{end}");
     rustix::io::write(rustix::stdio::stdout(), query.as_bytes())?;
 
-    let buf = read_stdin(
-        1000,
-        move || {
-            let mut charbuf: [u8; 1] = [0];
-            match rustix::io::read(stdin, &mut charbuf) {
-                Ok(_) => Ok(charbuf[0]),
-                Err(err) => Err(err.into()),
+    let mut parser = Parser::new();
+    let mut capabilities = vec![];
+    'out: loop {
+        let mut charbuf: [u8; 50] = [0; 50];
+        let result = rustix::io::read(stdin, &mut charbuf);
+        match result {
+            Ok(read) => {
+                for i in 0..read {
+                    if let Some(cap) = parser.push(char::from(charbuf[i])) {
+                        if cap == ParsedResponse::Status {
+                            break 'out;
+                        } else {
+                            capabilities.push(cap);
+                        }
+                    }
+                }
             }
-        },
-        fd_flags_original.is_ok(),
-    )?;
-    if buf.is_empty() {
+            Err(err) => {
+                if err.kind() == io::ErrorKind::WouldBlock {
+                    if parser.data.len() == 0 {
+                        // No data yet, keep polling.
+                        continue;
+                    }
+                    // We've read some data.
+                    break;
+                }
+                // Some other kind of read error.
+                return Err(err.into());
+            }
+        }
+    }
+
+    if capabilities.is_empty() {
         return Err("no reply to graphics support query".into());
     }
 
-    // Reset to previous mode and status, and termios attributes.
-    if let Ok(fd_flags_original) = fd_flags_original {
-        rustix::fs::fcntl_setfl(stdin, fd_flags_original)?;
-    }
+    // Reset to previous termios attributes.
     rustix::termios::tcsetattr(stdin, OptionalActions::Now, &termios_original)?;
-
-    let capabilities = parse_response(buf);
 
     let protocol = if capabilities.contains(&ParsedResponse::Kitty(true)) {
         Some(ProtocolType::Kitty)
@@ -366,169 +374,91 @@ fn query_device_attrs(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<Fon
 
     let mut font_size = None;
     for cap in capabilities {
-        if let ParsedResponse::FontSize(w, h) = cap {
+        if let ParsedResponse::CellSize(Some((w, h))) = cap {
             font_size = Some((w, h));
         }
     }
     Ok((protocol, font_size))
 }
 
-fn parse_response(buf: String) -> Vec<ParsedResponse> {
-    enum ParseState {
-        Empty,
-        EscapeStart,
-        Reading,
-        KittyReading,
-        KittyClosing,
-    }
-    struct Parser {
-        state: ParseState,
-        data: String,
-    }
-    let mut state = Parser {
-        state: ParseState::Empty,
-        data: String::new(),
-    };
-
-    let mut capabilities = vec![];
-    for c in buf.chars() {
-        match state.state {
-            ParseState::Empty => {
-                if c == '\x1b' {
-                    state.state = ParseState::EscapeStart;
-                }
-            }
-            ParseState::EscapeStart => {
-                if c == '[' {
-                    state.state = ParseState::Reading;
-                } else if c == '_' {
-                    state.state = ParseState::KittyReading;
-                }
-                state.data = String::new();
-            }
-            ParseState::Reading => {
-                if c == '\x1b' {
-                    state.state = ParseState::EscapeStart;
-                    capabilities.push(parse_sequence(&state.data));
-                } else {
-                    state.data.push(c);
-                }
-            }
-            ParseState::KittyReading => {
-                if c == '\x1b' {
-                    state.state = ParseState::KittyClosing;
-                } else {
-                    state.data.push(c);
-                }
-            }
-            ParseState::KittyClosing => {
-                if c == '\\' {
-                    state.state = ParseState::EscapeStart;
-                    capabilities.push(parse_sequence(&state.data));
-                }
-            }
-        }
-    }
-    if let ParseState::Reading = state.state {
-        capabilities.push(parse_sequence(&state.data));
-    }
-    capabilities
-}
-
 #[derive(Debug, PartialEq)]
 enum ParsedResponse {
-    Unknown(String),
+    Unknown,
+    Garbage,
     Kitty(bool),
     Sixel(bool),
-    FontSize(u16, u16),
+    CellSize(Option<(u16, u16)>),
     Status,
 }
 
-fn parse_sequence(data: &str) -> ParsedResponse {
-    if data.starts_with("Gi=31;") {
-        return ParsedResponse::Kitty(data.ends_with("OK"));
-    }
-    if data.starts_with('?') && data.ends_with('c') {
-        return ParsedResponse::Sixel(
-            // This is just easier than actually parsing the string.
-            data.contains(";4;")
-                || data.contains("?4;")
-                || data.contains(";4c")
-                || data.contains("?4c"),
-        );
-    }
-    if data.starts_with("6;") && data.ends_with('t') {
-        let inner: &Vec<&str> = &data[2..data.len() - 1].split(';').collect();
-        if let [h, w] = inner[..] {
-            if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
-                if w > 0 && h > 0 {
-                    return ParsedResponse::FontSize(w, h);
-                }
-            }
-        }
-        return ParsedResponse::Unknown(data.to_owned());
-    }
-    if data == "0n" {
-        return ParsedResponse::Status;
-    }
-    ParsedResponse::Unknown(data.to_owned())
+struct Parser {
+    data: String,
 }
 
-pub fn read_stdin(
-    timeout_ms: u128,
-    mut read: impl FnMut() -> io::Result<u8>,
-    is_nonblocking: bool,
-) -> io::Result<String> {
-    let start = Instant::now();
-    let mut buf = String::with_capacity(200);
-    loop {
-        let result = read();
-        if Instant::now().duration_since(start).as_millis() > timeout_ms {
-            // Always timeout, otherwise the terminal could potentially keep sending data forever.
-            return Err(io::Error::new(
-                io::ErrorKind::TimedOut,
-                match result {
-                    Err(err) => err.to_string(),
-                    Ok(_) => "timed out while reading data".to_string(),
-                },
-            ));
+impl Parser {
+    pub fn new() -> Self {
+        Parser {
+            data: String::new(),
         }
-        match result {
-            Ok(ch) => {
-                buf.push(char::from(ch));
-                if !is_nonblocking && ch == b'c' {
-                    // If we couldn't put stdin into nonblocking mode, exit on first 'c', which is
-                    // the end of the Send Device Attributes query. However, a 'c' could also
-                    // appear in the response to the kitty support query, which could contain any
-                    // error message string. But if there is no more data, then read() will block
-                    // forever.
-                    return Ok(buf);
-                }
+    }
+    pub fn push(self: &mut Self, next: char) -> Option<ParsedResponse> {
+        let cap = Self::parse_sequence(&self.data, next);
+        match cap {
+            ParsedResponse::Unknown => {
+                self.data.push(next);
             }
-            Err(err) => {
-                if err.kind() == io::ErrorKind::WouldBlock {
-                    if buf.is_empty() {
-                        // No data yet, keep polling.
-                        continue;
+            ParsedResponse::Garbage => {
+                self.data = String::from(next);
+            }
+            _ => {
+                self.data = String::new();
+                return Some(cap);
+            }
+        }
+        None
+    }
+
+    fn parse_sequence(data: &str, next: char) -> ParsedResponse {
+        if next == '\x1b' {
+            if data.len() == 0 || (!data.starts_with("\x1b[") && !data.starts_with("\x1b_Gi=31;")) {
+                return ParsedResponse::Garbage;
+            }
+        }
+        if next == '\\' && data.starts_with("\x1b_Gi=31;") && data.ends_with("\x1b") {
+            return ParsedResponse::Kitty(data == "\x1b_Gi=31;OK\x1b");
+        }
+        if next == 'c' && data.starts_with("\x1b[?") {
+            return ParsedResponse::Sixel(
+                // This is just easier than actually parsing the string.
+                data.contains(";4;")
+                    || data.contains("?4;")
+                    || data.contains(";4")
+                    || data.contains("?4"),
+            );
+        }
+        if next == 't' && data.starts_with("\x1b[6;") {
+            let inner: Vec<&str> = data.split(';').collect();
+            if let [_, h, w] = inner[..] {
+                if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
+                    if w > 0 && h > 0 {
+                        return ParsedResponse::CellSize(Some((w, h)));
                     }
-                    // We've read some data.
-                    return Ok(buf);
                 }
-                // Some other kind of read error.
-                return Err(err);
             }
+            return ParsedResponse::CellSize(None);
         }
+        if next == 'n' && data == "\x1b[0" {
+            return ParsedResponse::Status;
+        }
+        ParsedResponse::Unknown
     }
 }
 
 #[cfg(all(test, feature = "rustix"))]
 mod tests {
-    use std::{
-        assert_eq,
-        io::{self},
-    };
+    use std::assert_eq;
 
-    use crate::picker::{from_winsize, read_stdin, Picker, ProtocolType};
+    use crate::picker::{from_winsize, ParsedResponse, Parser, Picker, ProtocolType};
     use rustix::termios::Winsize;
 
     #[test]
@@ -558,64 +488,50 @@ mod tests {
         assert_eq!(picker.cycle_protocols(), ProtocolType::Halfblocks);
     }
 
-    #[derive(Clone)]
-    struct TestStdin<'a> {
-        wouldblock_count: u32,
-        data: &'a str,
-    }
-
-    fn test_stdin(wouldblock_count: u32, data: &str) -> TestStdin {
-        TestStdin {
-            wouldblock_count,
-            data,
-        }
-    }
-
-    fn read(stdin: &mut TestStdin) -> io::Result<u8> {
-        if stdin.wouldblock_count > 0 {
-            stdin.wouldblock_count -= 1;
-            return Err(io::Error::new(io::ErrorKind::WouldBlock, "waiting"));
-        }
-        match stdin.data {
-            "" => Err(io::Error::new(io::ErrorKind::WouldBlock, "done")),
-            data => {
-                stdin.data = &stdin.data[1..];
-                Ok(data.chars().next().unwrap() as u8)
+    #[test]
+    fn test_parse_all() {
+        let mut parser = Parser::new();
+        let mut caps = vec![];
+        for ch in "\x1b_Gi=31;OK\x1b\\\x1b[?64;4c\x1b[6;7;14t\x1b[0n".chars() {
+            if let Some(cap) = parser.push(ch) {
+                caps.push(cap);
             }
         }
+        assert_eq!(
+            caps,
+            vec![
+                ParsedResponse::Kitty(true),
+                ParsedResponse::Sixel(true),
+                ParsedResponse::CellSize(Some((14, 7))),
+                ParsedResponse::Status
+            ]
+        );
     }
 
     #[test]
-    fn test_read_stdin() {
-        let mut stdin = test_stdin(10, "abcabc");
-        assert_eq!("abcabc", read_stdin(20, || read(&mut stdin), true).unwrap());
+    fn test_parse_gibberish() {
+        let mut parser = Parser::new();
+        let mut caps = vec![];
+        for ch in "\x1bhonkey\x1btonkey\x1b[42\x1b\\".chars() {
+            if let Some(cap) = parser.push(ch) {
+                caps.push(cap);
+            }
+        }
+        assert_eq!(0, caps.len());
     }
 
     #[test]
-    fn test_read_stdin_timeout() {
-        let mut stdin = test_stdin(u32::MAX, "abc");
-        let err = read_stdin(1, || read(&mut stdin), true).unwrap_err();
-        assert_eq!(io::ErrorKind::TimedOut, err.kind());
-    }
-
-    #[test]
-    fn test_read_stdin_timeout_empty() {
-        let mut stdin = test_stdin(0, "");
-        let err = read_stdin(1, || read(&mut stdin), true).unwrap_err();
-        assert_eq!(io::ErrorKind::TimedOut, err.kind());
-    }
-
-    #[test]
-    fn test_read_stdin_timeout_neverending_data() {
-        let data: String = "a".repeat(10000000);
-        let mut stdin = test_stdin(1, &data);
-        let err = read_stdin(1, || read(&mut stdin), true).unwrap_err();
-        assert_eq!(io::ErrorKind::TimedOut, err.kind());
-    }
-
-    #[test]
-    fn test_read_stdin_blocking() {
-        let mut stdin = test_stdin(10, "abcabc");
-        assert_eq!("abc", read_stdin(20, || read(&mut stdin), false).unwrap());
+    fn test_parse_mixed_gibberish() {
+        let mut parser = Parser::new();
+        let mut caps = vec![];
+        for ch in "\x1bgarbage...\x1b[?64;5c\x1b[0n".chars() {
+            if let Some(cap) = parser.push(ch) {
+                caps.push(cap);
+            }
+        }
+        assert_eq!(
+            caps,
+            vec![ParsedResponse::Sixel(false), ParsedResponse::Status]
+        );
     }
 }
