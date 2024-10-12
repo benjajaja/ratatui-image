@@ -343,15 +343,6 @@ fn query_device_attrs(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<Fon
                 }
             }
             Err(err) => {
-                if err.kind() == io::ErrorKind::WouldBlock {
-                    if parser.data.len() == 0 {
-                        // No data yet, keep polling.
-                        continue;
-                    }
-                    // We've read some data.
-                    break;
-                }
-                // Some other kind of read error.
                 return Err(err.into());
             }
         }
@@ -384,7 +375,6 @@ fn query_device_attrs(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<Fon
 #[derive(Debug, PartialEq)]
 enum ParsedResponse {
     Unknown,
-    Garbage,
     Kitty(bool),
     Sixel(bool),
     CellSize(Option<(u16, u16)>),
@@ -393,64 +383,97 @@ enum ParsedResponse {
 
 struct Parser {
     data: String,
+    sequence: ParsedResponse,
 }
 
 impl Parser {
     pub fn new() -> Self {
         Parser {
             data: String::new(),
+            sequence: ParsedResponse::Unknown,
         }
     }
     pub fn push(self: &mut Self, next: char) -> Option<ParsedResponse> {
-        let cap = Self::parse_sequence(&self.data, next);
-        match cap {
+        match self.sequence {
             ParsedResponse::Unknown => {
+                if next == '\x1b' {
+                    // If the current sequence hasn't been identified yet, start a new one on Esc.
+                    self.data = String::new();
+                    self.sequence = ParsedResponse::Unknown;
+                    return None;
+                }
+                match (&self.data[..], next) {
+                    ("[", '?') => {
+                        self.sequence = ParsedResponse::Sixel(false);
+                    }
+                    ("_Gi=31", ';') => {
+                        self.sequence = ParsedResponse::Kitty(false);
+                    }
+                    ("[6", ';') => {
+                        self.sequence = ParsedResponse::CellSize(None);
+                    }
+                    ("[", '0') => {
+                        self.sequence = ParsedResponse::Status;
+                    }
+                    _ => {}
+                };
                 self.data.push(next);
             }
-            ParsedResponse::Garbage => {
-                self.data = String::from(next);
-            }
-            _ => {
-                self.data = String::new();
-                return Some(cap);
-            }
-        }
-        None
-    }
-
-    fn parse_sequence(data: &str, next: char) -> ParsedResponse {
-        if next == '\x1b' {
-            if data.len() == 0 || (!data.starts_with("\x1b[") && !data.starts_with("\x1b_Gi=31;")) {
-                return ParsedResponse::Garbage;
-            }
-        }
-        if next == '\\' && data.starts_with("\x1b_Gi=31;") && data.ends_with("\x1b") {
-            return ParsedResponse::Kitty(data == "\x1b_Gi=31;OK\x1b");
-        }
-        if next == 'c' && data.starts_with("\x1b[?") {
-            return ParsedResponse::Sixel(
-                // This is just easier than actually parsing the string.
-                data.contains(";4;")
-                    || data.contains("?4;")
-                    || data.contains(";4")
-                    || data.contains("?4"),
-            );
-        }
-        if next == 't' && data.starts_with("\x1b[6;") {
-            let inner: Vec<&str> = data.split(';').collect();
-            if let [_, h, w] = inner[..] {
-                if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
-                    if w > 0 && h > 0 {
-                        return ParsedResponse::CellSize(Some((w, h)));
-                    }
+            ParsedResponse::Sixel(_) => match next {
+                'c' => {
+                    // This is just easier than actually parsing the string.
+                    let is_sixel = self.data.contains(";4;")
+                        || self.data.contains("?4;")
+                        || self.data.contains(";4")
+                        || self.data.contains("?4");
+                    self.data = String::new();
+                    self.sequence = ParsedResponse::Unknown;
+                    return Some(ParsedResponse::Sixel(is_sixel));
                 }
-            }
-            return ParsedResponse::CellSize(None);
-        }
-        if next == 'n' && data == "\x1b[0" {
-            return ParsedResponse::Status;
-        }
-        ParsedResponse::Unknown
+                _ => {
+                    self.data.push(next);
+                }
+            },
+
+            ParsedResponse::Kitty(_) => match next {
+                '\\' => {
+                    let is_kitty = self.data == "_Gi=31;OK\x1b";
+                    self.data = String::new();
+                    self.sequence = ParsedResponse::Unknown;
+                    return Some(ParsedResponse::Kitty(is_kitty));
+                }
+                _ => {
+                    self.data.push(next);
+                }
+            },
+
+            ParsedResponse::CellSize(_) => match next {
+                't' => {
+                    let mut cell_size = None;
+                    let inner: Vec<&str> = self.data.split(';').collect();
+                    if let [_, h, w] = inner[..] {
+                        if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
+                            if w > 0 && h > 0 {
+                                cell_size = Some((w, h));
+                            }
+                        }
+                    }
+                    self.data = String::new();
+                    self.sequence = ParsedResponse::Unknown;
+                    return Some(ParsedResponse::CellSize(cell_size));
+                }
+                _ => {
+                    self.data.push(next);
+                }
+            },
+            ParsedResponse::Status => match next {
+                'n' => return Some(ParsedResponse::Status),
+                _ => {
+                    self.data.push(next);
+                }
+            },
+        };
+        None
     }
 }
 
@@ -490,48 +513,41 @@ mod tests {
 
     #[test]
     fn test_parse_all() {
-        let mut parser = Parser::new();
-        let mut caps = vec![];
-        for ch in "\x1b_Gi=31;OK\x1b\\\x1b[?64;4c\x1b[6;7;14t\x1b[0n".chars() {
-            if let Some(cap) = parser.push(ch) {
-                caps.push(cap);
+        for (name, str, expected) in vec![
+            (
+                "all",
+                "\x1b_Gi=31;OK\x1b\\\x1b[?64;4c\x1b[6;7;14t\x1b[0n",
+                vec![
+                    ParsedResponse::Kitty(true),
+                    ParsedResponse::Sixel(true),
+                    ParsedResponse::CellSize(Some((14, 7))),
+                    ParsedResponse::Status,
+                ],
+            ),
+            ("only garbage", "\x1bhonkey\x1btonkey\x1b[42\x1b\\", vec![]),
+            (
+                "preceding garbage",
+                "\x1bgarbage...\x1b[?64;5c\x1b[0n",
+                vec![ParsedResponse::Sixel(false), ParsedResponse::Status],
+            ),
+            (
+                "inner garbage",
+                "\x1b[6;7;14t\x1bgarbage...\x1b[?64;5c\x1b[0n",
+                vec![
+                    ParsedResponse::CellSize(Some((14, 7))),
+                    ParsedResponse::Sixel(false),
+                    ParsedResponse::Status,
+                ],
+            ),
+        ] {
+            let mut parser = Parser::new();
+            let mut caps = vec![];
+            for ch in str.chars() {
+                if let Some(cap) = parser.push(ch) {
+                    caps.push(cap);
+                }
             }
+            assert_eq!(caps, expected, "{name}");
         }
-        assert_eq!(
-            caps,
-            vec![
-                ParsedResponse::Kitty(true),
-                ParsedResponse::Sixel(true),
-                ParsedResponse::CellSize(Some((14, 7))),
-                ParsedResponse::Status
-            ]
-        );
-    }
-
-    #[test]
-    fn test_parse_gibberish() {
-        let mut parser = Parser::new();
-        let mut caps = vec![];
-        for ch in "\x1bhonkey\x1btonkey\x1b[42\x1b\\".chars() {
-            if let Some(cap) = parser.push(ch) {
-                caps.push(cap);
-            }
-        }
-        assert_eq!(0, caps.len());
-    }
-
-    #[test]
-    fn test_parse_mixed_gibberish() {
-        let mut parser = Parser::new();
-        let mut caps = vec![];
-        for ch in "\x1bgarbage...\x1b[?64;5c\x1b[0n".chars() {
-            if let Some(cap) = parser.push(ch) {
-                caps.push(cap);
-            }
-        }
-        assert_eq!(
-            caps,
-            vec![ParsedResponse::Sixel(false), ParsedResponse::Status]
-        );
     }
 }
