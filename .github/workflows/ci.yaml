@@ -41,7 +41,7 @@ jobs:
           args: ci-all
       - name: Build a windows binary
         if: matrix.platform == 'windows-latest'
-        run: cargo build --bin ratatui-image --no-default-features --features crossterm,image-defaults
+        run: cargo build --bin ratatui-image --features crossterm
 
   ensure-readme:
     name: Ensure readme is up-to-date
