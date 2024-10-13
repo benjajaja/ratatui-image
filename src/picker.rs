@@ -71,13 +71,13 @@ impl Picker {
     /// ```
     ///
     pub fn from_query_stdio() -> Result<Picker> {
-        // Detect tmux, and if positive then take some risky guess for iTerm2 support.
-        let (is_tmux, tmux_proto) = detect_tmux_and_inner_protocol_from_env();
+        // Detect tmux, and only if positive then take some risky guess for iTerm2 support.
+        let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();
 
         // Write and read to stdin to query protocol capabilities and font-size.
         let (capability_proto, font_size) = query_stdio_capabilities(is_tmux)?;
 
-        // Disregard protocol-from-capabilities if some env var says that we could try iTerm2.
+        // If some env var says that we should try iTerm2, then disregard protocol-from-capabilities.
         let iterm2_proto = iterm2_from_env();
 
         let protocol_type = tmux_proto
@@ -111,7 +111,7 @@ impl Picker {
     /// ```
     pub fn from_fontsize(font_size: FontSize) -> Picker {
         // Detect tmux, and if positive then take some risky guess for iTerm2 support.
-        let (is_tmux, tmux_proto) = detect_tmux_and_inner_protocol_from_env();
+        let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();
 
         // Disregard protocol-from-capabilities if some env var says that we could try iTerm2.
         let iterm2_proto = iterm2_from_env();
@@ -199,22 +199,11 @@ impl Picker {
     }
 }
 
-fn detect_tmux_and_inner_protocol_from_env() -> (bool, Option<ProtocolType>) {
-    let mut is_tmux = false;
-
+fn detect_tmux_and_outer_protocol_from_env() -> (bool, Option<ProtocolType>) {
     // Check if we're inside tmux.
-    if let Ok(term) = env::var("TERM") {
-        if term.starts_with("tmux") {
-            is_tmux = true;
-        }
-    }
-    if let Ok(term_program) = env::var("TERM_PROGRAM") {
-        if term_program == "tmux" {
-            is_tmux = true;
-        }
-    }
-
-    if !is_tmux {
+    if !env::var("TERM").is_ok_and(|term| term.starts_with("tmux"))
+        && !env::var("TERM_PROGRAM").is_ok_and(|term_program| term_program == "tmux")
+    {
         return (false, None);
     }
 
@@ -226,46 +215,36 @@ fn detect_tmux_and_inner_protocol_from_env() -> (bool, Option<ProtocolType>) {
         .spawn()
         .and_then(|mut child| child.wait()); // wait(), for check_device_attrs.
 
-    // ONLY if we're in tmux, take a risky guess because $TERM has been overwritten.
-    // The core issue is that iterm2 support cannot be queried, like kitty or sixel.
     // Crude guess based on the *existence* of some magic program specific env vars.
     // Produces false positives, for example xterm started from kitty inherits KITTY_WINDOW_ID.
     // Furthermore, tmux shares env vars from the first session, for example tmux started in xterm
     // after a previous tmux session started in kitty, inherits KITTY_WINDOW_ID.
-    let vars = [
-        ("KITTY_WINDOW_ID", ProtocolType::Kitty),
+    const OUTER_TERM_HINTS: [(&str, ProtocolType); 3] = [
+        ("KITTY_WINDOW_ID", ProtocolType::Kitty), // TODO: query should work inside tmux, remove?
         ("ITERM_SESSION_ID", ProtocolType::Iterm2),
         ("WEZTERM_EXECUTABLE", ProtocolType::Iterm2),
-    ]
-    .into_iter();
-    let protocol = if let Some(magic_proto) = vars
-        .into_iter()
-        .find(|v| env::var_os(v.0).is_some_and(|s| !s.is_empty()))
-        .map(|v| v.1)
-    {
-        Some(magic_proto)
-    } else {
-        None
-    };
-    (is_tmux, protocol)
+    ];
+    for (hint, proto) in OUTER_TERM_HINTS {
+        if env::var(hint).is_ok_and(|s| !s.is_empty()) {
+            return (true, Some(proto));
+        }
+    }
+    (true, None)
 }
 
 fn iterm2_from_env() -> Option<ProtocolType> {
-    if let Ok(term_program) = env::var("TERM_PROGRAM") {
-        if term_program.contains("iTerm")
+    if env::var("TERM_PROGRAM").is_ok_and(|term_program| {
+        term_program.contains("iTerm")
             || term_program.contains("WezTerm")
             || term_program.contains("mintty")
             || term_program.contains("vscode")
             || term_program.contains("Tabby")
             || term_program.contains("Hyper")
-        {
-            return Some(ProtocolType::Iterm2);
-        }
+    }) {
+        return Some(ProtocolType::Iterm2);
     }
-    if let Ok(lc_term) = env::var("LC_TERMINAL") {
-        if lc_term.contains("iTerm") {
-            return Some(ProtocolType::Iterm2);
-        }
+    if env::var("LC_TERMINAL").is_ok_and(|lc_term| lc_term.contains("iTerm")) {
+        return Some(ProtocolType::Iterm2);
     }
     None
 }
