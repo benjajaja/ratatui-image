@@ -104,7 +104,7 @@
 //! [`render_stateful_widget`]: https://docs.rs/ratatui/latest/ratatui/terminal/struct.Frame.html#method.render_stateful_widget
 use std::cmp::{max, min};
 
-use image::{imageops, DynamicImage, ImageBuffer, Rgb};
+use image::{imageops, DynamicImage, ImageBuffer, Rgba};
 use protocol::{ImageSource, Protocol, StatefulProtocol};
 use ratatui::{
     buffer::Buffer,
@@ -180,11 +180,11 @@ impl<'a> Widget for Image<'a> {
 /// ```
 pub struct StatefulImage {
     resize: Resize,
-    background_color: Option<Rgb<u8>>,
+    background_color: Option<Rgba<u8>>,
 }
 
 impl StatefulImage {
-    pub fn new(background_color: Option<Rgb<u8>>) -> StatefulImage {
+    pub fn new(background_color: Option<Rgba<u8>>) -> StatefulImage {
         StatefulImage {
             resize: Resize::Fit(None),
             background_color,
@@ -246,7 +246,7 @@ impl Resize {
         font_size: FontSize,
         current: Rect,
         area: Rect,
-        background_color: Option<Rgb<u8>>,
+        background_color: Option<Rgba<u8>>,
         force: bool,
     ) -> Option<(DynamicImage, Rect)> {
         self.needs_resize(source, font_size, current, area, force)
@@ -257,7 +257,7 @@ impl Resize {
                 let mut image = self.resize_image(source, width, height);
                 // Pad to cell size
                 if image.width() != width || image.height() != height {
-                    static DEFAULT_BACKGROUND: Rgb<u8> = Rgb([0, 0, 0]);
+                    static DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 0]);
                     let color = background_color.unwrap_or(DEFAULT_BACKGROUND);
                     let mut bg: DynamicImage = ImageBuffer::from_pixel(width, height, color).into();
                     imageops::overlay(&mut bg, &image, 0, 0);
@@ -373,7 +373,7 @@ fn resize_pixels(width: u16, height: u16, nwidth: u16, nheight: u16) -> (u16, u1
 
 #[cfg(test)]
 mod tests {
-    use image::{ImageBuffer, Rgb};
+    use image::{ImageBuffer, Rgba};
 
     use super::*;
 
@@ -381,7 +381,7 @@ mod tests {
 
     fn s(w: u16, h: u16) -> ImageSource {
         let image: DynamicImage =
-            ImageBuffer::from_pixel(w as _, h as _, Rgb::<u8>([255, 0, 0])).into();
+            ImageBuffer::from_pixel(w as _, h as _, Rgba::<u8>([255, 0, 0, 255])).into();
         ImageSource::new(image, FONT_SIZE)
     }
 

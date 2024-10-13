@@ -2,7 +2,7 @@
 use std::fmt::Write;
 
 use base64::{engine::general_purpose, Engine};
-use image::{DynamicImage, Rgb};
+use image::{DynamicImage, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::{FontSize, ImageSource, Resize, Result};
@@ -48,7 +48,7 @@ impl Kitty {
         source: &ImageSource,
         font_size: FontSize,
         resize: Resize,
-        background_color: Option<Rgb<u8>>,
+        background_color: Option<Rgba<u8>>,
         area: Rect,
         id: u32,
         is_tmux: bool,
@@ -113,7 +113,7 @@ impl StatefulProtocolTrait for StatefulKitty {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.rect, area, false)
     }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgba<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -193,8 +193,8 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<Str
 /// automatically by kitty.
 fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
     let (w, h) = (img.width(), img.height());
-    let img_rgb8 = img.to_rgb8();
-    let bytes = img_rgb8.as_raw();
+    let img_rgba8 = img.to_rgba8();
+    let bytes = img_rgba8.as_raw();
 
     let mut str = String::new();
 
@@ -217,7 +217,7 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
                 let more = if chunk_count > 1 { 1 } else { 0 };
                 write!(
                     str,
-                    "_Gq=2,i={id},a=T,U=1,f=24,t=d,s={w},v={h},m={more};{payload}"
+                    "_Gq=2,i={id},a=T,U=1,f=32,t=d,s={w},v={h},m={more};{payload}"
                 )
                 .unwrap();
             }
