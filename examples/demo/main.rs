@@ -241,7 +241,9 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     let block_left_bottom = Block::default().borders(Borders::ALL).title("Crop");
     let area = block_left_bottom.inner(chunks_left_bottom[0]);
     f.render_widget(
-        Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
+        Paragraph::new(app.background.as_str())
+            .wrap(Wrap { trim: true })
+            .style(Style::new().bg(Color::Green)),
         area,
     );
     match app.show_images {

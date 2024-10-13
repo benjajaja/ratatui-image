@@ -121,6 +121,7 @@ impl StatefulProtocol for StatefulKitty {
 
 fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<String>) {
     let [id_extra, id_r, id_g, id_b] = id.to_be_bytes();
+    // Set the background color to the kitty id
     let id_color = format!("\x1b[38;2;{id_r};{id_g};{id_b}m");
 
     // Draw each line of unicode placeholders but all into the first cell.
@@ -144,7 +145,7 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<St
             buf.cell_mut((area.left() + x, area.top() + y))
                 .map(|cell| cell.set_skip(true));
         }
-        symbol.push_str("\x1b[0m"); // Stop messing with styles now.
+        symbol.push_str("\x1b[39m"); // Reset the background color
         buf.cell_mut((area.left(), area.top() + y))
             .map(|cell| cell.set_symbol(&symbol));
     }
