@@ -34,20 +34,14 @@ jobs:
           override: true
       - uses: davidB/rust-cargo-make@v1
       - name: CI
-        if: matrix.platform == 'ubuntu-latest'
+        if: matrix.platform != 'windows-latest'
         uses: actions-rs/cargo@v1
         with:
           command: make
           args: ci-all
-      - name: Build
-        if: matrix.platform != 'ubuntu-latest'
-        uses: actions-rs/cargo@v1
-        with:
-          command: make
-          args: build
       - name: Build a windows binary
         if: matrix.platform == 'windows-latest'
-        run: cargo build --bin ratatui-image --features crossterm
+        run: cargo build --bin ratatui-image --no-default-features --features crossterm,image-defaults
 
   ensure-readme:
     name: Ensure readme is up-to-date

@@ -4,7 +4,7 @@ use std::env;
 
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
-#[cfg(all(feature = "rustix", unix))]
+#[cfg(feature = "rustix")]
 use rustix::{
     stdio::stdout,
     termios::{tcgetwinsize, Winsize},
@@ -253,7 +253,7 @@ fn iterm2_from_env() -> Option<ProtocolType> {
     None
 }
 
-#[cfg(all(feature = "rustix", unix))]
+#[cfg(feature = "rustix")]
 fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
     use rustix::termios::{LocalModes, OptionalActions};
 
@@ -341,7 +341,7 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     Ok((proto, font_size))
 }
 
-#[cfg(not(all(feature = "rustix", unix)))]
+#[cfg(not(feature = "rustix"))]
 fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
     Err("cannot query without rustix".into())
 }
