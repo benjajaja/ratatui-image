@@ -342,6 +342,11 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     Err("cannot query without rustix".into())
 }
 
+struct Parser {
+    data: String,
+    sequence: ParsedResponse,
+}
+
 #[derive(Debug, PartialEq)]
 enum ParsedResponse {
     Unknown,
@@ -349,11 +354,6 @@ enum ParsedResponse {
     Sixel(bool),
     CellSize(Option<(u16, u16)>),
     Status,
-}
-
-struct Parser {
-    data: String,
-    sequence: ParsedResponse,
 }
 
 impl Parser {
@@ -366,13 +366,11 @@ impl Parser {
     pub fn push(&mut self, next: char) -> Option<ParsedResponse> {
         match self.sequence {
             ParsedResponse::Unknown => {
-                if next == '\x1b' {
-                    // If the current sequence hasn't been identified yet, start a new one on Esc.
-                    self.data = String::new();
-                    self.sequence = ParsedResponse::Unknown;
-                    return None;
-                }
                 match (&self.data[..], next) {
+                    (_, '\x1b') => {
+                        // If the current sequence hasn't been identified yet, start a new one on Esc.
+                        return self.restart();
+                    }
                     ("[", '?') => {
                         self.sequence = ParsedResponse::Sixel(false);
                     }
@@ -399,6 +397,9 @@ impl Parser {
                     self.data = String::new();
                     self.sequence = ParsedResponse::Unknown;
                     return Some(ParsedResponse::Sixel(is_sixel));
+                }
+                '\x1b' => {
+                    return self.restart();
                 }
                 _ => {
                     self.data.push(next);
@@ -432,17 +433,28 @@ impl Parser {
                     self.sequence = ParsedResponse::Unknown;
                     return Some(ParsedResponse::CellSize(cell_size));
                 }
+                '\x1b' => {
+                    return self.restart();
+                }
                 _ => {
                     self.data.push(next);
                 }
             },
             ParsedResponse::Status => match next {
                 'n' => return Some(ParsedResponse::Status),
+                '\x1b' => {
+                    return self.restart();
+                }
                 _ => {
                     self.data.push(next);
                 }
             },
         };
+        None
+    }
+    fn restart(&mut self) -> Option<ParsedResponse> {
+        self.data = String::new();
+        self.sequence = ParsedResponse::Unknown;
         None
     }
 }
