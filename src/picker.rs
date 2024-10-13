@@ -141,6 +141,10 @@ impl Picker {
         self.font_size
     }
 
+    pub fn set_background_color(&mut self, background_color: Option<Rgb<u8>>) {
+        self.background_color = background_color
+    }
+
     /// Returns a new protocol for [`crate::Image`] widgets that fits into the given size.
     pub fn new_protocol(
         &mut self,
