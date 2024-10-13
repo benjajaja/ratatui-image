@@ -1,7 +1,7 @@
 //! Halfblocks protocol implementations.
 //! Uses the unicode character `▀` combined with foreground and background color. Assumes that the
 //! font aspect ratio is roughly 1:2. Should work in all terminals.
-use image::{imageops::FilterType, DynamicImage, Rgb};
+use image::{imageops::FilterType, DynamicImage, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use super::{Protocol, StatefulProtocol};
@@ -29,7 +29,7 @@ impl Halfblocks {
     pub fn from_source(
         source: &ImageSource,
         resize: Resize,
-        background_color: Option<Rgb<u8>>,
+        background_color: Option<Rgba<u8>>,
         area: Rect,
     ) -> Result<Self> {
         let (image, desired) = resize
@@ -111,7 +111,7 @@ impl StatefulProtocol for StatefulHalfblocks {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.current.rect, area, false)
     }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgba<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }

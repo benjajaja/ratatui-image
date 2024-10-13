@@ -6,7 +6,7 @@ use std::{
 };
 
 use dyn_clone::DynClone;
-use image::{DynamicImage, Rgb};
+use image::{DynamicImage, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::FontSize;
@@ -34,7 +34,7 @@ pub trait StatefulProtocol: Send + Sync + DynClone {
     fn resize_encode_render(
         &mut self,
         resize: &Resize,
-        background_color: Option<Rgb<u8>>,
+        background_color: Option<Rgba<u8>>,
         area: Rect,
         buf: &mut Buffer,
     ) {
@@ -56,7 +56,7 @@ pub trait StatefulProtocol: Send + Sync + DynClone {
     /// that next call for the given area does not need to redo the work.
     ///
     /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
-    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect);
+    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgba<u8>>, area: Rect);
 
     /// Render the currently resized and encoded data to the buffer.
     fn render(&mut self, area: Rect, buf: &mut Buffer);

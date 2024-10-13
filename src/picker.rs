@@ -2,7 +2,7 @@
 
 use std::env;
 
-use image::{DynamicImage, Rgb};
+use image::{DynamicImage, Rgba};
 use ratatui::layout::Rect;
 #[cfg(feature = "rustix")]
 use rustix::{
@@ -27,7 +27,7 @@ use crate::{
 pub struct Picker {
     font_size: FontSize,
     protocol_type: ProtocolType,
-    background_color: Option<Rgb<u8>>,
+    background_color: Option<Rgba<u8>>,
     is_tmux: bool,
     kitty_counter: u32,
 }
@@ -141,7 +141,7 @@ impl Picker {
         self.font_size
     }
 
-    pub fn set_background_color(&mut self, background_color: Option<Rgb<u8>>) {
+    pub fn set_background_color(&mut self, background_color: Option<Rgba<u8>>) {
         self.background_color = background_color
     }
 
