@@ -1,8 +1,8 @@
 //! ITerm2 protocol implementation.
 use base64::{engine::general_purpose, Engine};
-use image::{codecs::jpeg::JpegEncoder, DynamicImage, Rgb};
+use image::{DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect};
-use std::{cmp::min, format};
+use std::{cmp::min, format, io::Cursor};
 
 use super::{Protocol, StatefulProtocol};
 use crate::{ImageSource, Resize, Result};
@@ -38,9 +38,10 @@ impl FixedIterm2 {
 
 // TODO: change E to sixel_rs::status::Error and map when calling
 fn encode(img: DynamicImage, is_tmux: bool) -> Result<String> {
-    let mut jpg = vec![];
-    JpegEncoder::new_with_quality(&mut jpg, 75).encode_image(&img)?;
-    let data = general_purpose::STANDARD.encode(&jpg);
+    let mut png: Vec<u8> = vec![];
+    img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)?;
+
+    let data = general_purpose::STANDARD.encode(&png);
 
     let (start, end) = if is_tmux {
         ("\x1bPtmux;\x1b\x1b", "\x1b\\")
@@ -49,7 +50,7 @@ fn encode(img: DynamicImage, is_tmux: bool) -> Result<String> {
     };
     Ok(format!(
         "{start}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07{end}",
-        jpg.len(),
+        png.len(),
         img.width(),
         img.height(),
         data,
