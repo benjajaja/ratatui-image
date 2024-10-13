@@ -3,7 +3,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use image::Rgb;
 use ratatui::{
     backend::CrosstermBackend,
     crossterm::{
@@ -32,7 +31,22 @@ struct App {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filename = env::args()
         .nth(1)
-        .expect("Usage: <program> [path/to/image]");
+        .expect("Usage: <program> <path/to/image>");
+
+    let mut picker = Picker::from_query_stdio().unwrap_or_else(|_| {
+        let font_width = env::args()
+            .nth(2)
+            .expect("Usage: <program> <path/to/image> <font-width> <font-height>");
+        let font_height = env::args()
+            .nth(3)
+            .expect("Usage: <program> <path/to/image> <font-width> <font-height>");
+        let font_size = (
+            font_height.parse::<u16>().expect("could not parse size"),
+            font_width.parse::<u16>().expect("could not parse size"),
+        );
+        Picker::from_fontsize(font_size)
+    });
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -41,17 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let image = image::io::Reader::open(&filename)?.decode()?;
 
-    #[cfg(all(feature = "rustix", unix))]
-    let mut picker = Picker::from_query_stdio()?;
-    #[cfg(not(all(feature = "rustix", unix)))]
-    let mut picker = {
-        let font_size = (8, 16);
-        Picker::new(font_size)
-    };
-    picker.query_stdio();
-    picker.background_color = Some(Rgb::<u8>([255, 0, 255]));
-
-    let image_source = ImageSource::new(image.clone(), picker.font_size);
+    let image_source = ImageSource::new(image.clone(), picker.font_size());
     let image_state = picker.new_resize_protocol(image);
 
     let mut app = App {
@@ -76,7 +80,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         KeyCode::Char(c) => match c {
                             'q' => break,
                             ' ' => {
-                                app.picker.cycle_protocols();
+                                app.picker
+                                    .set_protocol_type(app.picker.protocol_type().next());
                                 app.image_state = app
                                     .picker
                                     .new_resize_protocol(app.image_source.image.clone());
@@ -114,7 +119,8 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     let lines = vec![
         Line::from(format!(
             "Terminal: {:?}, font size: {:?}",
-            app.picker.protocol_type, app.picker.font_size
+            app.picker.protocol_type(),
+            app.picker.font_size(),
         )),
         Line::from(format!("File: {}", app.filename)),
         Line::from(format!(

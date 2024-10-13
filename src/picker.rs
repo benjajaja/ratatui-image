@@ -1,6 +1,6 @@
 //! Helper module to build a protocol, and swap protocols at runtime
 
-use std::{env, io};
+use std::env;
 
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
@@ -25,10 +25,10 @@ use crate::{
 
 #[derive(Clone, Copy, Debug)]
 pub struct Picker {
-    pub font_size: FontSize,
-    pub background_color: Option<Rgb<u8>>,
-    pub protocol_type: ProtocolType,
-    pub is_tmux: bool,
+    font_size: FontSize,
+    protocol_type: ProtocolType,
+    background_color: Option<Rgb<u8>>,
+    is_tmux: bool,
     kitty_counter: u32,
 }
 
@@ -69,9 +69,21 @@ impl Picker {
     /// use ratatui_image::picker::Picker;
     /// let mut picker = Picker::from_query_stdio();
     /// ```
-    #[cfg(all(feature = "rustix", unix))]
+    ///
     pub fn from_query_stdio() -> Result<Picker> {
-        let (protocol_type, font_size, is_tmux) = query_stdio();
+        // Detect tmux, and if positive then take some risky guess for iTerm2 support.
+        let (is_tmux, tmux_proto) = detect_tmux_and_inner_protocol_from_env();
+
+        // Write and read to stdin to query protocol capabilities and font-size.
+        let (capability_proto, font_size) = query_stdio_capabilities(is_tmux)?;
+
+        // Disregard protocol-from-capabilities if some env var says that we could try iTerm2.
+        let iterm2_proto = iterm2_from_env();
+
+        let protocol_type = tmux_proto
+            .or(iterm2_proto)
+            .or(capability_proto)
+            .unwrap_or(ProtocolType::Halfblocks);
 
         if let Some(font_size) = font_size {
             Ok(Picker {
@@ -87,45 +99,46 @@ impl Picker {
     }
 
     /// Create a picker from a given terminal [FontSize].
+    /// This is the only way to create a picker on windows, for now.
     ///
     /// # Example
     /// ```rust
-    /// use ratatui_image::picker::{ProtocolType, Picker};
+    /// use ratatui_image::picker::Picker;
     ///
     /// let user_fontsize = (7, 14);
-    /// let user_protocol = ProtocolType::Halfblocks;
     ///
-    /// let mut picker = Picker::new(user_fontsize);
-    /// picker.protocol_type = user_protocol;
+    /// let mut picker = Picker::from_fontsize(user_fontsize);
     /// ```
-    pub fn new(font_size: FontSize) -> Picker {
+    pub fn from_fontsize(font_size: FontSize) -> Picker {
+        // Detect tmux, and if positive then take some risky guess for iTerm2 support.
+        let (is_tmux, tmux_proto) = detect_tmux_and_inner_protocol_from_env();
+
+        // Disregard protocol-from-capabilities if some env var says that we could try iTerm2.
+        let iterm2_proto = iterm2_from_env();
+
+        let protocol_type = tmux_proto
+            .or(iterm2_proto)
+            .unwrap_or(ProtocolType::Halfblocks);
+
         Picker {
             font_size,
             background_color: None,
-            protocol_type: ProtocolType::Halfblocks,
-            is_tmux: false,
+            protocol_type,
+            is_tmux,
             kitty_counter: rand::random(),
         }
     }
 
-    /// Query terminal stdio for graphics capabilities and font-size with some escape sequences.
-    ///
-    /// This writes and reads from stdio momentarily. WARNING: this method should be called after
-    /// entering alternate screen but before reading terminal events.
-    ///
-    pub fn query_stdio(&mut self) -> ProtocolType {
-        let font_size;
-        (self.protocol_type, font_size, self.is_tmux) = query_stdio();
-        if let Some(font_size) = font_size {
-            self.font_size = font_size;
-        }
+    pub fn protocol_type(self) -> ProtocolType {
         self.protocol_type
     }
 
-    /// Cycle through available protocols.
-    pub fn cycle_protocols(&mut self) -> ProtocolType {
-        self.protocol_type = self.protocol_type.next();
-        self.protocol_type
+    pub fn set_protocol_type(&mut self, protocol_type: ProtocolType) {
+        self.protocol_type = protocol_type;
+    }
+
+    pub fn font_size(self) -> FontSize {
+        self.font_size
     }
 
     /// Returns a new protocol for [`crate::Image`] widgets that fits into the given size.
@@ -186,23 +199,7 @@ impl Picker {
     }
 }
 
-#[cfg(all(feature = "rustix", unix))]
-pub fn from_winsize(winsize: Winsize) -> Result<FontSize> {
-    let Winsize {
-        ws_xpixel: x,
-        ws_ypixel: y,
-        ws_col: cols,
-        ws_row: rows,
-    } = winsize;
-    if x == 0 || y == 0 || cols == 0 || rows == 0 {
-        return Err(String::from("font_size zero value").into());
-    }
-    Ok((x / cols, y / rows))
-}
-
-fn query_stdio() -> (ProtocolType, Option<FontSize>, bool) {
-    let mut proto = ProtocolType::Halfblocks;
-    let mut font_size = None;
+fn detect_tmux_and_inner_protocol_from_env() -> (bool, Option<ProtocolType>) {
     let mut is_tmux = false;
 
     // Check if we're inside tmux.
@@ -217,48 +214,44 @@ fn query_stdio() -> (ProtocolType, Option<FontSize>, bool) {
         }
     }
 
-    if is_tmux {
-        let _ = std::process::Command::new("tmux")
-            .args(["set", "-p", "allow-passthrough", "on"])
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .and_then(|mut child| child.wait()); // wait(), for check_device_attrs.
-
-        // Only if we're in tmux, take a risky guess because $TERM has been overwritten.
-        // The core issue is that iterm2 support cannot be queried, like kitty or sixel.
-        if let Some(magic_proto) = guess_protocol_magic_env_var_exist() {
-            proto = magic_proto
-        }
+    if !is_tmux {
+        return (false, None);
     }
 
-    #[cfg(all(feature = "rustix", unix))]
-    if let Ok((cap_proto, cap_font_size)) = query_device_attrs(is_tmux) {
-        if let Some(cap_proto) = cap_proto {
-            proto = cap_proto;
-        }
-        font_size = cap_font_size.or_else(|| {
-            // Couldn't get font size by query, use tcgetwinsize.
-            let winsize = tcgetwinsize(stdout()).ok()?;
-            from_winsize(winsize).ok()
-        })
-    }
+    let _ = std::process::Command::new("tmux")
+        .args(["set", "-p", "allow-passthrough", "on"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .and_then(|mut child| child.wait()); // wait(), for check_device_attrs.
 
-    // Ideally the capabilities should be the best indication. In practice, some protocols
-    // are buggy on specific terminals, and we can pick another one that works better.
-    if let Ok(term) = env::var("TERM") {
-        if term == "mlterm" || term == "yaft-256color" {
-            proto = ProtocolType::Sixel;
-        }
-        if term.contains("kitty") {
-            proto = ProtocolType::Kitty;
-        }
-    }
+    // ONLY if we're in tmux, take a risky guess because $TERM has been overwritten.
+    // The core issue is that iterm2 support cannot be queried, like kitty or sixel.
+    // Crude guess based on the *existence* of some magic program specific env vars.
+    // Produces false positives, for example xterm started from kitty inherits KITTY_WINDOW_ID.
+    // Furthermore, tmux shares env vars from the first session, for example tmux started in xterm
+    // after a previous tmux session started in kitty, inherits KITTY_WINDOW_ID.
+    let vars = [
+        ("KITTY_WINDOW_ID", ProtocolType::Kitty),
+        ("ITERM_SESSION_ID", ProtocolType::Iterm2),
+        ("WEZTERM_EXECUTABLE", ProtocolType::Iterm2),
+    ]
+    .into_iter();
+    let protocol = if let Some(magic_proto) = vars
+        .into_iter()
+        .find(|v| env::var_os(v.0).is_some_and(|s| !s.is_empty()))
+        .map(|v| v.1)
+    {
+        Some(magic_proto)
+    } else {
+        None
+    };
+    (is_tmux, protocol)
+}
+
+fn iterm2_from_env() -> Option<ProtocolType> {
     if let Ok(term_program) = env::var("TERM_PROGRAM") {
-        if term_program == "MacTerm" {
-            proto = ProtocolType::Sixel;
-        }
         if term_program.contains("iTerm")
             || term_program.contains("WezTerm")
             || term_program.contains("mintty")
@@ -266,39 +259,19 @@ fn query_stdio() -> (ProtocolType, Option<FontSize>, bool) {
             || term_program.contains("Tabby")
             || term_program.contains("Hyper")
         {
-            proto = ProtocolType::Iterm2;
+            return Some(ProtocolType::Iterm2);
         }
     }
     if let Ok(lc_term) = env::var("LC_TERMINAL") {
         if lc_term.contains("iTerm") {
-            proto = ProtocolType::Iterm2;
+            return Some(ProtocolType::Iterm2);
         }
     }
-
-    // Fallback.
-    (proto, font_size, is_tmux)
-}
-
-/// Crude guess based on the *existence* of some magic program specific env vars.
-/// Produces false positives, for example xterm started from kitty inherits KITTY_WINDOW_ID.
-/// Furthermore, tmux shares env vars from the first session, for example tmux started in xterm
-/// after a previous tmux session started in kitty, inherits KITTY_WINDOW_ID.
-fn guess_protocol_magic_env_var_exist() -> Option<ProtocolType> {
-    let vars = [
-        ("KITTY_WINDOW_ID", ProtocolType::Kitty),
-        ("ITERM_SESSION_ID", ProtocolType::Iterm2),
-        ("WEZTERM_EXECUTABLE", ProtocolType::Iterm2),
-    ];
-    vars.into_iter().find(|v| env_exists(v.0)).map(|v| v.1)
-}
-
-#[inline]
-pub fn env_exists(name: &str) -> bool {
-    env::var_os(name).is_some_and(|s| !s.is_empty())
+    None
 }
 
 #[cfg(all(feature = "rustix", unix))]
-fn query_device_attrs(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
+fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
     use rustix::termios::{LocalModes, OptionalActions};
 
     let stdin = rustix::stdio::stdin();
@@ -332,8 +305,8 @@ fn query_device_attrs(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<Fon
         let result = rustix::io::read(stdin, &mut charbuf);
         match result {
             Ok(read) => {
-                for i in 0..read {
-                    if let Some(cap) = parser.push(char::from(charbuf[i])) {
+                for ch in charbuf.iter().take(read) {
+                    if let Some(cap) = parser.push(char::from(*ch)) {
                         if cap == ParsedResponse::Status {
                             break 'out;
                         } else {
@@ -355,21 +328,39 @@ fn query_device_attrs(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<Fon
     // Reset to previous termios attributes.
     rustix::termios::tcsetattr(stdin, OptionalActions::Now, &termios_original)?;
 
-    let protocol = if capabilities.contains(&ParsedResponse::Kitty(true)) {
-        Some(ProtocolType::Kitty)
-    } else if capabilities.contains(&ParsedResponse::Sixel(true)) {
-        Some(ProtocolType::Sixel)
-    } else {
-        None
-    };
-
+    let mut proto = None;
     let mut font_size = None;
+    if capabilities.contains(&ParsedResponse::Kitty(true)) {
+        proto = Some(ProtocolType::Kitty);
+    } else if capabilities.contains(&ParsedResponse::Sixel(true)) {
+        proto = Some(ProtocolType::Sixel);
+    }
+
     for cap in capabilities {
         if let ParsedResponse::CellSize(Some((w, h))) = cap {
             font_size = Some((w, h));
         }
     }
-    Ok((protocol, font_size))
+    font_size = font_size.or_else(|| {
+        //In case some terminal didnt't support the cell-size query.
+        let winsize = tcgetwinsize(stdout()).ok()?;
+        let Winsize {
+            ws_xpixel: x,
+            ws_ypixel: y,
+            ws_col: cols,
+            ws_row: rows,
+        } = winsize;
+        if x == 0 || y == 0 || cols == 0 || rows == 0 {
+            return None;
+        }
+        Some((x / cols, y / rows))
+    });
+    Ok((proto, font_size))
+}
+
+#[cfg(not(all(feature = "rustix", unix)))]
+fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
+    Err("cannot query without rustix".into())
 }
 
 #[derive(Debug, PartialEq)]
@@ -393,7 +384,7 @@ impl Parser {
             sequence: ParsedResponse::Unknown,
         }
     }
-    pub fn push(self: &mut Self, next: char) -> Option<ParsedResponse> {
+    pub fn push(&mut self, next: char) -> Option<ParsedResponse> {
         match self.sequence {
             ParsedResponse::Unknown => {
                 if next == '\x1b' {
@@ -477,38 +468,23 @@ impl Parser {
     }
 }
 
-#[cfg(all(test, feature = "rustix"))]
+#[cfg(test)]
 mod tests {
     use std::assert_eq;
 
-    use crate::picker::{from_winsize, ParsedResponse, Parser, Picker, ProtocolType};
-    use rustix::termios::Winsize;
-
-    #[test]
-    fn test_font_size() {
-        assert!(from_winsize(Winsize {
-            ws_row: 0,
-            ws_col: 0,
-            ws_xpixel: 10,
-            ws_ypixel: 10
-        })
-        .is_err());
-        assert!(from_winsize(Winsize {
-            ws_row: 10,
-            ws_col: 10,
-            ws_xpixel: 0,
-            ws_ypixel: 0
-        })
-        .is_err());
-    }
+    use crate::picker::{ParsedResponse, Parser, ProtocolType};
 
     #[test]
     fn test_cycle_protocol() {
-        let mut picker = Picker::new((1, 1));
-        assert_eq!(picker.cycle_protocols(), ProtocolType::Sixel);
-        assert_eq!(picker.cycle_protocols(), ProtocolType::Kitty);
-        assert_eq!(picker.cycle_protocols(), ProtocolType::Iterm2);
-        assert_eq!(picker.cycle_protocols(), ProtocolType::Halfblocks);
+        let mut proto = ProtocolType::Halfblocks;
+        proto = proto.next();
+        assert_eq!(proto, ProtocolType::Sixel);
+        proto = proto.next();
+        assert_eq!(proto, ProtocolType::Kitty);
+        proto = proto.next();
+        assert_eq!(proto, ProtocolType::Iterm2);
+        proto = proto.next();
+        assert_eq!(proto, ProtocolType::Halfblocks);
     }
 
     #[test]

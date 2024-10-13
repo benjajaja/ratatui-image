@@ -80,7 +80,7 @@ impl<'a> App<'a> {
             .new_protocol(dyn_img.clone(), size(), Resize::Fit(None))
             .unwrap();
 
-        let image_source = ImageSource::new(dyn_img.clone(), picker.font_size);
+        let image_source = ImageSource::new(dyn_img.clone(), picker.font_size());
         let image_fit_state = picker.new_resize_protocol(dyn_img.clone());
         let image_crop_state = picker.new_resize_protocol(dyn_img);
 
@@ -133,7 +133,8 @@ impl<'a> App<'a> {
                 }
             }
             'i' => {
-                self.picker.cycle_protocols();
+                self.picker
+                    .set_protocol_type(self.picker.protocol_type().next());
                 self.reset_images();
             }
             'o' => {
@@ -142,7 +143,7 @@ impl<'a> App<'a> {
                     _ => "./assets/Ada.png",
                 };
                 let dyn_img = image::io::Reader::open(path).unwrap().decode().unwrap();
-                self.image_source = ImageSource::new(dyn_img.clone(), self.picker.font_size);
+                self.image_source = ImageSource::new(dyn_img.clone(), self.picker.font_size());
                 self.image_source_path = path.into();
                 self.reset_images();
             }
@@ -292,11 +293,11 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
             Line::from("H/L: resize"),
             Line::from(format!(
                 "i: cycle image protocols (current: {:?})",
-                app.picker.protocol_type
+                app.picker.protocol_type()
             )),
             Line::from("o: cycle image"),
             Line::from(format!("t: toggle ({:?})", app.show_images)),
-            Line::from(format!("Font size: {:?}", app.picker.font_size)),
+            Line::from(format!("Font size: {:?}", app.picker.font_size())),
         ])
         .wrap(Wrap { trim: true }),
         area,

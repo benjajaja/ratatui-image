@@ -41,7 +41,7 @@
 //!
 //!     // Should use Picker::from_query_stdio() to get the font size and protocol,
 //!     // but we can't put that here because that would break doctests!
-//!     let mut picker = Picker::new((8, 12));
+//!     let mut picker = Picker::from_fontsize((8, 12));
 //!
 //!     // Load an image with the image crate.
 //!     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
