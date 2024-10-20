@@ -4,8 +4,7 @@ use image::{DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::{cmp::min, format, io::Cursor};
 
-use super::{Protocol, StatefulProtocol};
-use crate::{ImageSource, Resize, Result};
+use crate::{FontSize, ImageSource, Protocol, Resize, Result, StatefulProtocol};
 
 // Fixed sixel protocol
 #[derive(Clone, Default)]
@@ -18,13 +17,21 @@ pub struct FixedIterm2 {
 impl FixedIterm2 {
     pub fn from_source(
         source: &ImageSource,
+        font_size: FontSize,
         resize: Resize,
         background_color: Option<Rgb<u8>>,
         is_tmux: bool,
         area: Rect,
     ) -> Result<Self> {
         let (img, rect) = resize
-            .resize(source, Rect::default(), area, background_color, false)
+            .resize(
+                source,
+                font_size,
+                Rect::default(),
+                area,
+                background_color,
+                false,
+            )
             .unwrap_or_else(|| (source.image.clone(), source.desired));
 
         let data = encode(img, is_tmux)?;
@@ -113,14 +120,16 @@ fn render_area(rect: Rect, area: Rect, overdraw: bool) -> Option<Rect> {
 #[derive(Clone)]
 pub struct Iterm2State {
     source: ImageSource,
+    font_size: FontSize,
     current: FixedIterm2,
     hash: u64,
 }
 
 impl Iterm2State {
-    pub fn new(source: ImageSource, is_tmux: bool) -> Iterm2State {
+    pub fn new(source: ImageSource, font_size: FontSize, is_tmux: bool) -> Iterm2State {
         Iterm2State {
             source,
+            font_size,
             current: FixedIterm2 {
                 is_tmux,
                 ..FixedIterm2::default()
@@ -132,7 +141,7 @@ impl Iterm2State {
 
 impl StatefulProtocol for Iterm2State {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(&self.source, self.current.rect, area, false)
+        resize.needs_resize(&self.source, self.font_size, self.current.rect, area, false)
     }
     fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
@@ -142,6 +151,7 @@ impl StatefulProtocol for Iterm2State {
         let force = self.source.hash != self.hash;
         if let Some((img, rect)) = resize.resize(
             &self.source,
+            self.font_size,
             self.current.rect,
             area,
             background_color,

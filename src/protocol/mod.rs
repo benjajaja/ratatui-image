@@ -83,8 +83,6 @@ dyn_clone::clone_trait_object!(StatefulProtocol);
 pub struct ImageSource {
     /// The original image without resizing.
     pub image: DynamicImage,
-    /// The font size of the terminal.
-    pub font_size: FontSize,
     /// The area that the [`ImageSource::image`] covers, but not necessarily fills.
     pub desired: Rect,
     /// TODO: document this; when image changes but it doesn't need a resize, force a render.
@@ -103,7 +101,6 @@ impl ImageSource {
 
         ImageSource {
             image,
-            font_size,
             desired,
             hash,
         }

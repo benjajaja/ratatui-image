@@ -13,7 +13,7 @@ use ratatui::{buffer::Buffer, layout::Rect};
 use std::cmp::min;
 
 use super::{Protocol, StatefulProtocol};
-use crate::{ImageSource, Resize, Result};
+use crate::{FontSize, ImageSource, Resize, Result};
 
 // Fixed sixel protocol
 #[derive(Clone, Default)]
@@ -26,13 +26,21 @@ pub struct Sixel {
 impl Sixel {
     pub fn from_source(
         source: &ImageSource,
+        font_size: FontSize,
         resize: Resize,
         background_color: Option<Rgb<u8>>,
         is_tmux: bool,
         area: Rect,
     ) -> Result<Self> {
         let (img, rect) = resize
-            .resize(source, Rect::default(), area, background_color, false)
+            .resize(
+                source,
+                font_size,
+                Rect::default(),
+                area,
+                background_color,
+                false,
+            )
             .unwrap_or_else(|| (source.image.clone(), source.desired));
 
         let data = encode(img, is_tmux)?;
@@ -149,14 +157,16 @@ fn render_area(rect: Rect, area: Rect, overdraw: bool) -> Option<Rect> {
 #[derive(Clone)]
 pub struct StatefulSixel {
     source: ImageSource,
+    font_size: FontSize,
     current: Sixel,
     hash: u64,
 }
 
 impl StatefulSixel {
-    pub fn new(source: ImageSource, is_tmux: bool) -> StatefulSixel {
+    pub fn new(source: ImageSource, font_size: FontSize, is_tmux: bool) -> StatefulSixel {
         StatefulSixel {
             source,
+            font_size,
             current: Sixel {
                 is_tmux,
                 ..Sixel::default()
@@ -168,7 +178,7 @@ impl StatefulSixel {
 
 impl StatefulProtocol for StatefulSixel {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(&self.source, self.current.rect, area, false)
+        resize.needs_resize(&self.source, self.font_size, self.current.rect, area, false)
     }
     fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
@@ -178,6 +188,7 @@ impl StatefulProtocol for StatefulSixel {
         let force = self.source.hash != self.hash;
         if let Some((img, rect)) = resize.resize(
             &self.source,
+            self.font_size,
             self.current.rect,
             area,
             background_color,

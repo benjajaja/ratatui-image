@@ -5,7 +5,7 @@ use image::{imageops::FilterType, DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use super::{Protocol, StatefulProtocol};
-use crate::{ImageSource, Resize, Result};
+use crate::{FontSize, ImageSource, Resize, Result};
 
 // Fixed Halfblocks protocol
 #[derive(Clone, Default)]
@@ -28,12 +28,20 @@ impl Halfblocks {
     /// the image could be resized in relation to the font size beforehand.
     pub fn from_source(
         source: &ImageSource,
+        font_size: FontSize,
         resize: Resize,
         background_color: Option<Rgb<u8>>,
         area: Rect,
     ) -> Result<Self> {
         let (image, desired) = resize
-            .resize(source, Rect::default(), area, background_color, false)
+            .resize(
+                source,
+                font_size,
+                Rect::default(),
+                area,
+                background_color,
+                false,
+            )
             .unwrap_or_else(|| (source.image.clone(), source.desired));
         let data = encode(&image, desired);
         Ok(Self {
@@ -93,14 +101,16 @@ impl Protocol for Halfblocks {
 #[derive(Clone)]
 pub struct StatefulHalfblocks {
     source: ImageSource,
+    font_size: FontSize,
     current: Halfblocks,
     hash: u64,
 }
 
 impl StatefulHalfblocks {
-    pub fn new(source: ImageSource) -> StatefulHalfblocks {
+    pub fn new(source: ImageSource, font_size: FontSize) -> StatefulHalfblocks {
         StatefulHalfblocks {
             source,
+            font_size,
             current: Halfblocks::default(),
             hash: u64::default(),
         }
@@ -109,7 +119,7 @@ impl StatefulHalfblocks {
 
 impl StatefulProtocol for StatefulHalfblocks {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(&self.source, self.current.rect, area, false)
+        resize.needs_resize(&self.source, self.font_size, self.current.rect, area, false)
     }
     fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
@@ -119,6 +129,7 @@ impl StatefulProtocol for StatefulHalfblocks {
         let force = self.source.hash != self.hash;
         if let Some((img, rect)) = resize.resize(
             &self.source,
+            self.font_size,
             self.current.rect,
             area,
             background_color,
