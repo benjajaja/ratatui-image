@@ -11,7 +11,7 @@ use crate::{FontSize, ImageSource, Resize, Result};
 #[derive(Clone, Default)]
 pub struct Halfblocks {
     data: Vec<HalfBlock>,
-    rect: Rect,
+    area: Rect,
 }
 
 #[derive(Clone, Debug)]
@@ -33,21 +33,22 @@ impl Halfblocks {
         background_color: Option<Rgb<u8>>,
         area: Rect,
     ) -> Result<Self> {
-        let (image, desired) = resize
-            .resize(
-                source,
-                font_size,
-                Rect::default(),
-                area,
-                background_color,
-                false,
-            )
-            .unwrap_or_else(|| (source.image.clone(), source.desired));
-        let data = encode(&image, desired);
-        Ok(Self {
-            data,
-            rect: desired,
-        })
+        let resized = resize.resize(
+            source,
+            font_size,
+            Rect::default(),
+            area,
+            background_color,
+            false,
+        );
+        let (image, area) = match resized {
+            Some((ref image, desired)) => (image, desired),
+            None => (&source.image, source.area),
+        };
+
+        let data = encode(image, area);
+
+        Ok(Self { data, area })
     }
 }
 
@@ -82,8 +83,8 @@ fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
 impl Protocol for Halfblocks {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         for (i, hb) in self.data.iter().enumerate() {
-            let x = i as u16 % self.rect.width;
-            let y = i as u16 / self.rect.width;
+            let x = i as u16 % self.area.width;
+            let y = i as u16 / self.area.width;
             if x >= area.width || y >= area.height {
                 continue;
             }
@@ -94,7 +95,7 @@ impl Protocol for Halfblocks {
     }
 
     fn rect(&self) -> Rect {
-        self.rect
+        self.area
     }
 }
 
@@ -119,7 +120,7 @@ impl StatefulHalfblocks {
 
 impl StatefulProtocol for StatefulHalfblocks {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(&self.source, self.font_size, self.current.rect, area, false)
+        resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }
     fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
@@ -130,13 +131,13 @@ impl StatefulProtocol for StatefulHalfblocks {
         if let Some((img, rect)) = resize.resize(
             &self.source,
             self.font_size,
-            self.current.rect,
+            self.current.area,
             area,
             background_color,
             force,
         ) {
             let data = encode(&img, rect);
-            let current = Halfblocks { data, rect };
+            let current = Halfblocks { data, area: rect };
             self.current = current;
             self.hash = self.source.hash;
         }

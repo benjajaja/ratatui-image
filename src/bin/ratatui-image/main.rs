@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use image::DynamicImage;
 use ratatui::{
     backend::CrosstermBackend,
     crossterm::{
@@ -15,16 +16,12 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
-use ratatui_image::{
-    picker::Picker,
-    protocol::{ImageSource, StatefulProtocol},
-    Resize, StatefulImage,
-};
+use ratatui_image::{picker::Picker, protocol::StatefulProtocol, Resize, StatefulImage};
 
 struct App {
     pub filename: String,
     pub picker: Picker,
-    pub image_source: ImageSource,
+    pub image_source: DynamicImage,
     pub image_state: Box<dyn StatefulProtocol>,
 }
 
@@ -53,10 +50,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let image = image::io::Reader::open(&filename)?.decode()?;
+    let image_source = image::io::Reader::open(&filename)?.decode()?;
 
-    let image_source = ImageSource::new(image.clone(), picker.font_size());
-    let image_state = picker.new_resize_protocol(image);
+    let image_state = picker.new_resize_protocol(image_source.clone());
 
     let mut app = App {
         filename,
@@ -82,9 +78,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ' ' => {
                                 app.picker
                                     .set_protocol_type(app.picker.protocol_type().next());
-                                app.image_state = app
-                                    .picker
-                                    .new_resize_protocol(app.image_source.image.clone());
+                                app.image_state =
+                                    app.picker.new_resize_protocol(app.image_source.clone());
                             }
                             _ => {}
                         },
@@ -115,7 +110,6 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     let block_top = Block::default()
         .borders(Borders::ALL)
         .title("ratatui-image");
-    let dyn_img = &app.image_source.image;
     let lines = vec![
         Line::from(format!(
             "Terminal: {:?}, font size: {:?}",
@@ -125,8 +119,8 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         Line::from(format!("File: {}", app.filename)),
         Line::from(format!(
             "Image: {:?} {:?}",
-            (dyn_img.width(), dyn_img.height()),
-            dyn_img.color()
+            (app.image_source.width(), app.image_source.height()),
+            app.image_source.color()
         )),
     ];
     f.render_widget(

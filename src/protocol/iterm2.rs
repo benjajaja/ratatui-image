@@ -10,7 +10,7 @@ use crate::{FontSize, ImageSource, Protocol, Resize, Result, StatefulProtocol};
 #[derive(Clone, Default)]
 pub struct FixedIterm2 {
     pub data: String,
-    pub rect: Rect,
+    pub area: Rect,
     pub is_tmux: bool,
 }
 
@@ -23,28 +23,30 @@ impl FixedIterm2 {
         is_tmux: bool,
         area: Rect,
     ) -> Result<Self> {
-        let (img, rect) = resize
-            .resize(
-                source,
-                font_size,
-                Rect::default(),
-                area,
-                background_color,
-                false,
-            )
-            .unwrap_or_else(|| (source.image.clone(), source.desired));
+        let resized = resize.resize(
+            source,
+            font_size,
+            Rect::default(),
+            area,
+            background_color,
+            false,
+        );
+        let (image, area) = match resized {
+            Some((ref image, desired)) => (image, desired),
+            None => (&source.image, source.area),
+        };
 
-        let data = encode(img, is_tmux)?;
+        let data = encode(image, is_tmux)?;
         Ok(Self {
             data,
-            rect,
+            area,
             is_tmux,
         })
     }
 }
 
 // TODO: change E to sixel_rs::status::Error and map when calling
-fn encode(img: DynamicImage, is_tmux: bool) -> Result<String> {
+fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
     let mut png: Vec<u8> = vec![];
     img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)?;
 
@@ -66,10 +68,10 @@ fn encode(img: DynamicImage, is_tmux: bool) -> Result<String> {
 
 impl Protocol for FixedIterm2 {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        render(self.rect, &self.data, area, buf, false)
+        render(self.area, &self.data, area, buf, false)
     }
     fn rect(&self) -> Rect {
-        self.rect
+        self.area
     }
 }
 
@@ -141,7 +143,7 @@ impl Iterm2State {
 
 impl StatefulProtocol for Iterm2State {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(&self.source, self.font_size, self.current.rect, area, false)
+        resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }
     fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
@@ -152,17 +154,17 @@ impl StatefulProtocol for Iterm2State {
         if let Some((img, rect)) = resize.resize(
             &self.source,
             self.font_size,
-            self.current.rect,
+            self.current.area,
             area,
             background_color,
             force,
         ) {
             let is_tmux = self.current.is_tmux;
-            match encode(img, is_tmux) {
+            match encode(&img, is_tmux) {
                 Ok(data) => {
                     self.current = FixedIterm2 {
                         data,
-                        rect,
+                        area: rect,
                         is_tmux,
                     };
                     self.hash = self.source.hash;
@@ -174,6 +176,6 @@ impl StatefulProtocol for Iterm2State {
         }
     }
     fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        render(self.current.rect, &self.current.data, area, buf, true);
+        render(self.current.area, &self.current.data, area, buf, true);
     }
 }

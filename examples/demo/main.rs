@@ -16,6 +16,7 @@ mod termwiz;
 
 use std::{error::Error, num::Wrapping as w, path::PathBuf, time::Duration};
 
+use image::DynamicImage;
 use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -26,7 +27,7 @@ use ratatui::{
 };
 use ratatui_image::{
     picker::Picker,
-    protocol::{ImageSource, Protocol, StatefulProtocol},
+    protocol::{Protocol, StatefulProtocol},
     Image, Resize, StatefulImage,
 };
 
@@ -59,7 +60,7 @@ struct App<'a> {
     pub image_static_offset: (u16, u16),
 
     pub picker: Picker,
-    pub image_source: ImageSource,
+    pub image_source: DynamicImage,
     pub image_static: Box<dyn Protocol>,
     pub image_fit_state: Box<dyn StatefulProtocol>,
     pub image_crop_state: Box<dyn StatefulProtocol>,
@@ -72,17 +73,16 @@ fn size() -> Rect {
 impl<'a> App<'a> {
     pub fn new<B: Backend>(title: &'a str, _: &mut Terminal<B>) -> App<'a> {
         let ada = "./assets/Ada.png";
-        let dyn_img = image::io::Reader::open(ada).unwrap().decode().unwrap();
+        let image_source = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
         let mut picker = Picker::from_query_stdio().unwrap();
 
         let image_static = picker
-            .new_protocol(dyn_img.clone(), size(), Resize::Fit(None))
+            .new_protocol(image_source.clone(), size(), Resize::Fit(None))
             .unwrap();
 
-        let image_source = ImageSource::new(dyn_img.clone(), picker.font_size());
-        let image_fit_state = picker.new_resize_protocol(dyn_img.clone());
-        let image_crop_state = picker.new_resize_protocol(dyn_img);
+        let image_fit_state = picker.new_resize_protocol(image_source.clone());
+        let image_crop_state = picker.new_resize_protocol(image_source.clone());
 
         let mut background = String::new();
 
@@ -142,8 +142,7 @@ impl<'a> App<'a> {
                     Some("./assets/Ada.png") => "./assets/Jenkins.jpg",
                     _ => "./assets/Ada.png",
                 };
-                let dyn_img = image::io::Reader::open(path).unwrap().decode().unwrap();
-                self.image_source = ImageSource::new(dyn_img.clone(), self.picker.font_size());
+                self.image_source = image::io::Reader::open(path).unwrap().decode().unwrap();
                 self.image_source_path = path.into();
                 self.reset_images();
             }
@@ -180,15 +179,11 @@ impl<'a> App<'a> {
     fn reset_images(&mut self) {
         self.image_static = self
             .picker
-            .new_protocol(self.image_source.image.clone(), size(), Resize::Fit(None))
+            .new_protocol(self.image_source.clone(), size(), Resize::Fit(None))
             .unwrap();
 
-        self.image_fit_state = self
-            .picker
-            .new_resize_protocol(self.image_source.image.clone());
-        self.image_crop_state = self
-            .picker
-            .new_resize_protocol(self.image_source.image.clone());
+        self.image_fit_state = self.picker.new_resize_protocol(self.image_source.clone());
+        self.image_crop_state = self.picker.new_resize_protocol(self.image_source.clone());
     }
 
     pub fn on_tick(&mut self) {}

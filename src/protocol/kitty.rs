@@ -14,7 +14,7 @@ use super::{Protocol, StatefulProtocol};
 pub struct Kitty {
     transmit_data: String,
     unique_id: u32,
-    rect: Rect,
+    area: Rect,
 }
 
 impl Kitty {
@@ -32,22 +32,24 @@ impl Kitty {
         id: u32,
         is_tmux: bool,
     ) -> Result<Self> {
-        let (image, desired) = resize
-            .resize(
-                source,
-                font_size,
-                Rect::default(),
-                area,
-                background_color,
-                false,
-            )
-            .unwrap_or_else(|| (source.image.clone(), source.desired));
+        let resized = resize.resize(
+            source,
+            font_size,
+            Rect::default(),
+            area,
+            background_color,
+            false,
+        );
+        let (image, area) = match resized {
+            Some((ref image, desired)) => (image, desired),
+            None => (&source.image, source.area),
+        };
 
-        let transmit_data = transmit_virtual(&image, id, is_tmux);
+        let transmit_data = transmit_virtual(image, id, is_tmux);
         Ok(Self {
             transmit_data,
             unique_id: id,
-            rect: desired,
+            area,
         })
     }
 }
@@ -55,11 +57,11 @@ impl Kitty {
 impl Protocol for Kitty {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let mut seq = Some(self.transmit_data.clone());
-        render(area, self.rect, buf, self.unique_id, &mut seq);
+        render(area, self.area, buf, self.unique_id, &mut seq);
     }
 
     fn rect(&self) -> Rect {
-        self.rect
+        self.area
     }
 }
 

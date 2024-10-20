@@ -279,7 +279,7 @@ impl Resize {
         area: Rect,
         force: bool,
     ) -> Option<Rect> {
-        let desired = image.desired;
+        let desired = image.area;
         // Check if resize is needed at all.
         if desired.width <= area.width && desired.height <= area.height && desired == current {
             let width = (desired.width * font_size.0) as u32;
