@@ -56,11 +56,11 @@ args = ["build", "--features", "${BACKEND}"]
 [tasks.run-example]
 command = "cargo"
 args = [
-  "run", 
-  "--release", 
-  "--example", 
+  "run",
+  "--release",
+  "--example",
   "demo",
-  "--features", "rustix,serde,crossterm",
+  "--features", "serde,crossterm",
 ]
 
 # Screenshot tests
@@ -71,7 +71,7 @@ args = [
   "build",
   "--example",
   "screenshot",
-  "--features", "rustix,crossterm",
+  "--features", "crossterm",
 ]
 
 [tasks.screenshot-xvfb]
@@ -119,4 +119,3 @@ args = [
   "save",
   "target/recording.gif",
 ]
-
