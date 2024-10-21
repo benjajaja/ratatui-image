@@ -269,7 +269,7 @@ static TERMINAL_MODE_PRIOR_RAW_MODE: std::sync::Mutex<Option<rustix::termios::Te
     std::sync::Mutex::new(None);
 
 #[cfg(not(windows))]
-fn enable_row_mode() -> Result<()> {
+fn enable_raw_mode() -> Result<()> {
     use rustix::termios::{self, LocalModes, OptionalActions};
 
     let stdin = std::io::stdin();
@@ -288,7 +288,7 @@ fn enable_row_mode() -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn disable_row_mode() -> Result<()> {
+fn disable_raw_mode() -> Result<()> {
     use rustix::termios::{self, OptionalActions};
 
     if let Some(termios) = TERMINAL_MODE_PRIOR_RAW_MODE.lock().unwrap().as_ref() {
@@ -316,8 +316,80 @@ fn font_size_fallback() -> Option<FontSize> {
     Some((x / cols, y / rows))
 }
 
+#[cfg(windows)]
+static ORIGINAL_IN_MODE: std::sync::Mutex<Option<windows::Win32::System::Console::CONSOLE_MODE>> =
+    std::sync::Mutex::new(None);
+
+#[cfg(windows)]
+use windows::Win32::Foundation::HANDLE;
+
+#[cfg(windows)]
+fn current_in_handle() -> Result<HANDLE> {
+    use windows::{
+        core::PCWSTR,
+        Win32::{
+            Foundation::{GENERIC_READ, GENERIC_WRITE, HANDLE},
+            Storage::FileSystem::{
+                self, FILE_FLAGS_AND_ATTRIBUTES, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+            },
+        },
+    };
+
+    let utf16: Vec<u16> = "CONIN$\0".encode_utf16().collect();
+    let utf16_ptr: *const u16 = utf16.as_ptr();
+
+    Ok(unsafe {
+        FileSystem::CreateFileW(
+            PCWSTR(utf16_ptr),
+            (GENERIC_READ | GENERIC_WRITE).0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            None,
+            OPEN_EXISTING,
+            FILE_FLAGS_AND_ATTRIBUTES(0),
+            HANDLE::default(),
+        )
+    }?)
+}
+
+#[cfg(windows)]
+fn enable_raw_mode() -> Result<()> {
+    use windows::Win32::System::Console::{
+        self, CONSOLE_MODE, ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT,
+    };
+
+    let in_handle = current_in_handle()?;
+
+    let mut original_in_mode = CONSOLE_MODE::default();
+    unsafe { Console::GetConsoleMode(in_handle, &mut original_in_mode) }?;
+    *ORIGINAL_IN_MODE.lock().unwrap() = Some(original_in_mode);
+
+    let requested_in_modes = !ENABLE_ECHO_INPUT & !ENABLE_LINE_INPUT & !ENABLE_PROCESSED_INPUT;
+    let in_mode = original_in_mode & requested_in_modes;
+    unsafe { Console::SetConsoleMode(in_handle, in_mode) }?;
+
+    Ok(())
+}
+
+#[cfg(windows)]
+fn disable_raw_mode() -> Result<()> {
+    use windows::Win32::System::Console;
+
+    let in_handle = current_in_handle()?;
+
+    if let Some(in_mode) = ORIGINAL_IN_MODE.lock().unwrap().as_ref() {
+        unsafe { Console::SetConsoleMode(in_handle, *in_mode) }?;
+    }
+
+    Ok(())
+}
+
+#[cfg(windows)]
+fn font_size_fallback() -> Option<FontSize> {
+    Some((10, 20))
+}
+
 fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
-    enable_row_mode()?;
+    enable_raw_mode()?;
 
     let (start, escape, end) = if is_tmux {
         ("\x1bPtmux;", "\x1b\x1b", "\x1b\\")
@@ -364,7 +436,7 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     }
 
     // Reset to previous termios attributes.
-    disable_row_mode()?;
+    disable_raw_mode()?;
 
     let mut proto = None;
     let mut font_size = None;
