@@ -4,8 +4,6 @@
     not(feature = "termwiz")
 ))]
 compile_error!("The demo needs one of the crossterm, termion, or termwiz features");
-#[cfg(not(feature = "rustix"))]
-compile_error!("The demo needs rustix until window_size is on ratataui");
 
 #[cfg(feature = "crossterm")]
 mod crossterm;

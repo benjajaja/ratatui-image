@@ -1,14 +1,12 @@
 //! Helper module to build a protocol, and swap protocols at runtime
 
-use std::env;
+use std::{
+    env,
+    io::{self, Read, Write},
+};
 
 use image::{DynamicImage, Rgb};
 use ratatui::layout::Rect;
-#[cfg(feature = "rustix")]
-use rustix::{
-    stdio::stdout,
-    termios::{tcgetwinsize, Winsize},
-};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -253,17 +251,60 @@ fn iterm2_from_env() -> Option<ProtocolType> {
     None
 }
 
-#[cfg(feature = "rustix")]
-fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
-    use rustix::termios::{LocalModes, OptionalActions};
+#[cfg(not(windows))]
+static TERMINAL_MODE_PRIOR_RAW_MODE: std::sync::Mutex<Option<rustix::termios::Termios>> =
+    std::sync::Mutex::new(None);
 
-    let stdin = rustix::stdio::stdin();
-    let termios_original = rustix::termios::tcgetattr(stdin)?;
-    let mut termios = termios_original.clone();
+#[cfg(not(windows))]
+fn enable_row_mode() -> Result<()> {
+    use rustix::termios::{self, LocalModes, OptionalActions};
+
+    let stdin = std::io::stdin();
+    let mut termios = termios::tcgetattr(&stdin)?;
+    TERMINAL_MODE_PRIOR_RAW_MODE
+        .lock()
+        .unwrap()
+        .replace(termios.clone());
+
     // Disable canonical mode to read without waiting for Enter, disable echoing.
     termios.local_modes &= !LocalModes::ICANON;
     termios.local_modes &= !LocalModes::ECHO;
-    rustix::termios::tcsetattr(stdin, OptionalActions::Drain, &termios)?;
+    termios::tcsetattr(&stdin, OptionalActions::Drain, &termios)?;
+
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn disable_row_mode() -> Result<()> {
+    use rustix::termios::{self, OptionalActions};
+
+    if let Some(termios) = TERMINAL_MODE_PRIOR_RAW_MODE.lock().unwrap().as_ref() {
+        termios::tcsetattr(std::io::stdin(), OptionalActions::Now, termios)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn font_size_fallback() -> Option<FontSize> {
+    use rustix::termios::{self, Winsize};
+
+    let winsize = termios::tcgetwinsize(io::stdout()).ok()?;
+    let Winsize {
+        ws_xpixel: x,
+        ws_ypixel: y,
+        ws_col: cols,
+        ws_row: rows,
+    } = winsize;
+    if x == 0 || y == 0 || cols == 0 || rows == 0 {
+        return None;
+    }
+
+    Some((x / cols, y / rows))
+}
+
+fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
+    enable_row_mode()?;
 
     let (start, escape, end) = if is_tmux {
         ("\x1bPtmux;", "\x1b\x1b", "\x1b\\")
@@ -279,13 +320,14 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     // `[5n`: Device Status Report, implemented by all terminals, ensure that there is some
     // response and we don't hang reading forever.
     let query = format!("{start}{escape}_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA{escape}\\{escape}[c{escape}[16t{escape}[1337n{escape}[5n{end}");
-    rustix::io::write(rustix::stdio::stdout(), query.as_bytes())?;
+    io::stdout().write_all(query.as_bytes())?;
+    io::stdout().flush()?;
 
     let mut parser = Parser::new();
     let mut capabilities = vec![];
     'out: loop {
         let mut charbuf: [u8; 50] = [0; 50];
-        let result = rustix::io::read(stdin, &mut charbuf);
+        let result = io::stdin().read(&mut charbuf);
         match result {
             Ok(read) => {
                 for ch in charbuf.iter().take(read) {
@@ -309,7 +351,7 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     }
 
     // Reset to previous termios attributes.
-    rustix::termios::tcsetattr(stdin, OptionalActions::Now, &termios_original)?;
+    disable_row_mode()?;
 
     let mut proto = None;
     let mut font_size = None;
@@ -324,26 +366,10 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
             font_size = Some((w, h));
         }
     }
-    font_size = font_size.or_else(|| {
-        //In case some terminal didnt't support the cell-size query.
-        let winsize = tcgetwinsize(stdout()).ok()?;
-        let Winsize {
-            ws_xpixel: x,
-            ws_ypixel: y,
-            ws_col: cols,
-            ws_row: rows,
-        } = winsize;
-        if x == 0 || y == 0 || cols == 0 || rows == 0 {
-            return None;
-        }
-        Some((x / cols, y / rows))
-    });
-    Ok((proto, font_size))
-}
+    // In case some terminal didn't support the cell-size query.
+    font_size = font_size.or_else(font_size_fallback);
 
-#[cfg(not(feature = "rustix"))]
-fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
-    Err("cannot query without rustix".into())
+    Ok((proto, font_size))
 }
 
 struct Parser {

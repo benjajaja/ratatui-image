@@ -90,7 +90,6 @@
 //! The lib also includes a binary that renders an image file, but it is focused on testing.
 //!
 //! # Features
-//! * `rustix` (default) enables much better guessing of graphics protocols with `rustix::termios::tcgetattr`.
 //! * `crossterm` or `termion` should match your ratatui backend. `termwiz` is available, but not
 //!   working correctly with ratatu-image.
 //! * `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
