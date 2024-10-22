@@ -265,19 +265,16 @@ fn iterm2_from_env() -> Option<ProtocolType> {
 }
 
 #[cfg(not(windows))]
-static TERMINAL_MODE_PRIOR_RAW_MODE: std::sync::Mutex<Option<rustix::termios::Termios>> =
+static ORIGINAL_IN_MODE: std::sync::Mutex<Option<rustix::termios::Termios>> =
     std::sync::Mutex::new(None);
 
 #[cfg(not(windows))]
 fn enable_raw_mode() -> Result<()> {
     use rustix::termios::{self, LocalModes, OptionalActions};
 
-    let stdin = std::io::stdin();
+    let stdin = io::stdin();
     let mut termios = termios::tcgetattr(&stdin)?;
-    TERMINAL_MODE_PRIOR_RAW_MODE
-        .lock()
-        .unwrap()
-        .replace(termios.clone());
+    *ORIGINAL_IN_MODE.lock().unwrap() = Some(termios.clone());
 
     // Disable canonical mode to read without waiting for Enter, disable echoing.
     termios.local_modes &= !LocalModes::ICANON;
@@ -291,8 +288,8 @@ fn enable_raw_mode() -> Result<()> {
 fn disable_raw_mode() -> Result<()> {
     use rustix::termios::{self, OptionalActions};
 
-    if let Some(termios) = TERMINAL_MODE_PRIOR_RAW_MODE.lock().unwrap().as_ref() {
-        termios::tcsetattr(std::io::stdin(), OptionalActions::Now, termios)?;
+    if let Some(termios) = ORIGINAL_IN_MODE.lock().unwrap().as_ref() {
+        termios::tcsetattr(io::stdin(), OptionalActions::Now, termios)?;
     }
 
     Ok(())
@@ -504,11 +501,13 @@ impl Parser {
             }
             ParsedResponse::Sixel(_) => match next {
                 'c' => {
+                    self.data.push(next);
+
                     // This is just easier than actually parsing the string.
                     let is_sixel = self.data.contains(";4;")
                         || self.data.contains("?4;")
-                        || self.data.contains(";4")
-                        || self.data.contains("?4");
+                        || self.data.contains(";4c")
+                        || self.data.contains("?4c");
                     self.data = String::new();
                     self.sequence = ParsedResponse::Unknown;
                     return Some(ParsedResponse::Sixel(is_sixel));
