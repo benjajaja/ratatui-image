@@ -63,7 +63,7 @@ impl Picker {
     /// entering alternate screen but before reading terminal events.
     ///
     /// # Example
-    /// ```rust
+    /// ```no_run
     /// use ratatui_image::picker::Picker;
     /// let mut picker = Picker::from_query_stdio();
     /// ```
