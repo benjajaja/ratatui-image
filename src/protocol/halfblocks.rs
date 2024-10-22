@@ -5,13 +5,13 @@ use image::{imageops::FilterType, DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use super::{Protocol, StatefulProtocol};
-use crate::{ImageSource, Resize, Result};
+use crate::{FontSize, ImageSource, Resize, Result};
 
 // Fixed Halfblocks protocol
 #[derive(Clone, Default)]
 pub struct Halfblocks {
     data: Vec<HalfBlock>,
-    rect: Rect,
+    area: Rect,
 }
 
 #[derive(Clone, Debug)]
@@ -28,18 +28,27 @@ impl Halfblocks {
     /// the image could be resized in relation to the font size beforehand.
     pub fn from_source(
         source: &ImageSource,
+        font_size: FontSize,
         resize: Resize,
         background_color: Option<Rgb<u8>>,
         area: Rect,
     ) -> Result<Self> {
-        let (image, desired) = resize
-            .resize(source, Rect::default(), area, background_color, false)
-            .unwrap_or_else(|| (source.image.clone(), source.desired));
-        let data = encode(&image, desired);
-        Ok(Self {
-            data,
-            rect: desired,
-        })
+        let resized = resize.resize(
+            source,
+            font_size,
+            Rect::default(),
+            area,
+            background_color,
+            false,
+        );
+        let (image, area) = match resized {
+            Some((ref image, desired)) => (image, desired),
+            None => (&source.image, source.area),
+        };
+
+        let data = encode(image, area);
+
+        Ok(Self { data, area })
     }
 }
 
@@ -74,8 +83,8 @@ fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
 impl Protocol for Halfblocks {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         for (i, hb) in self.data.iter().enumerate() {
-            let x = i as u16 % self.rect.width;
-            let y = i as u16 / self.rect.width;
+            let x = i as u16 % self.area.width;
+            let y = i as u16 / self.area.width;
             if x >= area.width || y >= area.height {
                 continue;
             }
@@ -86,21 +95,23 @@ impl Protocol for Halfblocks {
     }
 
     fn rect(&self) -> Rect {
-        self.rect
+        self.area
     }
 }
 
 #[derive(Clone)]
 pub struct StatefulHalfblocks {
     source: ImageSource,
+    font_size: FontSize,
     current: Halfblocks,
     hash: u64,
 }
 
 impl StatefulHalfblocks {
-    pub fn new(source: ImageSource) -> StatefulHalfblocks {
+    pub fn new(source: ImageSource, font_size: FontSize) -> StatefulHalfblocks {
         StatefulHalfblocks {
             source,
+            font_size,
             current: Halfblocks::default(),
             hash: u64::default(),
         }
@@ -109,7 +120,7 @@ impl StatefulHalfblocks {
 
 impl StatefulProtocol for StatefulHalfblocks {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(&self.source, self.current.rect, area, false)
+        resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }
     fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
@@ -119,13 +130,14 @@ impl StatefulProtocol for StatefulHalfblocks {
         let force = self.source.hash != self.hash;
         if let Some((img, rect)) = resize.resize(
             &self.source,
-            self.current.rect,
+            self.font_size,
+            self.current.area,
             area,
             background_color,
             force,
         ) {
             let data = encode(&img, rect);
-            let current = Halfblocks { data, rect };
+            let current = Halfblocks { data, area: rect };
             self.current = current;
             self.hash = self.source.hash;
         }

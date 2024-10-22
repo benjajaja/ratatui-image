@@ -154,12 +154,14 @@ impl Picker {
         match self.protocol_type {
             ProtocolType::Halfblocks => Ok(Box::new(Halfblocks::from_source(
                 &source,
+                self.font_size,
                 resize,
                 self.background_color,
                 size,
             )?)),
             ProtocolType::Sixel => Ok(Box::new(Sixel::from_source(
                 &source,
+                self.font_size,
                 resize,
                 self.background_color,
                 self.is_tmux,
@@ -169,6 +171,7 @@ impl Picker {
                 self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
                 Ok(Box::new(Kitty::from_source(
                     &source,
+                    self.font_size,
                     resize,
                     self.background_color,
                     size,
@@ -178,6 +181,7 @@ impl Picker {
             }
             ProtocolType::Iterm2 => Ok(Box::new(FixedIterm2::from_source(
                 &source,
+                self.font_size,
                 resize,
                 self.background_color,
                 self.is_tmux,
@@ -190,13 +194,22 @@ impl Picker {
     pub fn new_resize_protocol(&mut self, image: DynamicImage) -> Box<dyn StatefulProtocol> {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
-            ProtocolType::Halfblocks => Box::new(StatefulHalfblocks::new(source)),
-            ProtocolType::Sixel => Box::new(StatefulSixel::new(source, self.is_tmux)),
+            ProtocolType::Halfblocks => Box::new(StatefulHalfblocks::new(source, self.font_size)),
+            ProtocolType::Sixel => {
+                Box::new(StatefulSixel::new(source, self.font_size, self.is_tmux))
+            }
             ProtocolType::Kitty => {
                 self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
-                Box::new(StatefulKitty::new(source, self.kitty_counter, self.is_tmux))
+                Box::new(StatefulKitty::new(
+                    source,
+                    self.font_size,
+                    self.kitty_counter,
+                    self.is_tmux,
+                ))
             }
-            ProtocolType::Iterm2 => Box::new(Iterm2State::new(source, self.is_tmux)),
+            ProtocolType::Iterm2 => {
+                Box::new(Iterm2State::new(source, self.font_size, self.is_tmux))
+            }
         }
     }
 }

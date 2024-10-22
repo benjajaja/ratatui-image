@@ -5,7 +5,7 @@ use base64::{engine::general_purpose, Engine};
 use image::{DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect};
 
-use crate::{ImageSource, Resize, Result};
+use crate::{FontSize, ImageSource, Resize, Result};
 
 use super::{Protocol, StatefulProtocol};
 
@@ -14,7 +14,7 @@ use super::{Protocol, StatefulProtocol};
 pub struct Kitty {
     transmit_data: String,
     unique_id: u32,
-    rect: Rect,
+    area: Rect,
 }
 
 impl Kitty {
@@ -25,21 +25,31 @@ impl Kitty {
     /// the image could be resized in relation to the font size beforehand.
     pub fn from_source(
         source: &ImageSource,
+        font_size: FontSize,
         resize: Resize,
         background_color: Option<Rgb<u8>>,
         area: Rect,
         id: u32,
         is_tmux: bool,
     ) -> Result<Self> {
-        let (image, desired) = resize
-            .resize(source, Rect::default(), area, background_color, false)
-            .unwrap_or_else(|| (source.image.clone(), source.desired));
+        let resized = resize.resize(
+            source,
+            font_size,
+            Rect::default(),
+            area,
+            background_color,
+            false,
+        );
+        let (image, area) = match resized {
+            Some((ref image, desired)) => (image, desired),
+            None => (&source.image, source.area),
+        };
 
-        let transmit_data = transmit_virtual(&image, id, is_tmux);
+        let transmit_data = transmit_virtual(image, id, is_tmux);
         Ok(Self {
             transmit_data,
             unique_id: id,
-            rect: desired,
+            area,
         })
     }
 }
@@ -47,17 +57,18 @@ impl Kitty {
 impl Protocol for Kitty {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let mut seq = Some(self.transmit_data.clone());
-        render(area, self.rect, buf, self.unique_id, &mut seq);
+        render(area, self.area, buf, self.unique_id, &mut seq);
     }
 
     fn rect(&self) -> Rect {
-        self.rect
+        self.area
     }
 }
 
 #[derive(Clone)]
 pub struct StatefulKitty {
     source: ImageSource,
+    font_size: FontSize,
     pub unique_id: u32,
     rect: Rect,
     hash: u64,
@@ -73,9 +84,10 @@ enum KittyProtoState {
 }
 
 impl StatefulKitty {
-    pub fn new(source: ImageSource, id: u32, is_tmux: bool) -> StatefulKitty {
+    pub fn new(source: ImageSource, font_size: FontSize, id: u32, is_tmux: bool) -> StatefulKitty {
         StatefulKitty {
             source,
+            font_size,
             unique_id: id,
             rect: Rect::default(),
             hash: u64::default(),
@@ -87,7 +99,7 @@ impl StatefulKitty {
 
 impl StatefulProtocol for StatefulKitty {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(&self.source, self.rect, area, false)
+        resize.needs_resize(&self.source, self.font_size, self.rect, area, false)
     }
     fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
         if area.width == 0 || area.height == 0 {
@@ -95,9 +107,14 @@ impl StatefulProtocol for StatefulKitty {
         }
 
         let force = self.source.hash != self.hash;
-        if let Some((img, rect)) =
-            resize.resize(&self.source, self.rect, area, background_color, force)
-        {
+        if let Some((img, rect)) = resize.resize(
+            &self.source,
+            self.font_size,
+            self.rect,
+            area,
+            background_color,
+            force,
+        ) {
             let data = transmit_virtual(&img, self.unique_id, self.is_tmux);
             self.hash = self.source.hash;
             self.rect = rect;
