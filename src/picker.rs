@@ -501,11 +501,13 @@ impl Parser {
             }
             ParsedResponse::Sixel(_) => match next {
                 'c' => {
+                    self.data.push(next);
+
                     // This is just easier than actually parsing the string.
                     let is_sixel = self.data.contains(";4;")
                         || self.data.contains("?4;")
-                        || self.data.contains(";4")
-                        || self.data.contains("?4");
+                        || self.data.contains(";4c")
+                        || self.data.contains("?4c");
                     self.data = String::new();
                     self.sequence = ParsedResponse::Unknown;
                     return Some(ParsedResponse::Sixel(is_sixel));
