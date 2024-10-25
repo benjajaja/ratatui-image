@@ -22,7 +22,6 @@ termwiz = ["ratatui/termwiz"]
 serde = ["dep:serde"]
 
 [dependencies]
-dyn-clone = "^1.0.11"
 image = { version = "^0.25.1", default-features = false, features = ["jpeg"] }
 icy_sixel = { version = "^0.1.1" }
 serde = { version = "^1.0", optional = true, features = ["derive"] }

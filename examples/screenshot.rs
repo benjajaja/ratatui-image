@@ -16,9 +16,9 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
-use ratatui_image::{picker::Picker, protocol::Protocol, Image, Resize};
+use ratatui_image::{picker::Picker, protocol::SProtocol, Image, Resize};
 struct App {
-    image: Box<dyn Protocol>,
+    image: SProtocol,
 }
 
 const ASSERT_FONT_SIZE: (u16, u16) = (9, 18);
@@ -91,7 +91,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         block.inner(area),
     );
 
-    let image = Image::new(app.image.as_ref());
+    let image = Image::new(&app.image);
     f.render_widget(image, block.inner(area));
     f.render_widget(block, area);
 }

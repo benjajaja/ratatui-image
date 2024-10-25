@@ -28,11 +28,11 @@
 //! # Quick start
 //! ```rust
 //! use ratatui::{backend::TestBackend, Terminal, Frame};
-//! use ratatui_image::{picker::Picker, StatefulImage, protocol::StatefulProtocol};
+//! use ratatui_image::{picker::Picker, StatefulImage, protocol::SStatefulProtocol};
 //!
 //! struct App {
 //!     // We need to hold the render state.
-//!     image: Box<dyn StatefulProtocol>,
+//!     image: SStatefulProtocol,
 //! }
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -108,7 +108,7 @@ use std::{
 };
 
 use image::{imageops, DynamicImage, ImageBuffer, Rgb};
-use protocol::{ImageSource, Protocol, StatefulProtocol};
+use protocol::{ImageSource, SProtocol, SStatefulProtocol};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -132,21 +132,21 @@ pub type FontSize = (u16, u16);
 ///
 /// ```rust
 /// # use ratatui::Frame;
-/// # use ratatui_image::{Resize, Image, protocol::Protocol};
+/// # use ratatui_image::{Resize, Image, protocol::SProtocol};
 /// struct App {
-///     image_static: Box<dyn Protocol>,
+///     image_static: SProtocol,
 /// }
 /// fn ui(f: &mut Frame<'_>, app: &mut App) {
-///     let image = Image::new(app.image_static.as_ref());
+///     let image = Image::new(&app.image_static);
 ///     f.render_widget(image, f.size());
 /// }
 /// ```
 pub struct Image<'a> {
-    image: &'a dyn Protocol,
+    image: &'a SProtocol,
 }
 
 impl<'a> Image<'a> {
-    pub fn new(image: &'a dyn Protocol) -> Image<'a> {
+    pub fn new(image: &'a SProtocol) -> Image<'a> {
         Image { image }
     }
 }
@@ -167,9 +167,9 @@ impl<'a> Widget for Image<'a> {
 ///
 /// ```rust
 /// # use ratatui::Frame;
-/// # use ratatui_image::{Resize, StatefulImage, protocol::{StatefulProtocol}};
+/// # use ratatui_image::{Resize, StatefulImage, protocol::{SStatefulProtocol}};
 /// struct App {
-///     image_state: Box<dyn StatefulProtocol>,
+///     image_state: SStatefulProtocol,
 /// }
 /// fn ui(f: &mut Frame<'_>, app: &mut App) {
 ///     let image = StatefulImage::new(None).resize(Resize::Crop(None));
@@ -199,13 +199,13 @@ impl StatefulImage {
 }
 
 impl StatefulWidget for StatefulImage {
-    type State = Box<dyn StatefulProtocol>;
+    type State = SStatefulProtocol;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         if area.width == 0 || area.height == 0 {
             return;
         }
 
-        state.resize_encode_render(&self.resize, self.background_color, area, buf)
+        state.resize_encode_render(&self.resize, self.background_color, area, buf);
     }
 }
 

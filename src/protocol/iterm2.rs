@@ -4,7 +4,9 @@ use image::{DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::{cmp::min, format, io::Cursor};
 
-use crate::{FontSize, ImageSource, Protocol, Resize, Result, StatefulProtocol};
+use crate::{FontSize, ImageSource, Resize, Result};
+
+use super::{Protocol, StatefulProtocol};
 
 // Fixed sixel protocol
 #[derive(Clone, Default)]

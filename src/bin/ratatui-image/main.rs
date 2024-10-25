@@ -16,13 +16,13 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
-use ratatui_image::{picker::Picker, protocol::StatefulProtocol, Resize, StatefulImage};
+use ratatui_image::{picker::Picker, protocol::SStatefulProtocol, Resize, StatefulImage};
 
 struct App {
     pub filename: String,
     pub picker: Picker,
     pub image_source: DynamicImage,
-    pub image_state: Box<dyn StatefulProtocol>,
+    pub image_state: SStatefulProtocol,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

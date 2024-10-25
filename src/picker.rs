@@ -17,7 +17,7 @@ use crate::{
         iterm2::{FixedIterm2, Iterm2State},
         kitty::{Kitty, StatefulKitty},
         sixel::{Sixel, StatefulSixel},
-        Protocol, StatefulProtocol,
+        SProtocol, SStatefulProtocol,
     },
     FontSize, ImageSource, Resize, Result,
 };
@@ -150,17 +150,17 @@ impl Picker {
         image: DynamicImage,
         size: Rect,
         resize: Resize,
-    ) -> Result<Box<dyn Protocol>> {
+    ) -> Result<SProtocol> {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
-            ProtocolType::Halfblocks => Ok(Box::new(Halfblocks::from_source(
+            ProtocolType::Halfblocks => Ok(SProtocol::Halfblocks(Halfblocks::from_source(
                 &source,
                 self.font_size,
                 resize,
                 self.background_color,
                 size,
             )?)),
-            ProtocolType::Sixel => Ok(Box::new(Sixel::from_source(
+            ProtocolType::Sixel => Ok(SProtocol::Sixel(Sixel::from_source(
                 &source,
                 self.font_size,
                 resize,
@@ -170,7 +170,7 @@ impl Picker {
             )?)),
             ProtocolType::Kitty => {
                 self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
-                Ok(Box::new(Kitty::from_source(
+                Ok(SProtocol::Kitty(Kitty::from_source(
                     &source,
                     self.font_size,
                     resize,
@@ -180,7 +180,7 @@ impl Picker {
                     self.is_tmux,
                 )?))
             }
-            ProtocolType::Iterm2 => Ok(Box::new(FixedIterm2::from_source(
+            ProtocolType::Iterm2 => Ok(SProtocol::ITerm2(FixedIterm2::from_source(
                 &source,
                 self.font_size,
                 resize,
@@ -192,16 +192,18 @@ impl Picker {
     }
 
     /// Returns a new *stateful* protocol for [`crate::StatefulImage`] widgets.
-    pub fn new_resize_protocol(&mut self, image: DynamicImage) -> Box<dyn StatefulProtocol> {
+    pub fn new_resize_protocol(&mut self, image: DynamicImage) -> SStatefulProtocol {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
-            ProtocolType::Halfblocks => Box::new(StatefulHalfblocks::new(source, self.font_size)),
+            ProtocolType::Halfblocks => {
+                SStatefulProtocol::Halfblocks(StatefulHalfblocks::new(source, self.font_size))
+            }
             ProtocolType::Sixel => {
-                Box::new(StatefulSixel::new(source, self.font_size, self.is_tmux))
+                SStatefulProtocol::Sixel(StatefulSixel::new(source, self.font_size, self.is_tmux))
             }
             ProtocolType::Kitty => {
                 self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
-                Box::new(StatefulKitty::new(
+                SStatefulProtocol::Kitty(StatefulKitty::new(
                     source,
                     self.font_size,
                     self.kitty_counter,
@@ -209,7 +211,7 @@ impl Picker {
                 ))
             }
             ProtocolType::Iterm2 => {
-                Box::new(Iterm2State::new(source, self.font_size, self.is_tmux))
+                SStatefulProtocol::ITerm2(Iterm2State::new(source, self.font_size, self.is_tmux))
             }
         }
     }

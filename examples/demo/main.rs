@@ -25,7 +25,7 @@ use ratatui::{
 };
 use ratatui_image::{
     picker::Picker,
-    protocol::{Protocol, StatefulProtocol},
+    protocol::{SProtocol, SStatefulProtocol},
     Image, Resize, StatefulImage,
 };
 
@@ -59,9 +59,9 @@ struct App<'a> {
 
     pub picker: Picker,
     pub image_source: DynamicImage,
-    pub image_static: Box<dyn Protocol>,
-    pub image_fit_state: Box<dyn StatefulProtocol>,
-    pub image_crop_state: Box<dyn StatefulProtocol>,
+    pub image_static: SProtocol,
+    pub image_fit_state: SStatefulProtocol,
+    pub image_crop_state: SStatefulProtocol,
 }
 
 fn size() -> Rect {
@@ -221,7 +221,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     match app.show_images {
         ShowImages::Resized => {}
         _ => {
-            let image = Image::new(app.image_static.as_ref());
+            let image = Image::new(&app.image_static);
             f.render_widget(image, area);
         }
     }

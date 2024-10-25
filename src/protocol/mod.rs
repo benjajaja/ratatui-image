@@ -5,11 +5,17 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use dyn_clone::DynClone;
 use image::{DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::FontSize;
+
+use self::{
+    halfblocks::{Halfblocks, StatefulHalfblocks},
+    iterm2::{FixedIterm2, Iterm2State},
+    kitty::{Kitty, StatefulKitty},
+    sixel::{Sixel, StatefulSixel},
+};
 
 use super::Resize;
 
@@ -26,24 +32,92 @@ pub trait Protocol: Send + Sync {
     fn rect(&self) -> Rect;
 }
 
-/// A stateful resizing image protocol for the [crate::StatefulImage] widget.
-pub trait StatefulProtocol: Send + Sync + DynClone {
+pub enum SProtocol {
+    Halfblocks(Halfblocks),
+    Sixel(Sixel),
+    Kitty(Kitty),
+    ITerm2(FixedIterm2),
+}
+impl SProtocol {
+    pub(crate) fn render(&self, area: Rect, buf: &mut Buffer) {
+        let inner: &dyn Protocol = match self {
+            Self::Halfblocks(halfblocks) => halfblocks,
+            Self::Sixel(sixel) => sixel,
+            Self::Kitty(kitty) => kitty,
+            Self::ITerm2(iterm2) => iterm2,
+        };
+        inner.render(area, buf);
+    }
+}
+
+pub enum SStatefulProtocol {
+    Halfblocks(StatefulHalfblocks),
+    Sixel(StatefulSixel),
+    Kitty(StatefulKitty),
+    ITerm2(Iterm2State),
+}
+
+impl SStatefulProtocol {
+    fn inner(&mut self) -> &mut dyn StatefulProtocol {
+        match self {
+            Self::Halfblocks(halfblocks) => halfblocks,
+            Self::Sixel(sixel) => sixel,
+            Self::Kitty(kitty) => kitty,
+            Self::ITerm2(iterm2) => iterm2,
+        }
+    }
     /// Resize and encode if necessary, and render immediately.
     ///
     /// This blocks the UI thread but requires neither threads nor async.
-    fn resize_encode_render(
+    pub fn resize_encode_render(
         &mut self,
         resize: &Resize,
         background_color: Option<Rgb<u8>>,
         area: Rect,
         buf: &mut Buffer,
     ) {
-        if let Some(rect) = self.needs_resize(resize, area) {
-            self.resize_encode(resize, background_color, rect);
+        let proto = self.inner();
+        if let Some(rect) = proto.needs_resize(resize, area) {
+            proto.resize_encode(resize, background_color, rect);
         }
-        self.render(area, buf);
+        proto.render(area, buf);
     }
 
+    /// Check if the current image state would need resizing (grow or shrink) for the given area.
+    ///
+    /// This can be called by the UI thread to check if this [StatefulProtocol] should be sent off
+    /// to some background thread/task to do the resizing and encoding, instead of rendering. The
+    /// thread should then return the [StatefulProtocol] so that it can be rendered.protoco
+    pub fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
+        match self {
+            SStatefulProtocol::Halfblocks(proto) => proto.needs_resize(resize, area),
+            SStatefulProtocol::Sixel(proto) => proto.needs_resize(resize, area),
+            SStatefulProtocol::Kitty(proto) => proto.needs_resize(resize, area),
+            SStatefulProtocol::ITerm2(proto) => proto.needs_resize(resize, area),
+        }
+    }
+
+    /// Resize the image and encode it for rendering. The result should be stored statefully so
+    /// that next call for the given area does not need to redo the work.
+    ///
+    /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
+    pub fn resize_encode(
+        &mut self,
+        resize: &Resize,
+        background_color: Option<Rgb<u8>>,
+        area: Rect,
+    ) {
+        self.inner().resize_encode(resize, background_color, area)
+    }
+
+    /// Render the currently resized and encoded data to the buffer.
+    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
+        self.inner().render(area, buf);
+    }
+}
+
+/// A stateful resizing image protocol for the [crate::StatefulImage] widget.
+pub trait StatefulProtocol: Send + Sync {
     /// Check if the current image state would need resizing (grow or shrink) for the given area.
     ///
     /// This can be called by the UI thread to check if this [StatefulProtocol] should be sent off
@@ -61,8 +135,6 @@ pub trait StatefulProtocol: Send + Sync + DynClone {
     /// Render the currently resized and encoded data to the buffer.
     fn render(&mut self, area: Rect, buf: &mut Buffer);
 }
-
-dyn_clone::clone_trait_object!(StatefulProtocol);
 
 #[derive(Clone)]
 /// Image source for [crate::protocol::StatefulProtocol]s
