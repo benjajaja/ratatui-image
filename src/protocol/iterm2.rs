@@ -72,9 +72,6 @@ impl Protocol for FixedIterm2 {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         render(self.area, &self.data, area, buf, false)
     }
-    fn rect(&self) -> Rect {
-        self.area
-    }
 }
 
 fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) {

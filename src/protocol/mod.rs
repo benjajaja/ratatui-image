@@ -28,8 +28,6 @@ pub mod sixel;
 pub trait Protocol: Send + Sync {
     /// Render the currently resized and encoded data to the buffer.
     fn render(&self, area: Rect, buf: &mut Buffer);
-    /// Get the [ratatui::layout::Rect] of the image.
-    fn rect(&self) -> Rect;
 }
 
 pub enum SProtocol {

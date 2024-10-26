@@ -93,10 +93,6 @@ impl Protocol for Halfblocks {
                 .map(|cell| cell.set_fg(hb.upper).set_bg(hb.lower).set_char('▀'));
         }
     }
-
-    fn rect(&self) -> Rect {
-        self.area
-    }
 }
 
 #[derive(Clone)]
