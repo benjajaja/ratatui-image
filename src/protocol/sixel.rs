@@ -13,7 +13,7 @@ use ratatui::{buffer::Buffer, layout::Rect};
 use std::cmp::min;
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
-use crate::{FontSize, ImageSource, Resize, Result};
+use crate::{errors::Errors, FontSize, ImageSource, Resize, Result};
 
 // Fixed sixel protocol
 #[derive(Clone, Default)]
@@ -71,10 +71,11 @@ fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
         MethodForLargest::Auto,
         MethodForRep::Auto,
         Quality::HIGH,
-    )?;
+    )
+    .map_err(|err| Errors::Sixel(err.to_string()))?;
     if is_tmux {
         if data.strip_prefix('\x1b').is_none() {
-            return Err("sixel string did not start with escape".into());
+            return Err(Errors::Tmux("sixel string did not start with escape"));
         }
 
         let mut data_tmux = TMUX_START.to_string();

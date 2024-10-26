@@ -12,6 +12,7 @@ use ratatui::layout::Rect;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    errors::Errors,
     protocol::{
         halfblocks::{Halfblocks, StatefulHalfblocks},
         iterm2::{Iterm2, StatefulIterm2},
@@ -93,7 +94,7 @@ impl Picker {
                 kitty_counter: rand::random(),
             })
         } else {
-            Err("could not query font size".into())
+            Err(Errors::NoFontSize)
         }
     }
 
@@ -397,7 +398,7 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     }
 
     if capabilities.is_empty() {
-        return Err("no reply to graphics support query".into());
+        return Err(Errors::NoCap);
     }
 
     let mut proto = None;

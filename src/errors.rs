@@ -1,25 +1,36 @@
+use std::sync::mpsc::RecvTimeoutError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Errors {
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
-    #[error("Image error: {0}")]
-    ImageError(#[from] image::error::ImageError),
-    #[error("Rustix error: {0}")]
-    RustixError(#[from] rustix::io::Errno),
-    #[error("{0}")]
-    Str(&'static str),
+    #[error("Could not detect font size")]
+    NoFontSize,
+    #[error("Could not detect any graphics capabilities")]
+    NoCap,
+    #[error("Timeout: {0}")]
+    Timeout(#[from] RecvTimeoutError),
     #[error("Sixel error: {0}")]
-    CustomError(String),
+    Sixel(String),
+    #[error("Tmux error: {0}")]
+    Tmux(&'static str),
+    #[error("IO error: {0}")]
+    IO(#[from] std::io::Error),
+    #[error("Image error: {0}")]
+    Image(#[from] image::error::ImageError),
 }
 
-impl From<&'static str> for Errors {
-    fn from(s: &'static str) -> Self {
-        Errors::Str(s)
+#[cfg(not(windows))]
+impl From<rustix::io::Errno> for Errors {
+    fn from(errno: rustix::io::Errno) -> Self {
+        Errors::IO(std::io::Error::from(errno))
     }
 }
 
-impl From<Box<dyn std::error::Error>> for Errors {
-    fn from(e: Box<dyn std::error::Error>) -> Self {
-        Errors::CustomError(e.to_string())
+#[cfg(windows)]
+impl From<windows::core::Error> for Errors {
+    fn from(err: windows::core::Error) -> Self {
+        Errors::IO(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            err.to_string(),
+        ))
     }
 }
