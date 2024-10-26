@@ -16,9 +16,9 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
-use ratatui_image::{picker::Picker, protocol::SProtocol, Image, Resize};
+use ratatui_image::{picker::Picker, protocol::Protocol, Image, Resize};
 struct App {
-    image: SProtocol,
+    image: Protocol,
 }
 
 const ASSERT_FONT_SIZE: (u16, u16) = (9, 18);

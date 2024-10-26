@@ -6,17 +6,17 @@ use std::{cmp::min, format, io::Cursor};
 
 use crate::{FontSize, ImageSource, Resize, Result};
 
-use super::{Protocol, StatefulProtocol};
+use super::{ProtocolTrait, StatefulProtocolTrait};
 
 // Fixed sixel protocol
 #[derive(Clone, Default)]
-pub struct FixedIterm2 {
+pub struct Iterm2 {
     pub data: String,
     pub area: Rect,
     pub is_tmux: bool,
 }
 
-impl FixedIterm2 {
+impl Iterm2 {
     pub fn from_source(
         source: &ImageSource,
         font_size: FontSize,
@@ -68,7 +68,7 @@ fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
     ))
 }
 
-impl Protocol for FixedIterm2 {
+impl ProtocolTrait for Iterm2 {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         render(self.area, &self.data, area, buf, false)
     }
@@ -119,28 +119,28 @@ fn render_area(rect: Rect, area: Rect, overdraw: bool) -> Option<Rect> {
 }
 
 #[derive(Clone)]
-pub struct Iterm2State {
+pub struct StatefulIterm2 {
     source: ImageSource,
     font_size: FontSize,
-    current: FixedIterm2,
+    current: Iterm2,
     hash: u64,
 }
 
-impl Iterm2State {
-    pub fn new(source: ImageSource, font_size: FontSize, is_tmux: bool) -> Iterm2State {
-        Iterm2State {
+impl StatefulIterm2 {
+    pub fn new(source: ImageSource, font_size: FontSize, is_tmux: bool) -> StatefulIterm2 {
+        StatefulIterm2 {
             source,
             font_size,
-            current: FixedIterm2 {
+            current: Iterm2 {
                 is_tmux,
-                ..FixedIterm2::default()
+                ..Iterm2::default()
             },
             hash: u64::default(),
         }
     }
 }
 
-impl StatefulProtocol for Iterm2State {
+impl StatefulProtocolTrait for StatefulIterm2 {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }
@@ -161,7 +161,7 @@ impl StatefulProtocol for Iterm2State {
             let is_tmux = self.current.is_tmux;
             match encode(&img, is_tmux) {
                 Ok(data) => {
-                    self.current = FixedIterm2 {
+                    self.current = Iterm2 {
                         data,
                         area: rect,
                         is_tmux,

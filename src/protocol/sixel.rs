@@ -12,7 +12,7 @@ use image::{DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::cmp::min;
 
-use super::{Protocol, StatefulProtocol};
+use super::{ProtocolTrait, StatefulProtocolTrait};
 use crate::{FontSize, ImageSource, Resize, Result};
 
 // Fixed sixel protocol
@@ -91,7 +91,7 @@ fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
     Ok(data)
 }
 
-impl Protocol for Sixel {
+impl ProtocolTrait for Sixel {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         render(self.area, &self.data, area, buf, false)
     }
@@ -175,7 +175,7 @@ impl StatefulSixel {
     }
 }
 
-impl StatefulProtocol for StatefulSixel {
+impl StatefulProtocolTrait for StatefulSixel {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }

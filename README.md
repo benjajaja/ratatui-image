@@ -45,11 +45,11 @@ an image that has been loaded, at a different or same position.
 ## Quick start
 ```rust
 use ratatui::{backend::TestBackend, Terminal, Frame};
-use ratatui_image::{picker::Picker, StatefulImage, protocol::SStatefulProtocol};
+use ratatui_image::{picker::Picker, StatefulImage, protocol::StatefulProtocol};
 
 struct App {
     // We need to hold the render state.
-    image: SStatefulProtocol,
+    image: StatefulProtocol,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -4,7 +4,7 @@
 use image::{imageops::FilterType, DynamicImage, Rgb};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
-use super::{Protocol, StatefulProtocol};
+use super::{ProtocolTrait, StatefulProtocolTrait};
 use crate::{FontSize, ImageSource, Resize, Result};
 
 // Fixed Halfblocks protocol
@@ -80,7 +80,7 @@ fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
     data
 }
 
-impl Protocol for Halfblocks {
+impl ProtocolTrait for Halfblocks {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         for (i, hb) in self.data.iter().enumerate() {
             let x = i as u16 % self.area.width;
@@ -114,7 +114,7 @@ impl StatefulHalfblocks {
     }
 }
 
-impl StatefulProtocol for StatefulHalfblocks {
+impl StatefulProtocolTrait for StatefulHalfblocks {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }

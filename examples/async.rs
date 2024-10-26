@@ -18,7 +18,7 @@ use ratatui::{
 };
 use ratatui_image::{
     picker::Picker,
-    protocol::SStatefulProtocol,
+    protocol::StatefulProtocol,
     thread::{ThreadImage, ThreadProtocol},
     Resize,
 };
@@ -29,7 +29,7 @@ struct App {
 
 enum AppEvent {
     KeyEvent(KeyEvent),
-    Redraw(SStatefulProtocol),
+    Redraw(StatefulProtocol),
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
 
     // Send a [ResizeProtocol] to resize and encode it in a separate thread.
-    let (tx_worker, rec_worker) = mpsc::channel::<(SStatefulProtocol, Resize, Rect)>();
+    let (tx_worker, rec_worker) = mpsc::channel::<(StatefulProtocol, Resize, Rect)>();
 
     // Send UI-events and the [ResizeProtocol] result back to main thread.
     let (tx_main, rec_main) = mpsc::channel();

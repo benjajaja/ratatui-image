@@ -7,7 +7,7 @@ use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::{FontSize, ImageSource, Resize, Result};
 
-use super::{Protocol, StatefulProtocol};
+use super::{ProtocolTrait, StatefulProtocolTrait};
 
 // Fixed Kitty protocol (transmits image data on every render!)
 #[derive(Clone, Default)]
@@ -54,7 +54,7 @@ impl Kitty {
     }
 }
 
-impl Protocol for Kitty {
+impl ProtocolTrait for Kitty {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let mut seq = Some(self.transmit_data.clone());
         render(area, self.area, buf, self.unique_id, &mut seq);
@@ -93,7 +93,7 @@ impl StatefulKitty {
     }
 }
 
-impl StatefulProtocol for StatefulKitty {
+impl StatefulProtocolTrait for StatefulKitty {
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.rect, area, false)
     }

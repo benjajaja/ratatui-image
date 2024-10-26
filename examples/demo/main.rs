@@ -25,7 +25,7 @@ use ratatui::{
 };
 use ratatui_image::{
     picker::Picker,
-    protocol::{SProtocol, SStatefulProtocol},
+    protocol::{Protocol, StatefulProtocol},
     Image, Resize, StatefulImage,
 };
 
@@ -59,9 +59,9 @@ struct App<'a> {
 
     pub picker: Picker,
     pub image_source: DynamicImage,
-    pub image_static: SProtocol,
-    pub image_fit_state: SStatefulProtocol,
-    pub image_crop_state: SStatefulProtocol,
+    pub image_static: Protocol,
+    pub image_fit_state: StatefulProtocol,
+    pub image_crop_state: StatefulProtocol,
 }
 
 fn size() -> Rect {

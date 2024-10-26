@@ -28,11 +28,11 @@
 //! # Quick start
 //! ```rust
 //! use ratatui::{backend::TestBackend, Terminal, Frame};
-//! use ratatui_image::{picker::Picker, StatefulImage, protocol::SStatefulProtocol};
+//! use ratatui_image::{picker::Picker, StatefulImage, protocol::StatefulProtocol};
 //!
 //! struct App {
 //!     // We need to hold the render state.
-//!     image: SStatefulProtocol,
+//!     image: StatefulProtocol,
 //! }
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -108,7 +108,7 @@ use std::{
 };
 
 use image::{imageops, DynamicImage, ImageBuffer, Rgb};
-use protocol::{ImageSource, SProtocol, SStatefulProtocol};
+use protocol::{ImageSource, Protocol, StatefulProtocol};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -132,9 +132,9 @@ pub type FontSize = (u16, u16);
 ///
 /// ```rust
 /// # use ratatui::Frame;
-/// # use ratatui_image::{Resize, Image, protocol::SProtocol};
+/// # use ratatui_image::{Resize, Image, protocol::Protocol};
 /// struct App {
-///     image_static: SProtocol,
+///     image_static: Protocol,
 /// }
 /// fn ui(f: &mut Frame<'_>, app: &mut App) {
 ///     let image = Image::new(&app.image_static);
@@ -142,11 +142,11 @@ pub type FontSize = (u16, u16);
 /// }
 /// ```
 pub struct Image<'a> {
-    image: &'a SProtocol,
+    image: &'a Protocol,
 }
 
 impl<'a> Image<'a> {
-    pub fn new(image: &'a SProtocol) -> Image<'a> {
+    pub fn new(image: &'a Protocol) -> Image<'a> {
         Image { image }
     }
 }
@@ -167,9 +167,9 @@ impl<'a> Widget for Image<'a> {
 ///
 /// ```rust
 /// # use ratatui::Frame;
-/// # use ratatui_image::{Resize, StatefulImage, protocol::{SStatefulProtocol}};
+/// # use ratatui_image::{Resize, StatefulImage, protocol::{StatefulProtocol}};
 /// struct App {
-///     image_state: SStatefulProtocol,
+///     image_state: StatefulProtocol,
 /// }
 /// fn ui(f: &mut Frame<'_>, app: &mut App) {
 ///     let image = StatefulImage::new(None).resize(Resize::Crop(None));
@@ -199,7 +199,7 @@ impl StatefulImage {
 }
 
 impl StatefulWidget for StatefulImage {
-    type State = SStatefulProtocol;
+    type State = StatefulProtocol;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         if area.width == 0 || area.height == 0 {
             return;

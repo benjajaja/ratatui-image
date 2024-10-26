@@ -14,10 +14,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     protocol::{
         halfblocks::{Halfblocks, StatefulHalfblocks},
-        iterm2::{FixedIterm2, Iterm2State},
+        iterm2::{Iterm2, StatefulIterm2},
         kitty::{Kitty, StatefulKitty},
         sixel::{Sixel, StatefulSixel},
-        SProtocol, SStatefulProtocol,
+        Protocol, StatefulProtocol,
     },
     FontSize, ImageSource, Resize, Result,
 };
@@ -150,17 +150,17 @@ impl Picker {
         image: DynamicImage,
         size: Rect,
         resize: Resize,
-    ) -> Result<SProtocol> {
+    ) -> Result<Protocol> {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
-            ProtocolType::Halfblocks => Ok(SProtocol::Halfblocks(Halfblocks::from_source(
+            ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::from_source(
                 &source,
                 self.font_size,
                 resize,
                 self.background_color,
                 size,
             )?)),
-            ProtocolType::Sixel => Ok(SProtocol::Sixel(Sixel::from_source(
+            ProtocolType::Sixel => Ok(Protocol::Sixel(Sixel::from_source(
                 &source,
                 self.font_size,
                 resize,
@@ -170,7 +170,7 @@ impl Picker {
             )?)),
             ProtocolType::Kitty => {
                 self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
-                Ok(SProtocol::Kitty(Kitty::from_source(
+                Ok(Protocol::Kitty(Kitty::from_source(
                     &source,
                     self.font_size,
                     resize,
@@ -180,7 +180,7 @@ impl Picker {
                     self.is_tmux,
                 )?))
             }
-            ProtocolType::Iterm2 => Ok(SProtocol::ITerm2(FixedIterm2::from_source(
+            ProtocolType::Iterm2 => Ok(Protocol::ITerm2(Iterm2::from_source(
                 &source,
                 self.font_size,
                 resize,
@@ -192,18 +192,18 @@ impl Picker {
     }
 
     /// Returns a new *stateful* protocol for [`crate::StatefulImage`] widgets.
-    pub fn new_resize_protocol(&mut self, image: DynamicImage) -> SStatefulProtocol {
+    pub fn new_resize_protocol(&mut self, image: DynamicImage) -> StatefulProtocol {
         let source = ImageSource::new(image, self.font_size);
         match self.protocol_type {
             ProtocolType::Halfblocks => {
-                SStatefulProtocol::Halfblocks(StatefulHalfblocks::new(source, self.font_size))
+                StatefulProtocol::Halfblocks(StatefulHalfblocks::new(source, self.font_size))
             }
             ProtocolType::Sixel => {
-                SStatefulProtocol::Sixel(StatefulSixel::new(source, self.font_size, self.is_tmux))
+                StatefulProtocol::Sixel(StatefulSixel::new(source, self.font_size, self.is_tmux))
             }
             ProtocolType::Kitty => {
                 self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
-                SStatefulProtocol::Kitty(StatefulKitty::new(
+                StatefulProtocol::Kitty(StatefulKitty::new(
                     source,
                     self.font_size,
                     self.kitty_counter,
@@ -211,7 +211,7 @@ impl Picker {
                 ))
             }
             ProtocolType::Iterm2 => {
-                SStatefulProtocol::ITerm2(Iterm2State::new(source, self.font_size, self.is_tmux))
+                StatefulProtocol::ITerm2(StatefulIterm2::new(source, self.font_size, self.is_tmux))
             }
         }
     }

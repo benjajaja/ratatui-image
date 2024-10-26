@@ -11,7 +11,7 @@ use ratatui::{
     widgets::StatefulWidget,
 };
 
-use crate::{protocol::SStatefulProtocol, Resize};
+use crate::{protocol::StatefulProtocol, Resize};
 
 /// A widget that uses a custom ThreadProtocol as state to offload resizing and encoding to a
 /// background thread.
@@ -63,21 +63,21 @@ impl StatefulWidget for ThreadImage {
 /// Has `inner` [ResizeProtocol] that is sent off to the `tx` mspc channel to do the
 /// `resize_encode()` work.
 pub struct ThreadProtocol {
-    inner: Option<SStatefulProtocol>,
-    tx: Sender<(SStatefulProtocol, Resize, Rect)>,
+    inner: Option<StatefulProtocol>,
+    tx: Sender<(StatefulProtocol, Resize, Rect)>,
 }
 
 impl ThreadProtocol {
     pub fn new(
-        tx: Sender<(SStatefulProtocol, Resize, Rect)>,
-        inner: SStatefulProtocol,
+        tx: Sender<(StatefulProtocol, Resize, Rect)>,
+        inner: StatefulProtocol,
     ) -> ThreadProtocol {
         ThreadProtocol {
             inner: Some(inner),
             tx,
         }
     }
-    pub fn set_protocol(&mut self, proto: SStatefulProtocol) {
+    pub fn set_protocol(&mut self, proto: StatefulProtocol) {
         self.inner = Some(proto);
     }
 }
