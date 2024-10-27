@@ -18,6 +18,7 @@ pub enum Response {
 pub enum Capability {
     Kitty,
     Sixel,
+    RectangularOps,
     CellSize(Option<(u16, u16)>),
     Status, // Might as well call this "End" internally.
 }
@@ -26,6 +27,15 @@ pub enum Capability {
 pub struct DeviceAttributeResponse {
     pub sixel: bool,
     pub rectangular_ops: bool,
+}
+
+impl Default for Parser {
+    fn default() -> Self {
+        Parser {
+            data: String::new(),
+            sequence: Response::Unknown,
+        }
+    }
 }
 
 impl Parser {
@@ -91,19 +101,18 @@ impl Parser {
             }
             Response::DeviceAttributes => match next {
                 'c' => {
-                    let caps: Vec<&str> = (self.data[2..]).split(';').collect();
-                    eprintln!("caps: {caps:?}");
-                    let mut is_sixel = false;
-                    let mut rectangular = false;
-                    for cap in caps {
+                    let mut caps = vec![];
+                    let inner: Vec<&str> = (self.data[2..]).split(';').collect();
+                    eprintln!("caps: {inner:?}");
+                    for cap in inner {
                         match cap {
-                            "4" => is_sixel = true,
-                            "28" => rectangular = true,
+                            "4" => caps.push(Capability::Sixel),
+                            "28" => caps.push(Capability::RectangularOps),
                             _ => {}
                         }
                     }
                     self.restart();
-                    return vec![Capability::Sixel(is_sixel)];
+                    return caps;
                 }
                 '\x1b' => {
                     return self.restart();
@@ -180,8 +189,8 @@ mod tests {
                 "all",
                 "\x1b_Gi=31;OK\x1b\\\x1b[?64;4c\x1b[6;7;14t\x1b[0n",
                 vec![
-                    Capability::Kitty(true),
-                    Capability::Sixel(true),
+                    Capability::Kitty,
+                    Capability::Sixel,
                     Capability::CellSize(Some((14, 7))),
                     Capability::Status,
                 ],
@@ -190,16 +199,12 @@ mod tests {
             (
                 "preceding garbage",
                 "\x1bgarbage...\x1b[?64;5c\x1b[0n",
-                vec![Capability::Sixel(false), Capability::Status],
+                vec![Capability::Status],
             ),
             (
                 "inner garbage",
                 "\x1b[6;7;14t\x1bgarbage...\x1b[?64;5c\x1b[0n",
-                vec![
-                    Capability::CellSize(Some((14, 7))),
-                    Capability::Sixel(false),
-                    Capability::Status,
-                ],
+                vec![Capability::CellSize(Some((14, 7))), Capability::Status],
             ),
         ] {
             let mut parser = Parser::new();

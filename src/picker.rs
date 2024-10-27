@@ -399,9 +399,9 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
 
     let mut proto = None;
     let mut font_size = None;
-    if capabilities.contains(&Capability::Kitty(true)) {
+    if capabilities.contains(&Capability::Kitty) {
         proto = Some(ProtocolType::Kitty);
-    } else if capabilities.contains(&Capability::Sixel(true)) {
+    } else if capabilities.contains(&Capability::Sixel) {
         proto = Some(ProtocolType::Sixel);
     }
 
