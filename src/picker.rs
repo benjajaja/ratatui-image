@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use cap_parser::{Capability, Parser};
 use image::{DynamicImage, Rgba};
 use ratatui::layout::Rect;
 #[cfg(feature = "serde")]
@@ -22,6 +23,8 @@ use crate::{
     },
     FontSize, ImageSource, Resize, Result,
 };
+
+pub mod cap_parser;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Picker {
@@ -357,12 +360,6 @@ fn font_size_fallback() -> Option<FontSize> {
 }
 
 fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
-    let (start, escape, end) = if is_tmux {
-        ("\x1bPtmux;", "\x1b\x1b", "\x1b\\")
-    } else {
-        ("", "\x1b", "")
-    };
-
     // Send several control sequences at once:
     // `_Gi=...`: Kitty graphics support.
     // `[c`: Capabilities including sixels.
@@ -370,7 +367,7 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     // `[1337n`: iTerm2 (some terminals implement the protocol but sadly not this custom CSI)
     // `[5n`: Device Status Report, implemented by all terminals, ensure that there is some
     // response and we don't hang reading forever.
-    let query = format!("{start}{escape}_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA{escape}\\{escape}[c{escape}[16t{escape}[1337n{escape}[5n{end}");
+    let query = Parser::query(is_tmux);
     io::stdout().write_all(query.as_bytes())?;
     io::stdout().flush()?;
 
@@ -382,12 +379,11 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
         match result {
             Ok(read) => {
                 for ch in charbuf.iter().take(read) {
-                    if let Some(cap) = parser.push(char::from(*ch)) {
-                        if cap == ParsedResponse::Status {
-                            break 'out;
-                        } else {
-                            capabilities.push(cap);
-                        }
+                    let mut more_caps = parser.push(char::from(*ch));
+                    if more_caps[..] == [Capability::Status] {
+                        break 'out;
+                    } else {
+                        capabilities.append(&mut more_caps);
                     }
                 }
             }
@@ -403,14 +399,14 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
 
     let mut proto = None;
     let mut font_size = None;
-    if capabilities.contains(&ParsedResponse::Kitty(true)) {
+    if capabilities.contains(&Capability::Kitty(true)) {
         proto = Some(ProtocolType::Kitty);
-    } else if capabilities.contains(&ParsedResponse::Sixel(true)) {
+    } else if capabilities.contains(&Capability::Sixel(true)) {
         proto = Some(ProtocolType::Sixel);
     }
 
     for cap in capabilities {
-        if let ParsedResponse::CellSize(Some((w, h))) = cap {
+        if let Capability::CellSize(Some((w, h))) = cap {
             font_size = Some((w, h));
         }
     }
@@ -418,123 +414,6 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     font_size = font_size.or_else(font_size_fallback);
 
     Ok((proto, font_size))
-}
-
-struct Parser {
-    data: String,
-    sequence: ParsedResponse,
-}
-
-#[derive(Debug, PartialEq)]
-enum ParsedResponse {
-    Unknown,
-    Kitty(bool),
-    Sixel(bool),
-    CellSize(Option<(u16, u16)>),
-    Status,
-}
-
-impl Parser {
-    pub fn new() -> Self {
-        Parser {
-            data: String::new(),
-            sequence: ParsedResponse::Unknown,
-        }
-    }
-    pub fn push(&mut self, next: char) -> Option<ParsedResponse> {
-        match self.sequence {
-            ParsedResponse::Unknown => {
-                match (&self.data[..], next) {
-                    (_, '\x1b') => {
-                        // If the current sequence hasn't been identified yet, start a new one on Esc.
-                        return self.restart();
-                    }
-                    ("[", '?') => {
-                        self.sequence = ParsedResponse::Sixel(false);
-                    }
-                    ("_Gi=31", ';') => {
-                        self.sequence = ParsedResponse::Kitty(false);
-                    }
-                    ("[6", ';') => {
-                        self.sequence = ParsedResponse::CellSize(None);
-                    }
-                    ("[", '0') => {
-                        self.sequence = ParsedResponse::Status;
-                    }
-                    _ => {}
-                };
-                self.data.push(next);
-            }
-            ParsedResponse::Sixel(_) => match next {
-                'c' => {
-                    // This is just easier than actually parsing the string.
-                    let is_sixel = self.data.contains(";4;")
-                        || self.data.contains("?4;")
-                        || self.data.ends_with(";4")
-                        || self.data.ends_with("?4");
-                    self.data = String::new();
-                    self.sequence = ParsedResponse::Unknown;
-                    return Some(ParsedResponse::Sixel(is_sixel));
-                }
-                '\x1b' => {
-                    return self.restart();
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
-
-            ParsedResponse::Kitty(_) => match next {
-                '\\' => {
-                    let is_kitty = self.data == "_Gi=31;OK\x1b";
-                    self.data = String::new();
-                    self.sequence = ParsedResponse::Unknown;
-                    return Some(ParsedResponse::Kitty(is_kitty));
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
-
-            ParsedResponse::CellSize(_) => match next {
-                't' => {
-                    let mut cell_size = None;
-                    let inner: Vec<&str> = self.data.split(';').collect();
-                    if let [_, h, w] = inner[..] {
-                        if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
-                            if w > 0 && h > 0 {
-                                cell_size = Some((w, h));
-                            }
-                        }
-                    }
-                    self.data = String::new();
-                    self.sequence = ParsedResponse::Unknown;
-                    return Some(ParsedResponse::CellSize(cell_size));
-                }
-                '\x1b' => {
-                    return self.restart();
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
-            ParsedResponse::Status => match next {
-                'n' => return Some(ParsedResponse::Status),
-                '\x1b' => {
-                    return self.restart();
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
-        };
-        None
-    }
-    fn restart(&mut self) -> Option<ParsedResponse> {
-        self.data = String::new();
-        self.sequence = ParsedResponse::Unknown;
-        None
-    }
 }
 
 fn query_with_timeout(
@@ -567,7 +446,7 @@ fn query_with_timeout(
 mod tests {
     use std::assert_eq;
 
-    use crate::picker::{ParsedResponse, Parser, Picker, ProtocolType};
+    use crate::picker::{Picker, ProtocolType};
 
     #[test]
     fn test_cycle_protocol() {
@@ -585,45 +464,5 @@ mod tests {
     #[test]
     fn test_from_query_stdio_no_hang() {
         let _ = Picker::from_query_stdio();
-    }
-
-    #[test]
-    fn test_parse_all() {
-        for (name, str, expected) in vec![
-            (
-                "all",
-                "\x1b_Gi=31;OK\x1b\\\x1b[?64;4c\x1b[6;7;14t\x1b[0n",
-                vec![
-                    ParsedResponse::Kitty(true),
-                    ParsedResponse::Sixel(true),
-                    ParsedResponse::CellSize(Some((14, 7))),
-                    ParsedResponse::Status,
-                ],
-            ),
-            ("only garbage", "\x1bhonkey\x1btonkey\x1b[42\x1b\\", vec![]),
-            (
-                "preceding garbage",
-                "\x1bgarbage...\x1b[?64;5c\x1b[0n",
-                vec![ParsedResponse::Sixel(false), ParsedResponse::Status],
-            ),
-            (
-                "inner garbage",
-                "\x1b[6;7;14t\x1bgarbage...\x1b[?64;5c\x1b[0n",
-                vec![
-                    ParsedResponse::CellSize(Some((14, 7))),
-                    ParsedResponse::Sixel(false),
-                    ParsedResponse::Status,
-                ],
-            ),
-        ] {
-            let mut parser = Parser::new();
-            let mut caps = vec![];
-            for ch in str.chars() {
-                if let Some(cap) = parser.push(ch) {
-                    caps.push(cap);
-                }
-            }
-            assert_eq!(caps, expected, "{name}");
-        }
     }
 }
