@@ -70,7 +70,7 @@ fn size() -> Rect {
 
 impl<'a> App<'a> {
     pub fn new<B: Backend>(title: &'a str, _: &mut Terminal<B>) -> App<'a> {
-        let ada = "./assets/Ada.png";
+        let ada = "./assets/NixOS.png";
         let image_source = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
         let mut picker = Picker::from_query_stdio().unwrap();
