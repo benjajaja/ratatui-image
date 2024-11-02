@@ -49,6 +49,7 @@ trait StatefulProtocolTrait: Send + Sync {
 }
 
 /// A fixed-size image protocol for the [crate::Image] widget.
+#[derive(Clone)]
 pub enum Protocol {
     Halfblocks(Halfblocks),
     Sixel(Sixel),
@@ -71,6 +72,7 @@ impl Protocol {
 ///
 /// The [create::thread::ThreadImage] widget also uses this, and is the reason why resizing is
 /// split from rendering.
+#[derive(Clone)]
 pub enum StatefulProtocol {
     Halfblocks(StatefulHalfblocks),
     Sixel(StatefulSixel),
