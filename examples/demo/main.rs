@@ -214,7 +214,9 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     let block_left_top = Block::default().borders(Borders::ALL).title("Fixed");
     let area = block_left_top.inner(left_chunks[0]);
     f.render_widget(
-        Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
+        Paragraph::new(app.background.as_str())
+            .style(Color::Yellow)
+            .wrap(Wrap { trim: true }),
         area,
     );
     f.render_widget(block_left_top, left_chunks[0]);
@@ -222,7 +224,14 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         ShowImages::Resized => {}
         _ => {
             let image = Image::new(&app.image_static);
-            f.render_widget(image, area);
+            // Let it be surrounded by styled text.
+            let offset_area = Rect {
+                x: area.x + 2,
+                y: area.y + 2,
+                width: area.width.saturating_sub(2),
+                height: area.height.saturating_sub(2),
+            };
+            f.render_widget(image, offset_area);
         }
     }
 
@@ -261,7 +270,10 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     );
     f.render_widget(block_middle_bottom, chunks_left_bottom[1]);
 
-    let block_right_top = Block::default().borders(Borders::ALL).title("Fit");
+    let block_right_top = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Color::Blue)
+        .title("Fit");
     let area = block_right_top.inner(right_chunks[0]);
     f.render_widget(
         Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),

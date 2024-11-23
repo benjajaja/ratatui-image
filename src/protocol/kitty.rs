@@ -146,6 +146,9 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<St
     for y in 0..(area.height.min(rect.height)) {
         let mut symbol = seq.take().unwrap_or_default();
 
+        // Save cursor postion, including fg color which is what we want.
+        symbol.push_str("\x1b[s");
+
         // Start unicode placeholder sequence
         symbol.push_str(&id_color);
         add_placeholder(&mut symbol, 0, y, id_extra);
@@ -158,7 +161,13 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<St
             buf.cell_mut((area.left() + x, area.top() + y))
                 .map(|cell| cell.set_skip(true));
         }
-        symbol.push_str("\x1b[39m"); // Reset the background color
+
+        // Restore saved cursor position including color, and now we have to move back to
+        // the end of the area.
+        let right = area.width - 1;
+        let down = area.height - 1;
+        symbol.push_str(&format!("\x1b[u\x1b[{right}C\x1b[{down}B"));
+
         buf.cell_mut((area.left(), area.top() + y))
             .map(|cell| cell.set_symbol(&symbol));
     }
