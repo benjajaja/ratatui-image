@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn ui(f: &mut Frame<'_>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(6), Constraint::Min(1)].as_ref())
+        .constraints([Constraint::Max(5), Constraint::Min(1)].as_ref())
         .split(f.area());
 
     let block_top = Block::default()
@@ -112,7 +112,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         .title("ratatui-image");
     let lines = vec![
         Line::from(format!(
-            "Terminal: {:?}, font size: {:?}",
+            "Protocol: {:?}, font size: {:?}",
             app.picker.protocol_type(),
             app.picker.font_size(),
         )),
