@@ -221,6 +221,10 @@ pub enum Resize {
     ///
     /// The [CropOptions] defaults to clipping the bottom and the right sides.
     Crop(Option<CropOptions>),
+    /// Scale the image
+    ///
+    /// Same as `Resize::Fit` except it resizes the image even if the image is smaller than the render area
+    Scale(Option<FilterType>),
 }
 
 impl Default for Resize {
@@ -278,7 +282,11 @@ impl Resize {
     ) -> Option<Rect> {
         let desired = image.area;
         // Check if resize is needed at all.
-        if desired.width <= area.width && desired.height <= area.height && desired == current {
+        if !matches!(self, &Resize::Scale(_))
+            && desired.width <= area.width
+            && desired.height <= area.height
+            && desired == current
+        {
             let width = (desired.width * font_size.0) as u32;
             let height = (desired.height * font_size.1) as u32;
             if !force && (image.image.width() == width || image.image.height() == height) {
@@ -294,52 +302,54 @@ impl Resize {
     }
 
     fn resize_image(&self, source: &ImageSource, width: u32, height: u32) -> DynamicImage {
-        static DEFAULT_FILTER_TYPE: FilterType = FilterType::Nearest;
-        static DEFAULT_CROP_OPTIONS: CropOptions = CropOptions {
+        const DEFAULT_FILTER_TYPE: FilterType = FilterType::Nearest;
+        const DEFAULT_CROP_OPTIONS: CropOptions = CropOptions {
             clip_top: false,
             clip_left: false,
         };
+        let image = &source.image;
         match self {
-            Self::Fit(filter_type) => {
-                source
-                    .image
-                    .resize(width, height, filter_type.unwrap_or(DEFAULT_FILTER_TYPE))
+            Self::Fit(filter_type) | Self::Scale(filter_type) => {
+                image.resize(width, height, filter_type.unwrap_or(DEFAULT_FILTER_TYPE))
             }
             Self::Crop(options) => {
                 let options = options.as_ref().unwrap_or(&DEFAULT_CROP_OPTIONS);
                 let y = if options.clip_top {
-                    source.image.height().saturating_sub(height)
+                    image.height().saturating_sub(height)
                 } else {
                     0
                 };
                 let x = if options.clip_left {
-                    source.image.width().saturating_sub(width)
+                    image.width().saturating_sub(width)
                 } else {
                     0
                 };
-                source.image.crop_imm(x, y, width, height)
+                image.crop_imm(x, y, width, height)
             }
         }
     }
 
     fn needs_resize_rect(&self, desired: Rect, area: Rect) -> Rect {
-        match self {
-            Self::Fit(_) => {
-                let (width, height) = resize_pixels(
-                    desired.width,
-                    desired.height,
-                    min(area.width, desired.width),
-                    min(area.height, desired.height),
-                );
-                Rect::new(0, 0, width, height)
-            }
-            Self::Crop(_) => Rect::new(
-                0,
-                0,
-                min(desired.width, area.width),
-                min(desired.height, area.height),
+        let (width, height) = match self {
+            Self::Fit(_) => resize_pixels(
+                desired.width,
+                desired.height,
+                min(area.width, desired.width) as u16,
+                min(area.height, desired.height) as u16,
             ),
-        }
+
+            Self::Crop(_) => (
+                min(desired.width, area.width) as u16,
+                min(desired.height, area.height) as u16,
+            ),
+            Self::Scale(_) => resize_pixels(
+                desired.width,
+                desired.height,
+                max(area.width, desired.width) as u16,
+                max(area.height, desired.height) as u16,
+            ),
+        };
+        Rect::new(0, 0, width, height)
     }
 }
 
