@@ -18,8 +18,8 @@ use image::DynamicImage;
 use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
-    text::Line,
+    style::{Color, Style, Styled, Stylize},
+    text::{Line, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
@@ -28,6 +28,7 @@ use ratatui_image::{
     protocol::{Protocol, StatefulProtocol},
     Image, Resize, StatefulImage,
 };
+use rustix::path::Arg;
 
 fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "crossterm")]
@@ -212,23 +213,12 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         .split(outer_block.inner(f.area()));
     f.render_widget(outer_block, f.area());
 
-    let left_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(chunks[0]);
-    let right_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(chunks[1]);
+    let left_chunks = vertical_layout().split(chunks[0]);
+    let right_chunks = vertical_layout().split(chunks[1]);
 
-    let block_left_top = Block::default().borders(Borders::ALL).title("Fixed");
+    let block_left_top = block("Fixed");
     let area = block_left_top.inner(left_chunks[0]);
-    f.render_widget(
-        Paragraph::new(app.background.as_str())
-            .style(Color::Yellow)
-            .wrap(Wrap { trim: true }),
-        area,
-    );
+    f.render_widget(paragraph(app.background.as_str().style(Color::Yellow), area));
     f.render_widget(block_left_top, left_chunks[0]);
     match app.show_images {
         ShowImages::Resized => {}
@@ -250,12 +240,10 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(left_chunks[1]);
 
-    let block_left_bottom = Block::default().borders(Borders::ALL).title("Crop");
+    let block_left_bottom = block("Crop");
     let area = block_left_bottom.inner(chunks_left_bottom[0]);
     f.render_widget(
-        Paragraph::new(app.background.as_str())
-            .wrap(Wrap { trim: true })
-            .style(Style::new().bg(Color::Green)),
+        paragraph(app.background.as_str()).style(Style::new().bg(Color::Green)),
         area,
     );
     match app.show_images {
@@ -271,24 +259,23 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     }
     f.render_widget(block_left_bottom, chunks_left_bottom[0]);
 
-    let block_middle_bottom = Block::default().borders(Borders::ALL).title("Placeholder");
+    let block_middle_bottom = block("Placeholder");
     f.render_widget(
-        Paragraph::new(app.background.as_str())
-            .wrap(Wrap { trim: true })
-            .style(Style::new().bg(Color::Blue)),
+        paragraph(app.background.as_str()).style(Style::new().bg(Color::Blue)),
         block_middle_bottom.inner(chunks_left_bottom[1]),
     );
     f.render_widget(block_middle_bottom, chunks_left_bottom[1]);
 
+<<<<<<< HEAD
     let block_right_top = Block::default()
         .borders(Borders::ALL)
         .border_style(Color::Blue)
         .title("Fit");
+=======
+    let block_right_top = block("Fit");
+>>>>>>> f947fb4 (refactor(demo): simplify ui function which is required for updating the demo)
     let area = block_right_top.inner(right_chunks[0]);
-    f.render_widget(
-        Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
-        area,
-    );
+    f.render_widget(paragraph(app.background.as_str()), area);
     match app.show_images {
         ShowImages::Fixed => {}
         _ => {
@@ -302,10 +289,10 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     }
     f.render_widget(block_right_top, right_chunks[0]);
 
-    let block_right_bottom = Block::default().borders(Borders::ALL).title("Help");
+    let block_right_bottom = block("Help");
     let area = block_right_bottom.inner(right_chunks[1]);
     f.render_widget(
-        Paragraph::new(vec![
+        paragraph(vec![
             Line::from("Key bindings:"),
             Line::from("H/L: resize"),
             Line::from(format!(
@@ -315,9 +302,22 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
             Line::from("o: cycle image"),
             Line::from(format!("t: toggle ({:?})", app.show_images)),
             Line::from(format!("Font size: {:?}", app.picker.font_size())),
-        ])
-        .wrap(Wrap { trim: true }),
+        ]),
         area,
     );
     f.render_widget(block_right_bottom, right_chunks[1]);
+}
+
+fn paragraph<'a, T: Into<Text<'a>>>(str: T) -> Paragraph<'a> {
+    Paragraph::new(str).wrap(Wrap { trim: true })
+}
+
+fn vertical_layout() -> Layout {
+    Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+}
+
+fn block(name: &str) -> Block<'_> {
+    Block::default().borders(Borders::ALL).title(name)
 }
