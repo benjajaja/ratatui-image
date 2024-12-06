@@ -190,9 +190,9 @@ impl App {
             .picker
             .new_protocol(self.image_source.clone(), size(), Resize::Fit(None))
             .unwrap();
-
         self.image_fit_state = self.picker.new_resize_protocol(self.image_source.clone());
-        self.image_crop_state = self.picker.new_resize_protocol(self.image_source.clone());
+        self.image_crop_state = self.image_fit_state.clone();
+        self.image_scale_state = self.image_fit_state.clone();
     }
 
     pub fn on_tick(&mut self) {}
