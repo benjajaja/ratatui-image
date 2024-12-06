@@ -59,9 +59,9 @@
 //!
 //! fn ui(f: &mut Frame<'_>, app: &mut App) {
 //!     // The image widget.
-//!     let image = StatefulImage::new(None);
+//!     let image = StatefulImage::default();
 //!     // Render with the protocol state.
-//!     f.render_stateful_widget(image, f.size(), &mut app.image);
+//!     f.render_stateful_widget(image, f.area(), &mut app.image);
 //! }
 //! ```
 //!
@@ -170,24 +170,20 @@ impl<'a> Widget for Image<'a> {
 ///     image_state: StatefulProtocol,
 /// }
 /// fn ui(f: &mut Frame<'_>, app: &mut App) {
-///     let image = StatefulImage::new(None).resize(Resize::Crop(None));
+///     let image = StatefulImage::default().resize(Resize::Crop(None));
 ///     f.render_stateful_widget(
 ///         image,
-///         f.size(),
+///         f.area(),
 ///         &mut app.image_state,
 ///     );
 /// }
 /// ```
+#[derive(Default)]
 pub struct StatefulImage {
     resize: Resize,
 }
 
 impl StatefulImage {
-    pub fn new() -> StatefulImage {
-        StatefulImage {
-            resize: Resize::Fit(None),
-        }
-    }
     pub fn resize(mut self, resize: Resize) -> StatefulImage {
         self.resize = resize;
         self
@@ -225,6 +221,12 @@ pub enum Resize {
     ///
     /// The [CropOptions] defaults to clipping the bottom and the right sides.
     Crop(Option<CropOptions>),
+}
+
+impl Default for Resize {
+    fn default() -> Self {
+        Resize::Fit(None)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -379,7 +381,7 @@ mod tests {
     fn s(w: u16, h: u16) -> ImageSource {
         let image: DynamicImage =
             ImageBuffer::from_pixel(w as _, h as _, Rgba::<u8>([255, 0, 0, 255])).into();
-        ImageSource::new(image, FONT_SIZE, Rgba::<u8>([0, 0, 0, 0]).into())
+        ImageSource::new(image, FONT_SIZE, [0, 0, 0, 0].into())
     }
 
     fn r(w: u16, h: u16) -> Rect {

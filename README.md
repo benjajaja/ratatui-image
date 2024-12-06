@@ -76,9 +76,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn ui(f: &mut Frame<'_>, app: &mut App) {
     // The image widget.
-    let image = StatefulImage::new(None);
+    let image = StatefulImage::default();
     // Render with the protocol state.
-    f.render_stateful_widget(image, f.size(), &mut app.image);
+    f.render_stateful_widget(image, f.area(), &mut app.image);
 }
 ```
 

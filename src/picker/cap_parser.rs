@@ -105,7 +105,6 @@ impl Parser {
                 'c' => {
                     let mut caps = vec![];
                     let inner: Vec<&str> = (self.data[2..]).split(';').collect();
-                    eprintln!("caps: {inner:?}");
                     for cap in inner {
                         match cap {
                             "4" => caps.push(Capability::Sixel),
