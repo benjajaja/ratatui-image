@@ -81,7 +81,7 @@ jobs:
         # xwd is in x11-apps, convert seems to be installed
         run: sudo apt-get install -y x11-apps xterm
       - name: Screenshot
-        run: cargo make screenshot-xvfb
+        run: cargo make screenshot-xvfb && test -f ./target/screenshot_xterm.png
       - name: Upload screenshot
         uses: actions/upload-artifact@v4
         with:
