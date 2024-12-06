@@ -45,13 +45,15 @@ impl Parser {
             sequence: Response::Unknown,
         }
     }
+    // Tmux requires escapes to be escaped, and some special start/end sequences.
+    pub fn escape_tmux(is_tmux: bool) -> (&'static str, &'static str, &'static str) {
+        match is_tmux {
+            false => ("", "\x1b", ""),
+            true => ("\x1bPtmux;", "\x1b\x1b", "\x1b\\"),
+        }
+    }
     pub fn query(is_tmux: bool) -> String {
-        // Tmux requires escapes to be escaped, and some special start/end sequences.
-        let (start, escape, end) = if !is_tmux {
-            ("", "\x1b", "")
-        } else {
-            ("\x1bPtmux;", "\x1b\x1b", "\x1b\\")
-        };
+        let (start, escape, end) = Parser::escape_tmux(is_tmux);
 
         let mut buf = String::with_capacity(100);
         buf.push_str(start);

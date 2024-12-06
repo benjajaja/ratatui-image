@@ -70,7 +70,7 @@ fn size() -> Rect {
 
 impl<'a> App<'a> {
     pub fn new<B: Backend>(title: &'a str, _: &mut Terminal<B>) -> App<'a> {
-        let ada = "./assets/NixOS.png";
+        let ada = "./assets/Ada.png";
         let image_source = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
         let mut picker = Picker::from_query_stdio().unwrap();
@@ -138,6 +138,7 @@ impl<'a> App<'a> {
             'o' => {
                 let path = match self.image_source_path.to_str() {
                     Some("./assets/Ada.png") => "./assets/Jenkins.jpg",
+                    Some("./assets/Jenkins.jpg") => "./assets/NixOS.png",
                     _ => "./assets/Ada.png",
                 };
                 self.image_source = image::io::Reader::open(path).unwrap().decode().unwrap();
@@ -226,8 +227,8 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
             let image = Image::new(&mut app.image_static);
             // Let it be surrounded by styled text.
             let offset_area = Rect {
-                x: area.x + 2,
-                y: area.y + 2,
+                x: area.x + 1,
+                y: area.y + 1,
                 width: area.width.saturating_sub(2),
                 height: area.height.saturating_sub(2),
             };

@@ -6,8 +6,7 @@
 //! [supports]: https://arewesixelyet.com
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel
 use icy_sixel::{
-    dither::sixel_dither, output::sixel_output, DiffusionMethod, EncodePolicy, MethodForLargest,
-    MethodForRep, PixelFormat, Quality, SixelResult,
+    sixel_string, DiffusionMethod, MethodForLargest, MethodForRep, PixelFormat, Quality,
 };
 use image::{DynamicImage, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
@@ -91,53 +90,6 @@ fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
         return Ok(data_tmux);
     }
     Ok(data)
-}
-
-/// Copied over from icy_sixel::sixel_string so that we can try sixel_dither::set_transparent().
-/// We also set the prefix to allow transparency in general.
-#[allow(clippy::too_many_arguments)]
-fn sixel_string(
-    bytes: &[u8],
-    width: i32,
-    height: i32,
-    pixelformat: PixelFormat,
-    method_for_diffuse: DiffusionMethod,
-    method_for_largest: MethodForLargest,
-    method_for_rep: MethodForRep,
-    quality_mode: Quality,
-) -> SixelResult<String> {
-    let mut sixel_data: Vec<u8> = Vec::new();
-
-    let mut sixel_output = sixel_output::new(&mut sixel_data);
-    sixel_output.set_encode_policy(EncodePolicy::AUTO);
-    let mut sixel_dither = sixel_dither::new(256).unwrap();
-
-    sixel_dither.initialize(
-        bytes,
-        width,
-        height,
-        pixelformat,
-        method_for_largest,
-        method_for_rep,
-        quality_mode,
-    )?;
-    sixel_dither.set_pixelformat(pixelformat);
-    sixel_dither.set_diffusion_type(method_for_diffuse);
-
-    // TODO: this just sets a random color to transparent. This works, but what we want is that any
-    // transparent pixel in `bytes` gets that color assigned, which is not the case.
-    sixel_dither.set_transparent(0);
-
-    let mut bytes = bytes.to_vec();
-    sixel_output.encode(&mut bytes, width, height, 0, &mut sixel_dither)?;
-
-    let mut str = String::from_utf8_lossy(&sixel_data).to_string();
-    if str.strip_prefix("\x1bPq").is_some() {
-        // This adds transparency support, but I am not exactly sure what the values mean.
-        // Some reference: https://jexer.sourceforge.io/sixel.html
-        str = format!("\x1bP0;1;0q{str}");
-    }
-    Ok(str)
 }
 
 impl ProtocolTrait for Sixel {
