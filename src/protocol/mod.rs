@@ -26,7 +26,7 @@ pub mod sixel;
 
 trait ProtocolTrait: Send + Sync {
     /// Render the currently resized and encoded data to the buffer.
-    fn render(&self, area: Rect, buf: &mut Buffer);
+    fn render(&mut self, area: Rect, buf: &mut Buffer);
 }
 
 trait StatefulProtocolTrait: Send + Sync {
@@ -57,8 +57,8 @@ pub enum Protocol {
     ITerm2(Iterm2),
 }
 impl Protocol {
-    pub(crate) fn render(&self, area: Rect, buf: &mut Buffer) {
-        let inner: &dyn ProtocolTrait = match self {
+    pub(crate) fn render(&mut self, area: Rect, buf: &mut Buffer) {
+        let inner: &mut dyn ProtocolTrait = match self {
             Self::Halfblocks(halfblocks) => halfblocks,
             Self::Sixel(sixel) => sixel,
             Self::Kitty(kitty) => kitty,

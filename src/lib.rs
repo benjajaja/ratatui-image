@@ -135,16 +135,16 @@ pub type FontSize = (u16, u16);
 ///     image_static: Protocol,
 /// }
 /// fn ui(f: &mut Frame<'_>, app: &mut App) {
-///     let image = Image::new(&app.image_static);
+///     let image = Image::new(&mut app.image_static);
 ///     f.render_widget(image, f.size());
 /// }
 /// ```
 pub struct Image<'a> {
-    image: &'a Protocol,
+    image: &'a mut Protocol,
 }
 
 impl<'a> Image<'a> {
-    pub fn new(image: &'a Protocol) -> Image<'a> {
+    pub fn new(image: &'a mut Protocol) -> Image<'a> {
         Image { image }
     }
 }

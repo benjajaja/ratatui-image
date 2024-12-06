@@ -81,7 +81,7 @@ fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
 }
 
 impl ProtocolTrait for Halfblocks {
-    fn render(&self, area: Rect, buf: &mut Buffer) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
         for (i, hb) in self.data.iter().enumerate() {
             let x = i as u16 % self.area.width;
             let y = i as u16 / self.area.width;
@@ -139,6 +139,6 @@ impl StatefulProtocolTrait for StatefulHalfblocks {
         }
     }
     fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        Halfblocks::render(&self.current, area, buf);
+        Halfblocks::render(&mut self.current, area, buf);
     }
 }

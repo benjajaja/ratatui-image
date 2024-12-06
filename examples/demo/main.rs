@@ -223,7 +223,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     match app.show_images {
         ShowImages::Resized => {}
         _ => {
-            let image = Image::new(&app.image_static);
+            let image = Image::new(&mut app.image_static);
             // Let it be surrounded by styled text.
             let offset_area = Rect {
                 x: area.x + 2,
