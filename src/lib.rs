@@ -149,7 +149,7 @@ impl<'a> Image<'a> {
     }
 }
 
-impl<'a> Widget for Image<'a> {
+impl Widget for Image<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width == 0 || area.height == 0 {
             return;
@@ -342,12 +342,7 @@ impl Resize {
                 min(desired.width, area.width) as u16,
                 min(desired.height, area.height) as u16,
             ),
-            Self::Scale(_) => resize_pixels(
-                desired.width,
-                desired.height,
-                max(area.width, desired.width) as u16,
-                max(area.height, desired.height) as u16,
-            ),
+            Self::Scale(_) => resize_pixels(desired.width, desired.height, area.width, area.height),
         };
         Rect::new(0, 0, width, height)
     }

@@ -182,9 +182,9 @@ impl<'a> App<'a> {
             .picker
             .new_protocol(self.image_source.clone(), size(), Resize::Fit(None))
             .unwrap();
-
         self.image_fit_state = self.picker.new_resize_protocol(self.image_source.clone());
-        self.image_crop_state = self.picker.new_resize_protocol(self.image_source.clone());
+        self.image_crop_state = self.image_fit_state.clone();
+        self.image_scale_state = self.image_fit_state.clone();
     }
 
     pub fn on_tick(&mut self) {}
@@ -254,24 +254,6 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(left_chunks[1]);
 
-    let block_left_bottom = block("Crop");
-    let area = block_left_bottom.inner(chunks_left_bottom[0]);
-    f.render_widget(
-        paragraph(app.background.as_str()).style(Style::new().bg(Color::Green)),
-        area,
-    );
-    match app.show_images {
-        ShowImages::Fixed => {}
-        _ => {
-            let image = StatefulImage::new(None).resize(Resize::Crop(None));
-            f.render_stateful_widget(
-                image,
-                block_left_bottom.inner(chunks_left_bottom[0]),
-                &mut app.image_crop_state,
-            );
-        }
-    }
-    f.render_widget(block_left_bottom, chunks_left_bottom[0]);
     app.render_resized_image(f, Resize::Crop(None), chunks_left_bottom[0]);
     app.render_resized_image(f, Resize::Scale(None), chunks_left_bottom[1]);
     app.render_resized_image(f, Resize::Fit(None), right_chunks[0]);
