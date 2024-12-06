@@ -79,10 +79,9 @@ impl<'a> App<'a> {
         let image_static = picker
             .new_protocol(image_source.clone(), size(), Resize::Fit(None))
             .unwrap();
-
         let image_fit_state = picker.new_resize_protocol(image_source.clone());
-        let image_crop_state = image_fit_state.clone();
-        let image_scale_state = image_fit_state.clone();
+        let image_crop_state = picker.new_resize_protocol(image_source.clone());
+        let image_scale_state = picker.new_resize_protocol(image_source.clone());
 
         let mut background = String::new();
 
@@ -183,8 +182,8 @@ impl<'a> App<'a> {
             .new_protocol(self.image_source.clone(), size(), Resize::Fit(None))
             .unwrap();
         self.image_fit_state = self.picker.new_resize_protocol(self.image_source.clone());
-        self.image_crop_state = self.image_fit_state.clone();
-        self.image_scale_state = self.image_fit_state.clone();
+        self.image_crop_state = self.picker.new_resize_protocol(self.image_source.clone());
+        self.image_scale_state = self.picker.new_resize_protocol(self.image_source.clone());
     }
 
     pub fn on_tick(&mut self) {}
