@@ -30,7 +30,7 @@ impl Halfblocks {
         source: &ImageSource,
         font_size: FontSize,
         resize: Resize,
-        background_color: Option<Rgba<u8>>,
+        background_color: Rgba<u8>,
         area: Rect,
     ) -> Result<Self> {
         let resized = resize.resize(
@@ -115,10 +115,13 @@ impl StatefulHalfblocks {
 }
 
 impl StatefulProtocolTrait for StatefulHalfblocks {
+    fn background_color(&self) -> Rgba<u8> {
+        self.source.background_color
+    }
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgba<u8>>, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }

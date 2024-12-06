@@ -74,6 +74,8 @@ impl<'a> App<'a> {
         let image_source = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
         let mut picker = Picker::from_query_stdio().unwrap();
+        // Set completely transparent background (experimental, only works for iTerm2 and Kitty).
+        picker.set_background_color([0, 0, 0, 0]);
 
         let image_static = picker
             .new_protocol(image_source.clone(), size(), Resize::Fit(None))
@@ -252,7 +254,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     match app.show_images {
         ShowImages::Fixed => {}
         _ => {
-            let image = StatefulImage::new(None).resize(Resize::Crop(None));
+            let image = StatefulImage::new().resize(Resize::Crop(None));
             f.render_stateful_widget(
                 image,
                 block_left_bottom.inner(chunks_left_bottom[0]),
@@ -283,7 +285,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     match app.show_images {
         ShowImages::Fixed => {}
         _ => {
-            let image = StatefulImage::new(None).resize(Resize::Fit(None));
+            let image = StatefulImage::new().resize(Resize::Fit(None));
             f.render_stateful_widget(
                 image,
                 block_right_top.inner(right_chunks[0]),

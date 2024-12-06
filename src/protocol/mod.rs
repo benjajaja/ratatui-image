@@ -5,7 +5,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use image::{DynamicImage, GenericImageView, Rgba};
+use image::{imageops, DynamicImage, GenericImageView, ImageBuffer, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::FontSize;
@@ -30,6 +30,8 @@ trait ProtocolTrait: Send + Sync {
 }
 
 trait StatefulProtocolTrait: Send + Sync {
+    // Get the background color that fills in when resizing.
+    fn background_color(&self) -> Rgba<u8>;
     /// Check if the current image state would need resizing (grow or shrink) for the given area.
     ///
     /// This can be called by the UI thread to check if this [StatefulProtocol] should be sent off
@@ -42,7 +44,7 @@ trait StatefulProtocolTrait: Send + Sync {
     /// that next call for the given area does not need to redo the work.
     ///
     /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
-    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgba<u8>>, area: Rect);
+    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect);
 
     /// Render the currently resized and encoded data to the buffer.
     fn render(&mut self, area: Rect, buf: &mut Buffer);
@@ -80,7 +82,7 @@ pub enum StatefulProtocol {
     ITerm2(StatefulIterm2),
 }
 impl StatefulProtocol {
-    fn inner_trait(&mut self) -> &mut dyn StatefulProtocolTrait {
+    fn inner_trait(&self) -> &dyn StatefulProtocolTrait {
         match self {
             Self::Halfblocks(halfblocks) => halfblocks,
             Self::Sixel(sixel) => sixel,
@@ -88,17 +90,31 @@ impl StatefulProtocol {
             Self::ITerm2(iterm2) => iterm2,
         }
     }
+    fn inner_trait_mut(&mut self) -> &mut dyn StatefulProtocolTrait {
+        match self {
+            Self::Halfblocks(halfblocks) => halfblocks,
+            Self::Sixel(sixel) => sixel,
+            Self::Kitty(kitty) => kitty,
+            Self::ITerm2(iterm2) => iterm2,
+        }
+    }
+
+    pub fn background_color(&self) -> Rgba<u8> {
+        let proto = self.inner_trait();
+        proto.background_color()
+    }
+
     /// Resize and encode if necessary, and render immediately.
     ///
     /// This blocks the UI thread but requires neither threads nor async.
     pub fn resize_encode_render(
         &mut self,
         resize: &Resize,
-        background_color: Option<Rgba<u8>>,
+        background_color: Rgba<u8>,
         area: Rect,
         buf: &mut Buffer,
     ) {
-        let proto = self.inner_trait();
+        let proto = self.inner_trait_mut();
         if let Some(rect) = proto.needs_resize(resize, area) {
             proto.resize_encode(resize, background_color, rect);
         }
@@ -123,19 +139,14 @@ impl StatefulProtocol {
     /// that next call for the given area does not need to redo the work.
     ///
     /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
-    pub fn resize_encode(
-        &mut self,
-        resize: &Resize,
-        background_color: Option<Rgba<u8>>,
-        area: Rect,
-    ) {
-        self.inner_trait()
+    pub fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
+        self.inner_trait_mut()
             .resize_encode(resize, background_color, area)
     }
 
     /// Render the currently resized and encoded data to the buffer.
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        self.inner_trait().render(area, buf);
+        self.inner_trait_mut().render(area, buf);
     }
 }
 
@@ -162,18 +173,37 @@ pub struct ImageSource {
     pub area: Rect,
     /// TODO: document this; when image changes but it doesn't need a resize, force a render.
     pub hash: u64,
+    /// The background color that should be used for padding or background when resizing.
+    pub background_color: Rgba<u8>,
 }
 
 impl ImageSource {
     /// Create a new image source
-    pub fn new(image: DynamicImage, font_size: FontSize) -> ImageSource {
+    pub fn new(
+        mut image: DynamicImage,
+        font_size: FontSize,
+        background_color: Rgba<u8>,
+    ) -> ImageSource {
         let area = ImageSource::round_pixel_size_to_cells(image.width(), image.height(), font_size);
 
         let mut state = DefaultHasher::new();
         image.as_bytes().hash(&mut state);
         let hash = state.finish();
 
-        ImageSource { image, area, hash }
+        // We only need to underlay the background color here if it's not completely transparent.
+        if background_color.0[3] != 0 {
+            let mut bg: DynamicImage =
+                ImageBuffer::from_pixel(image.width(), image.height(), background_color).into();
+            imageops::overlay(&mut bg, &image, 0, 0);
+            image = bg;
+        }
+
+        ImageSource {
+            image,
+            area,
+            hash,
+            background_color,
+        }
     }
     /// Round an image pixel size to the nearest matching cell size, given a font size.
     fn round_pixel_size_to_cells(

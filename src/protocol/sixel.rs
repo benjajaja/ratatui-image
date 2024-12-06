@@ -28,7 +28,7 @@ impl Sixel {
         source: &ImageSource,
         font_size: FontSize,
         resize: Resize,
-        background_color: Option<Rgba<u8>>,
+        background_color: Rgba<u8>,
         is_tmux: bool,
         area: Rect,
     ) -> Result<Self> {
@@ -182,10 +182,13 @@ impl StatefulSixel {
 }
 
 impl StatefulProtocolTrait for StatefulSixel {
+    fn background_color(&self) -> Rgba<u8> {
+        self.source.background_color
+    }
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgba<u8>>, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }

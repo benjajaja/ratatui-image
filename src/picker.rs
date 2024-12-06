@@ -26,11 +26,14 @@ use crate::{
 
 pub mod cap_parser;
 
+// Transparent background is not well tested enough.
+const DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 255]);
+
 #[derive(Clone, Copy, Debug)]
 pub struct Picker {
     font_size: FontSize,
     protocol_type: ProtocolType,
-    background_color: Option<Rgba<u8>>,
+    background_color: Rgba<u8>,
     is_tmux: bool,
     kitty_counter: u32,
 }
@@ -91,7 +94,7 @@ impl Picker {
         if let Some(font_size) = font_size {
             Ok(Picker {
                 font_size,
-                background_color: None,
+                background_color: DEFAULT_BACKGROUND,
                 protocol_type,
                 is_tmux,
                 kitty_counter: rand::random(),
@@ -125,7 +128,7 @@ impl Picker {
 
         Picker {
             font_size,
-            background_color: None,
+            background_color: DEFAULT_BACKGROUND,
             protocol_type,
             is_tmux,
             kitty_counter: rand::random(),
@@ -144,8 +147,12 @@ impl Picker {
         self.font_size
     }
 
-    pub fn set_background_color(&mut self, background_color: Option<Rgba<u8>>) {
-        self.background_color = background_color
+    // Change the default background color.
+    //
+    // The background color is always underlayed. It may be transparent, but this is
+    // experimental, as some terminals may not clear stale characters behind images.
+    pub fn set_background_color<T: Into<Rgba<u8>>>(&mut self, background_color: T) {
+        self.background_color = background_color.into();
     }
 
     /// Returns a new protocol for [`crate::Image`] widgets that fits into the given size.
@@ -155,7 +162,7 @@ impl Picker {
         size: Rect,
         resize: Resize,
     ) -> Result<Protocol> {
-        let source = ImageSource::new(image, self.font_size);
+        let source = ImageSource::new(image, self.font_size, self.background_color);
         match self.protocol_type {
             ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::from_source(
                 &source,
@@ -197,7 +204,7 @@ impl Picker {
 
     /// Returns a new *stateful* protocol for [`crate::StatefulImage`] widgets.
     pub fn new_resize_protocol(&mut self, image: DynamicImage) -> StatefulProtocol {
-        let source = ImageSource::new(image, self.font_size);
+        let source = ImageSource::new(image, self.font_size, self.background_color);
         match self.protocol_type {
             ProtocolType::Halfblocks => {
                 StatefulProtocol::Halfblocks(StatefulHalfblocks::new(source, self.font_size))
