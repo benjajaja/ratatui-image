@@ -80,26 +80,37 @@ impl Picker {
         let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();
 
         // Write and read to stdin to query protocol capabilities and font-size.
-        let (capability_proto, font_size) = query_with_timeout(is_tmux, Duration::from_secs(1))?;
+        match query_with_timeout(is_tmux, Duration::from_secs(1)) {
+            Ok((capability_proto, font_size)) => {
+                // If some env var says that we should try iTerm2, then disregard protocol-from-capabilities.
+                let iterm2_proto = iterm2_from_env();
 
-        // If some env var says that we should try iTerm2, then disregard protocol-from-capabilities.
-        let iterm2_proto = iterm2_from_env();
+                let protocol_type = tmux_proto
+                    .or(iterm2_proto)
+                    .or(capability_proto)
+                    .unwrap_or(ProtocolType::Halfblocks);
 
-        let protocol_type = tmux_proto
-            .or(iterm2_proto)
-            .or(capability_proto)
-            .unwrap_or(ProtocolType::Halfblocks);
-
-        if let Some(font_size) = font_size {
-            Ok(Picker {
-                font_size,
+                if let Some(font_size) = font_size {
+                    Ok(Picker {
+                        font_size,
+                        background_color: DEFAULT_BACKGROUND,
+                        protocol_type,
+                        is_tmux,
+                        kitty_counter: rand::random(),
+                    })
+                } else {
+                    Err(Errors::NoFontSize)
+                }
+            }
+            Err(Errors::NoCap) => Ok(Picker {
+                // This is completely arbitrary, but it doesn't matter much for halfblocks.
+                font_size: (4, 8),
                 background_color: DEFAULT_BACKGROUND,
-                protocol_type,
+                protocol_type: ProtocolType::Halfblocks,
                 is_tmux,
                 kitty_counter: rand::random(),
-            })
-        } else {
-            Err(Errors::NoFontSize)
+            }),
+            Err(err) => Err(err),
         }
     }
 
@@ -429,13 +440,13 @@ fn query_with_timeout(
     thread::spawn(move || {
         let _ = tx.send(
             enable_raw_mode()
+                .map_err(Errors::into)
                 .and_then(|disable_raw_mode| {
                     let result = query_stdio_capabilities(is_tmux);
                     // Always try to return to raw_mode.
                     disable_raw_mode()?;
                     result
-                })
-                .map_err(|dyn_err| io::Error::new(io::ErrorKind::Other, dyn_err.to_string())),
+                }),
         );
     });
 
