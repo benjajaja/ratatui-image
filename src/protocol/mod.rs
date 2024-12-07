@@ -5,7 +5,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use image::{imageops, DynamicImage, GenericImageView, ImageBuffer, Rgba};
+use image::{imageops, DynamicImage, ImageBuffer, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::FontSize;
@@ -215,29 +215,4 @@ impl ImageSource {
         let height = (img_height as f32 / char_height as f32).ceil() as u16;
         Rect::new(0, 0, width, height)
     }
-}
-
-// Slice the image into `(image.height() / slice_height)` slices.
-// The image height must be a multiple of slice_height.
-// This is necessary for some protocols to be able to render transparent images
-// over stale characters, together with the Erase in Line (EL) CSI (currently
-// iTerm2, but Sixel may also need this once transparency works).
-fn slice_image(image: &DynamicImage, slice_height: u32) -> Vec<DynamicImage> {
-    let (width, height) = image.dimensions();
-    assert!(
-        height % slice_height == 0,
-        "Height must be a multiple of slice height"
-    );
-
-    let num_slices = height / slice_height;
-    let mut slices = Vec::with_capacity(num_slices as usize);
-
-    for i in 0..num_slices {
-        let y_offset = i * slice_height;
-        // Crop the region and convert it back into a DynamicImage
-        let cropped = image.crop_imm(0, y_offset, width, slice_height);
-        slices.push(cropped);
-    }
-
-    slices
 }

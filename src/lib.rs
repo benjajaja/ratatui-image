@@ -255,13 +255,14 @@ impl Resize {
                 let height = (rect.height * font_size.1) as u32;
                 // Resize/Crop/etc. but not necessarily fitting cell size
                 let mut image = self.resize_image(source, width, height);
-                // Pad to cell size with some background color.
-                if image.width() != width || image.height() != height {
-                    let mut bg: DynamicImage =
-                        ImageBuffer::from_pixel(width, height, background_color).into();
-                    imageops::overlay(&mut bg, &image, 0, 0);
-                    image = bg;
-                }
+                // Always pad to cell size with background color, Sixel doesn't have transparency
+                // and would get a white background by the sixel library.
+                // Once Sixel gets transparency support, only pad
+                // `if image.width() != width || image.height() != height`.
+                let mut bg: DynamicImage =
+                    ImageBuffer::from_pixel(width, height, background_color).into();
+                imageops::overlay(&mut bg, &image, 0, 0);
+                image = bg;
                 (image, rect)
             })
     }

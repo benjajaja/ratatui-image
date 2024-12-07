@@ -26,8 +26,7 @@ use crate::{
 
 pub mod cap_parser;
 
-// Transparent background is not well tested enough.
-const DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 255]);
+const DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 0]);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Picker {
@@ -147,10 +146,7 @@ impl Picker {
         self.font_size
     }
 
-    // Change the default background color.
-    //
-    // The background color is always underlayed. It may be transparent, but this is
-    // experimental, as some terminals may not clear stale characters behind images.
+    // Change the default background color (transparent black).
     pub fn set_background_color<T: Into<Rgba<u8>>>(&mut self, background_color: T) {
         self.background_color = background_color.into();
     }

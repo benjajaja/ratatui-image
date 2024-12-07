@@ -59,14 +59,14 @@ static TMUX_START: &str = "\x1bPtmux;";
 // TODO: change E to sixel_rs::status::Error and map when calling
 fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
     let (w, h) = (img.width(), img.height());
-    let img_rgba8 = img.to_rgba8();
-    let bytes = img_rgba8.as_raw();
+    let img_rgb8 = img.to_rgb8();
+    let bytes = img_rgb8.as_raw();
 
     let data = sixel_string(
         bytes,
         w as i32,
         h as i32,
-        PixelFormat::RGBA8888,
+        PixelFormat::RGB888,
         DiffusionMethod::Stucki,
         MethodForLargest::Auto,
         MethodForRep::Auto,
@@ -123,12 +123,6 @@ fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) 
         Some(r) => r,
     };
 
-    // DECERA
-    // let top = render_area.top() + 1;
-    // let left = render_area.left() + 1;
-    // let bottom = render_area.bottom() + 1;
-    // let right = render_area.right() + 1;
-    // let seq = format!("\x1b[{top};{left};{bottom};{right}$z{data}");
     buf.cell_mut(render_area).map(|cell| cell.set_symbol(data));
     let mut skip_first = false;
 

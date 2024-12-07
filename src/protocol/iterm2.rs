@@ -6,13 +6,11 @@ use std::{cmp::min, format, io::Cursor};
 
 use crate::{errors, picker::cap_parser::Parser, FontSize, ImageSource, Resize, Result};
 
-use super::{slice_image, ProtocolTrait, StatefulProtocolTrait};
+use super::{ProtocolTrait, StatefulProtocolTrait};
 
-// Fixed sixel protocol
 #[derive(Clone, Default)]
 pub struct Iterm2 {
-    // One literal image slice per row, see below why this is necessary.
-    pub data: Vec<String>,
+    pub data: String,
     pub area: Rect,
     pub is_tmux: bool,
 }
@@ -39,7 +37,7 @@ impl Iterm2 {
             None => (&source.image, source.area),
         };
 
-        let data = encode(image, font_size.1, is_tmux)?;
+        let data = encode(image, area, is_tmux)?;
         Ok(Self {
             data,
             area,
@@ -48,30 +46,36 @@ impl Iterm2 {
     }
 }
 
-// Slice the image into N rows matching the terminal font size height, so that
-// we can output the `Erase in Line (EL)` for each row before the potentially
-// transparent image without showing stale character artifacts.
-fn encode(img: &DynamicImage, font_height: u16, is_tmux: bool) -> Result<Vec<String>> {
-    let results = slice_image(img, font_height as u32)
-        .into_iter()
-        .flat_map(|img| {
-            let mut png: Vec<u8> = vec![];
-            img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)?;
+fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String> {
+    let mut png: Vec<u8> = vec![];
+    img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)?;
 
-            let data = general_purpose::STANDARD.encode(&png);
+    let data = general_purpose::STANDARD.encode(&png);
 
-            let (start, escape, end) = Parser::escape_tmux(is_tmux);
-            Ok::<String, errors::Errors>(format!(
-                    // Clear row from cursor on, for stale characters behind transparent images.
-                "{start}{escape}[0K{escape}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07{end}",
-                png.len(),
-                img.width(),
-                img.height(),
-                data,
-            ))
-        })
-        .collect();
-    Ok(results)
+    let (start, escape, end) = Parser::escape_tmux(is_tmux);
+
+    // Transparency needs explicit erasing of stale characters, or they stay behind the rendered
+    // image due to skipping of the following characters _in the buffer_.
+    // DECERA does not work in WezTerm, however ECH and and cursor CUD and CUU do.
+    // For each line, erase `width` characters, then move back and place image.
+    let width = render_area.width;
+    let height = render_area.height;
+    let mut seq = String::from(start);
+    for _ in 0..height {
+        seq.push_str(&format!("\x1b[{width}X\x1b[1B").to_string());
+    }
+    seq.push_str(&format!("\x1b[{height}A").to_string());
+
+    seq.push_str(&format!(
+        "{escape}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07",
+        png.len(),
+        img.width(),
+        img.height(),
+        data,
+    ));
+    seq.push_str(end);
+
+    Ok::<String, errors::Errors>(seq)
 }
 
 impl ProtocolTrait for Iterm2 {
@@ -80,7 +84,7 @@ impl ProtocolTrait for Iterm2 {
     }
 }
 
-fn render(rect: Rect, data: &[String], area: Rect, buf: &mut Buffer, overdraw: bool) {
+fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) {
     let render_area = match render_area(rect, area, overdraw) {
         None => {
             // If we render out of area, then the buffer will attempt to write regular text (or
@@ -93,13 +97,16 @@ fn render(rect: Rect, data: &[String], area: Rect, buf: &mut Buffer, overdraw: b
         Some(r) => r,
     };
 
-    // Render each slice, see `encode()` for details.
-    for (i, slice) in data.iter().enumerate() {
-        let x = render_area.left();
-        let y = render_area.top() + (i as u16);
-        buf.cell_mut((x, y)).map(|cell| cell.set_symbol(slice));
-        for x in (render_area.left() + 1)..render_area.right() {
-            // Skip following columns to avoid writing over the image.
+    buf.cell_mut(render_area).map(|cell| cell.set_symbol(data));
+    let mut skip_first = false;
+
+    // Skip entire area
+    for y in render_area.top()..render_area.bottom() {
+        for x in render_area.left()..render_area.right() {
+            if !skip_first {
+                skip_first = true;
+                continue;
+            }
             buf.cell_mut((x, y)).map(|cell| cell.set_skip(true));
         }
     }
@@ -165,7 +172,7 @@ impl StatefulProtocolTrait for StatefulIterm2 {
             force,
         ) {
             let is_tmux = self.current.is_tmux;
-            match encode(&img, self.font_size.1, is_tmux) {
+            match encode(&img, rect, is_tmux) {
                 Ok(data) => {
                     self.current = Iterm2 {
                         data,
