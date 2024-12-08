@@ -125,3 +125,45 @@ args = [
   "save",
   "target/recording.gif",
 ]
+
+# Eyeball (manual QA) tasks
+
+[tasks.demo-build]
+command = "cargo"
+args = [
+  "build",
+  "--example",
+  "demo",
+  "--features", "crossterm",
+]
+
+[tasks.eyeball]
+script = '''
+cargo make eyeball-xterm &
+cargo make eyeball-foot &
+cargo make eyeball-kitty &
+cargo make eyeball-wezterm &
+'''
+
+[tasks.eyeball-xterm]
+dependencies = [ "demo-build" ]
+command = "xterm"
+args = [ "-ti", "vt340", "./target/debug/examples/demo" ]
+
+[tasks.eyeball-foot]
+dependencies = [ "demo-build" ]
+command = "foot"
+args = [ "./target/debug/examples/demo" ]
+
+[tasks.eyeball-wezterm]
+dependencies = [ "demo-build" ]
+script = '''
+PWD=$(pwd)
+wezterm start --cwd $PWD ./target/debug/examples/demo
+'''
+
+[tasks.eyeball-kitty]
+dependencies = [ "demo-build" ]
+command = "kitty"
+args = [ "./target/debug/examples/demo" ]
+
