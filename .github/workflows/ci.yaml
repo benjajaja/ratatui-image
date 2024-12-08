@@ -30,7 +30,7 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.74.0
+          toolchain: 1.81.0
           profile: default
           override: true
       - uses: davidB/rust-cargo-make@v1
@@ -55,7 +55,7 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.74.0
+          toolchain: 1.81.0
           profile: default
           override: true
       - uses: davidB/rust-cargo-make@v1
@@ -73,7 +73,7 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.74.0
+          toolchain: 1.81.0
           profile: default
           override: true
       - uses: davidB/rust-cargo-make@v1
