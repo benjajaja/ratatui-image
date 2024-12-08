@@ -54,7 +54,7 @@ impl Sixel {
     }
 }
 
-static TMUX_START: &str = "\x1bPtmux;";
+const TMUX_START: &str = "\x1bPtmux;";
 
 // TODO: change E to sixel_rs::status::Error and map when calling
 fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {

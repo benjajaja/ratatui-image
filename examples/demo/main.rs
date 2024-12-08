@@ -18,8 +18,8 @@ use image::DynamicImage;
 use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
-    text::Line,
+    style::{Color, Style, Styled, Stylize},
+    text::{Line, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
@@ -46,22 +46,25 @@ enum ShowImages {
     Resized,
 }
 
+
 struct App {
-    pub title: String,
-    pub should_quit: bool,
-    pub tick_rate: Duration,
-    pub background: String,
-    pub split_percent: u16,
-    pub show_images: ShowImages,
+    title: String,
+    should_quit: bool,
+    tick_rate: Duration,
+    background: String,
+    split_percent: u16,
+    show_images: ShowImages,
 
-    pub image_source_path: PathBuf,
-    pub image_static_offset: (u16, u16),
 
-    pub picker: Picker,
-    pub image_source: DynamicImage,
-    pub image_static: Protocol,
-    pub image_fit_state: StatefulProtocol,
-    pub image_crop_state: StatefulProtocol,
+    image_source_path: PathBuf,
+    image_static_offset: (u16, u16),
+
+    picker: Picker,
+    image_source: DynamicImage,
+    image_static: Protocol,
+    image_fit_state: StatefulProtocol,
+    image_crop_state: StatefulProtocol,
+    image_scale_state: StatefulProtocol,
 }
 
 fn size() -> Rect {
@@ -85,9 +88,9 @@ impl App {
         let image_static = picker
             .new_protocol(image_source.clone(), size(), Resize::Fit(None))
             .unwrap();
-
         let image_fit_state = picker.new_resize_protocol(image_source.clone());
         let image_crop_state = picker.new_resize_protocol(image_source.clone());
+        let image_scale_state = picker.new_resize_protocol(image_source.clone());
 
         let mut background = String::new();
 
@@ -107,7 +110,7 @@ impl App {
             background.push(c);
         }
 
-        App {
+        Self {
             title,
             should_quit: false,
             tick_rate: Duration::from_millis(1000),
@@ -121,6 +124,7 @@ impl App {
             image_static,
             image_fit_state,
             image_crop_state,
+            image_scale_state,
 
             image_static_offset: (0, 0),
         }
@@ -187,12 +191,31 @@ impl App {
             .picker
             .new_protocol(self.image_source.clone(), size(), Resize::Fit(None))
             .unwrap();
-
         self.image_fit_state = self.picker.new_resize_protocol(self.image_source.clone());
         self.image_crop_state = self.picker.new_resize_protocol(self.image_source.clone());
+        self.image_scale_state = self.picker.new_resize_protocol(self.image_source.clone());
     }
 
     pub fn on_tick(&mut self) {}
+
+    fn render_resized_image(&mut self, f: &mut Frame<'_>, resize: Resize, area: Rect) {
+        let (state, name, color) = match resize {
+            Resize::Fit(_) => (&mut self.image_fit_state, "Fit", Color::Magenta),
+            Resize::Crop(_) => (&mut self.image_crop_state, "Crop", Color::Green),
+            Resize::Scale(_) => (&mut self.image_scale_state, "Scale", Color::Blue),
+        };
+        let block = block(name);
+        let inner_area = block.inner(area);
+        f.render_widget(paragraph(self.background.as_str().bg(color)), inner_area);
+        match self.show_images {
+            ShowImages::Fixed => (),
+            _ => {
+                let image = StatefulImage::new(None).resize(resize);
+                f.render_stateful_widget(image, inner_area, state);
+            }
+        };
+        f.render_widget(block, area);
+    }
 }
 
 fn ui(f: &mut Frame<'_>, app: &mut App) {
@@ -212,21 +235,13 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         .split(outer_block.inner(f.area()));
     f.render_widget(outer_block, f.area());
 
-    let left_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(chunks[0]);
-    let right_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(chunks[1]);
+    let left_chunks = vertical_layout().split(chunks[0]);
+    let right_chunks = vertical_layout().split(chunks[1]);
 
-    let block_left_top = Block::default().borders(Borders::ALL).title("Fixed");
+    let block_left_top = block("Fixed");
     let area = block_left_top.inner(left_chunks[0]);
     f.render_widget(
-        Paragraph::new(app.background.as_str())
-            .style(Color::Yellow)
-            .wrap(Wrap { trim: true }),
+        paragraph(app.background.as_str()).style(Color::Yellow),
         area,
     );
     f.render_widget(block_left_top, left_chunks[0]);
@@ -249,63 +264,14 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(left_chunks[1]);
+    app.render_resized_image(f, Resize::Crop(None), chunks_left_bottom[0]);
+    app.render_resized_image(f, Resize::Scale(None), chunks_left_bottom[1]);
+    app.render_resized_image(f, Resize::Fit(None), right_chunks[0]);
+    let block_right_bottom = block("Help");
 
-    let block_left_bottom = Block::default().borders(Borders::ALL).title("Crop");
-    let area = block_left_bottom.inner(chunks_left_bottom[0]);
-    f.render_widget(
-        Paragraph::new(app.background.as_str())
-            .wrap(Wrap { trim: true })
-            .style(Style::new().bg(Color::Green)),
-        area,
-    );
-    match app.show_images {
-        ShowImages::Fixed => {}
-        _ => {
-            let image = StatefulImage::default().resize(Resize::Crop(None));
-            f.render_stateful_widget(
-                image,
-                block_left_bottom.inner(chunks_left_bottom[0]),
-                &mut app.image_crop_state,
-            );
-        }
-    }
-    f.render_widget(block_left_bottom, chunks_left_bottom[0]);
-
-    let block_middle_bottom = Block::default().borders(Borders::ALL).title("Placeholder");
-    f.render_widget(
-        Paragraph::new(app.background.as_str())
-            .wrap(Wrap { trim: true })
-            .style(Style::new().bg(Color::Blue)),
-        block_middle_bottom.inner(chunks_left_bottom[1]),
-    );
-    f.render_widget(block_middle_bottom, chunks_left_bottom[1]);
-
-    let block_right_top = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Color::Blue)
-        .title("Fit");
-    let area = block_right_top.inner(right_chunks[0]);
-    f.render_widget(
-        Paragraph::new(app.background.as_str()).wrap(Wrap { trim: true }),
-        area,
-    );
-    match app.show_images {
-        ShowImages::Fixed => {}
-        _ => {
-            let image = StatefulImage::default();
-            f.render_stateful_widget(
-                image,
-                block_right_top.inner(right_chunks[0]),
-                &mut app.image_fit_state,
-            );
-        }
-    }
-    f.render_widget(block_right_top, right_chunks[0]);
-
-    let block_right_bottom = Block::default().borders(Borders::ALL).title("Help");
     let area = block_right_bottom.inner(right_chunks[1]);
     f.render_widget(
-        Paragraph::new(vec![
+        paragraph(vec![
             Line::from("Key bindings:"),
             Line::from("H/L: resize"),
             Line::from(format!(
@@ -315,9 +281,22 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
             Line::from("o: cycle image"),
             Line::from(format!("t: toggle ({:?})", app.show_images)),
             Line::from(format!("Font size: {:?}", app.picker.font_size())),
-        ])
-        .wrap(Wrap { trim: true }),
+        ]),
         area,
     );
     f.render_widget(block_right_bottom, right_chunks[1]);
+}
+
+fn paragraph<'a, T: Into<Text<'a>>>(str: T) -> Paragraph<'a> {
+    Paragraph::new(str).wrap(Wrap { trim: true })
+}
+
+fn vertical_layout() -> Layout {
+    Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+}
+
+fn block(name: &str) -> Block<'_> {
+    Block::default().borders(Borders::ALL).title(name)
 }
