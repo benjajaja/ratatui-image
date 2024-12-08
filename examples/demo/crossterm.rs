@@ -31,8 +31,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // TODO: set app.picker window size when PR is merged.
-    let app = App::new("Crossterm demo", &mut terminal);
+    let app = App::new(&mut terminal);
 
     // run app
     let res = run_app(&mut terminal, app);

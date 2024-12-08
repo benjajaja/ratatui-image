@@ -12,7 +12,7 @@ mod termion;
 #[cfg(feature = "termwiz")]
 mod termwiz;
 
-use std::{error::Error, num::Wrapping as w, path::PathBuf, time::Duration};
+use std::{env, error::Error, num::Wrapping as w, path::PathBuf, time::Duration};
 
 use image::DynamicImage;
 use ratatui::{
@@ -46,8 +46,8 @@ enum ShowImages {
     Resized,
 }
 
-struct App<'a> {
-    pub title: &'a str,
+struct App {
+    pub title: String,
     pub should_quit: bool,
     pub tick_rate: Duration,
     pub background: String,
@@ -68,8 +68,13 @@ fn size() -> Rect {
     Rect::new(0, 0, 30, 16)
 }
 
-impl<'a> App<'a> {
-    pub fn new<B: Backend>(title: &'a str, _: &mut Terminal<B>) -> App<'a> {
+impl App {
+    pub fn new<B: Backend>(_: &mut Terminal<B>) -> Self {
+        let title = format!(
+            "Demo ({})",
+            env::var("TERM").unwrap_or("unknown".to_string())
+        );
+
         let ada = "./assets/Ada.png";
         let image_source = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
@@ -191,7 +196,9 @@ impl<'a> App<'a> {
 }
 
 fn ui(f: &mut Frame<'_>, app: &mut App) {
-    let outer_block = Block::default().borders(Borders::TOP).title(app.title);
+    let outer_block = Block::default()
+        .borders(Borders::TOP)
+        .title(app.title.as_str());
 
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
