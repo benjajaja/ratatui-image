@@ -334,13 +334,13 @@ impl Resize {
             Self::Fit(_) => resize_pixels(
                 desired.width,
                 desired.height,
-                min(area.width, desired.width) as u16,
-                min(area.height, desired.height) as u16,
+                min(area.width, desired.width),
+                min(area.height, desired.height),
             ),
 
             Self::Crop(_) => (
-                min(desired.width, area.width) as u16,
-                min(desired.height, area.height) as u16,
+                min(desired.width, area.width),
+                min(desired.height, area.height),
             ),
             Self::Scale(_) => resize_pixels(desired.width, desired.height, area.width, area.height),
         };
