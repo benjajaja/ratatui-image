@@ -25,7 +25,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     // create app and run it
-    let app = App::new("Termion demo", &mut terminal);
+    let app = App::new(&mut terminal);
     run_app(&mut terminal, app)?;
 
     Ok(())

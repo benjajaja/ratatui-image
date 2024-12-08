@@ -18,7 +18,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     terminal.hide_cursor()?;
 
     // create app and run it
-    let app = App::new("Termwiz Demo", &mut terminal);
+    let app = App::new(&mut terminal);
     let res = run_app(&mut terminal, app);
 
     terminal.show_cursor()?;

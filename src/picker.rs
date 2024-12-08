@@ -6,7 +6,8 @@ use std::{
     time::Duration,
 };
 
-use image::{DynamicImage, Rgb};
+use cap_parser::{Capability, Parser};
+use image::{DynamicImage, Rgba};
 use ratatui::layout::Rect;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -23,11 +24,15 @@ use crate::{
     FontSize, ImageSource, Resize, Result,
 };
 
+pub mod cap_parser;
+
+const DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 0]);
+
 #[derive(Clone, Copy, Debug)]
 pub struct Picker {
     font_size: FontSize,
     protocol_type: ProtocolType,
-    background_color: Option<Rgb<u8>>,
+    background_color: Rgba<u8>,
     is_tmux: bool,
     kitty_counter: u32,
 }
@@ -75,26 +80,37 @@ impl Picker {
         let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();
 
         // Write and read to stdin to query protocol capabilities and font-size.
-        let (capability_proto, font_size) = query_with_timeout(is_tmux, Duration::from_secs(1))?;
+        match query_with_timeout(is_tmux, Duration::from_secs(1)) {
+            Ok((capability_proto, font_size)) => {
+                // If some env var says that we should try iTerm2, then disregard protocol-from-capabilities.
+                let iterm2_proto = iterm2_from_env();
 
-        // If some env var says that we should try iTerm2, then disregard protocol-from-capabilities.
-        let iterm2_proto = iterm2_from_env();
+                let protocol_type = tmux_proto
+                    .or(iterm2_proto)
+                    .or(capability_proto)
+                    .unwrap_or(ProtocolType::Halfblocks);
 
-        let protocol_type = tmux_proto
-            .or(iterm2_proto)
-            .or(capability_proto)
-            .unwrap_or(ProtocolType::Halfblocks);
-
-        if let Some(font_size) = font_size {
-            Ok(Picker {
-                font_size,
-                background_color: None,
-                protocol_type,
+                if let Some(font_size) = font_size {
+                    Ok(Picker {
+                        font_size,
+                        background_color: DEFAULT_BACKGROUND,
+                        protocol_type,
+                        is_tmux,
+                        kitty_counter: rand::random(),
+                    })
+                } else {
+                    Err(Errors::NoFontSize)
+                }
+            }
+            Err(Errors::NoCap) => Ok(Picker {
+                // This is completely arbitrary, but it doesn't matter much for halfblocks.
+                font_size: (4, 8),
+                background_color: DEFAULT_BACKGROUND,
+                protocol_type: ProtocolType::Halfblocks,
                 is_tmux,
                 kitty_counter: rand::random(),
-            })
-        } else {
-            Err(Errors::NoFontSize)
+            }),
+            Err(err) => Err(err),
         }
     }
 
@@ -122,7 +138,7 @@ impl Picker {
 
         Picker {
             font_size,
-            background_color: None,
+            background_color: DEFAULT_BACKGROUND,
             protocol_type,
             is_tmux,
             kitty_counter: rand::random(),
@@ -141,8 +157,9 @@ impl Picker {
         self.font_size
     }
 
-    pub fn set_background_color(&mut self, background_color: Option<Rgb<u8>>) {
-        self.background_color = background_color
+    // Change the default background color (transparent black).
+    pub fn set_background_color<T: Into<Rgba<u8>>>(&mut self, background_color: T) {
+        self.background_color = background_color.into();
     }
 
     /// Returns a new protocol for [`crate::Image`] widgets that fits into the given size.
@@ -152,7 +169,7 @@ impl Picker {
         size: Rect,
         resize: Resize,
     ) -> Result<Protocol> {
-        let source = ImageSource::new(image, self.font_size);
+        let source = ImageSource::new(image, self.font_size, self.background_color);
         match self.protocol_type {
             ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::from_source(
                 &source,
@@ -194,7 +211,7 @@ impl Picker {
 
     /// Returns a new *stateful* protocol for [`crate::StatefulImage`] widgets.
     pub fn new_resize_protocol(&mut self, image: DynamicImage) -> StatefulProtocol {
-        let source = ImageSource::new(image, self.font_size);
+        let source = ImageSource::new(image, self.font_size, self.background_color);
         match self.protocol_type {
             ProtocolType::Halfblocks => {
                 StatefulProtocol::Halfblocks(StatefulHalfblocks::new(source, self.font_size))
@@ -357,12 +374,6 @@ fn font_size_fallback() -> Option<FontSize> {
 }
 
 fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
-    let (start, escape, end) = if is_tmux {
-        ("\x1bPtmux;", "\x1b\x1b", "\x1b\\")
-    } else {
-        ("", "\x1b", "")
-    };
-
     // Send several control sequences at once:
     // `_Gi=...`: Kitty graphics support.
     // `[c`: Capabilities including sixels.
@@ -370,7 +381,7 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     // `[1337n`: iTerm2 (some terminals implement the protocol but sadly not this custom CSI)
     // `[5n`: Device Status Report, implemented by all terminals, ensure that there is some
     // response and we don't hang reading forever.
-    let query = format!("{start}{escape}_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA{escape}\\{escape}[c{escape}[16t{escape}[1337n{escape}[5n{end}");
+    let query = Parser::query(is_tmux);
     io::stdout().write_all(query.as_bytes())?;
     io::stdout().flush()?;
 
@@ -382,12 +393,11 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
         match result {
             Ok(read) => {
                 for ch in charbuf.iter().take(read) {
-                    if let Some(cap) = parser.push(char::from(*ch)) {
-                        if cap == ParsedResponse::Status {
-                            break 'out;
-                        } else {
-                            capabilities.push(cap);
-                        }
+                    let mut more_caps = parser.push(char::from(*ch));
+                    if more_caps[..] == [Capability::Status] {
+                        break 'out;
+                    } else {
+                        capabilities.append(&mut more_caps);
                     }
                 }
             }
@@ -403,14 +413,14 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
 
     let mut proto = None;
     let mut font_size = None;
-    if capabilities.contains(&ParsedResponse::Kitty(true)) {
+    if capabilities.contains(&Capability::Kitty) {
         proto = Some(ProtocolType::Kitty);
-    } else if capabilities.contains(&ParsedResponse::Sixel(true)) {
+    } else if capabilities.contains(&Capability::Sixel) {
         proto = Some(ProtocolType::Sixel);
     }
 
     for cap in capabilities {
-        if let ParsedResponse::CellSize(Some((w, h))) = cap {
+        if let Capability::CellSize(Some((w, h))) = cap {
             font_size = Some((w, h));
         }
     }
@@ -418,123 +428,6 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     font_size = font_size.or_else(font_size_fallback);
 
     Ok((proto, font_size))
-}
-
-struct Parser {
-    data: String,
-    sequence: ParsedResponse,
-}
-
-#[derive(Debug, PartialEq)]
-enum ParsedResponse {
-    Unknown,
-    Kitty(bool),
-    Sixel(bool),
-    CellSize(Option<(u16, u16)>),
-    Status,
-}
-
-impl Parser {
-    pub fn new() -> Self {
-        Parser {
-            data: String::new(),
-            sequence: ParsedResponse::Unknown,
-        }
-    }
-    pub fn push(&mut self, next: char) -> Option<ParsedResponse> {
-        match self.sequence {
-            ParsedResponse::Unknown => {
-                match (&self.data[..], next) {
-                    (_, '\x1b') => {
-                        // If the current sequence hasn't been identified yet, start a new one on Esc.
-                        return self.restart();
-                    }
-                    ("[", '?') => {
-                        self.sequence = ParsedResponse::Sixel(false);
-                    }
-                    ("_Gi=31", ';') => {
-                        self.sequence = ParsedResponse::Kitty(false);
-                    }
-                    ("[6", ';') => {
-                        self.sequence = ParsedResponse::CellSize(None);
-                    }
-                    ("[", '0') => {
-                        self.sequence = ParsedResponse::Status;
-                    }
-                    _ => {}
-                };
-                self.data.push(next);
-            }
-            ParsedResponse::Sixel(_) => match next {
-                'c' => {
-                    // This is just easier than actually parsing the string.
-                    let is_sixel = self.data.contains(";4;")
-                        || self.data.contains("?4;")
-                        || self.data.ends_with(";4")
-                        || self.data.ends_with("?4");
-                    self.data = String::new();
-                    self.sequence = ParsedResponse::Unknown;
-                    return Some(ParsedResponse::Sixel(is_sixel));
-                }
-                '\x1b' => {
-                    return self.restart();
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
-
-            ParsedResponse::Kitty(_) => match next {
-                '\\' => {
-                    let is_kitty = self.data == "_Gi=31;OK\x1b";
-                    self.data = String::new();
-                    self.sequence = ParsedResponse::Unknown;
-                    return Some(ParsedResponse::Kitty(is_kitty));
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
-
-            ParsedResponse::CellSize(_) => match next {
-                't' => {
-                    let mut cell_size = None;
-                    let inner: Vec<&str> = self.data.split(';').collect();
-                    if let [_, h, w] = inner[..] {
-                        if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
-                            if w > 0 && h > 0 {
-                                cell_size = Some((w, h));
-                            }
-                        }
-                    }
-                    self.data = String::new();
-                    self.sequence = ParsedResponse::Unknown;
-                    return Some(ParsedResponse::CellSize(cell_size));
-                }
-                '\x1b' => {
-                    return self.restart();
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
-            ParsedResponse::Status => match next {
-                'n' => return Some(ParsedResponse::Status),
-                '\x1b' => {
-                    return self.restart();
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
-        };
-        None
-    }
-    fn restart(&mut self) -> Option<ParsedResponse> {
-        self.data = String::new();
-        self.sequence = ParsedResponse::Unknown;
-        None
-    }
 }
 
 fn query_with_timeout(
@@ -547,13 +440,13 @@ fn query_with_timeout(
     thread::spawn(move || {
         let _ = tx.send(
             enable_raw_mode()
+                .map_err(Errors::into)
                 .and_then(|disable_raw_mode| {
                     let result = query_stdio_capabilities(is_tmux);
                     // Always try to return to raw_mode.
                     disable_raw_mode()?;
                     result
-                })
-                .map_err(|dyn_err| io::Error::new(io::ErrorKind::Other, dyn_err.to_string())),
+                }),
         );
     });
 
@@ -567,7 +460,7 @@ fn query_with_timeout(
 mod tests {
     use std::assert_eq;
 
-    use crate::picker::{ParsedResponse, Parser, Picker, ProtocolType};
+    use crate::picker::{Picker, ProtocolType};
 
     #[test]
     fn test_cycle_protocol() {
@@ -585,45 +478,5 @@ mod tests {
     #[test]
     fn test_from_query_stdio_no_hang() {
         let _ = Picker::from_query_stdio();
-    }
-
-    #[test]
-    fn test_parse_all() {
-        for (name, str, expected) in vec![
-            (
-                "all",
-                "\x1b_Gi=31;OK\x1b\\\x1b[?64;4c\x1b[6;7;14t\x1b[0n",
-                vec![
-                    ParsedResponse::Kitty(true),
-                    ParsedResponse::Sixel(true),
-                    ParsedResponse::CellSize(Some((14, 7))),
-                    ParsedResponse::Status,
-                ],
-            ),
-            ("only garbage", "\x1bhonkey\x1btonkey\x1b[42\x1b\\", vec![]),
-            (
-                "preceding garbage",
-                "\x1bgarbage...\x1b[?64;5c\x1b[0n",
-                vec![ParsedResponse::Sixel(false), ParsedResponse::Status],
-            ),
-            (
-                "inner garbage",
-                "\x1b[6;7;14t\x1bgarbage...\x1b[?64;5c\x1b[0n",
-                vec![
-                    ParsedResponse::CellSize(Some((14, 7))),
-                    ParsedResponse::Sixel(false),
-                    ParsedResponse::Status,
-                ],
-            ),
-        ] {
-            let mut parser = Parser::new();
-            let mut caps = vec![];
-            for ch in str.chars() {
-                if let Some(cap) = parser.push(ch) {
-                    caps.push(cap);
-                }
-            }
-            assert_eq!(caps, expected, "{name}");
-        }
     }
 }

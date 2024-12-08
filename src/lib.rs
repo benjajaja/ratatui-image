@@ -59,9 +59,9 @@
 //!
 //! fn ui(f: &mut Frame<'_>, app: &mut App) {
 //!     // The image widget.
-//!     let image = StatefulImage::new(None);
+//!     let image = StatefulImage::default();
 //!     // Render with the protocol state.
-//!     f.render_stateful_widget(image, f.size(), &mut app.image);
+//!     f.render_stateful_widget(image, f.area(), &mut app.image);
 //! }
 //! ```
 //!
@@ -104,7 +104,7 @@
 //! [`render_stateful_widget`]: https://docs.rs/ratatui/latest/ratatui/terminal/struct.Frame.html#method.render_stateful_widget
 use std::cmp::{max, min};
 
-use image::{imageops, DynamicImage, ImageBuffer, Rgb};
+use image::{imageops, DynamicImage, ImageBuffer, Rgba};
 use protocol::{ImageSource, Protocol, StatefulProtocol};
 use ratatui::{
     buffer::Buffer,
@@ -135,16 +135,16 @@ pub type FontSize = (u16, u16);
 ///     image_static: Protocol,
 /// }
 /// fn ui(f: &mut Frame<'_>, app: &mut App) {
-///     let image = Image::new(&app.image_static);
+///     let image = Image::new(&mut app.image_static);
 ///     f.render_widget(image, f.size());
 /// }
 /// ```
 pub struct Image<'a> {
-    image: &'a Protocol,
+    image: &'a mut Protocol,
 }
 
 impl<'a> Image<'a> {
-    pub fn new(image: &'a Protocol) -> Image<'a> {
+    pub fn new(image: &'a mut Protocol) -> Image<'a> {
         Image { image }
     }
 }
@@ -170,26 +170,20 @@ impl Widget for Image<'_> {
 ///     image_state: StatefulProtocol,
 /// }
 /// fn ui(f: &mut Frame<'_>, app: &mut App) {
-///     let image = StatefulImage::new(None).resize(Resize::Crop(None));
+///     let image = StatefulImage::default().resize(Resize::Crop(None));
 ///     f.render_stateful_widget(
 ///         image,
-///         f.size(),
+///         f.area(),
 ///         &mut app.image_state,
 ///     );
 /// }
 /// ```
+#[derive(Default)]
 pub struct StatefulImage {
     resize: Resize,
-    background_color: Option<Rgb<u8>>,
 }
 
 impl StatefulImage {
-    pub fn new(background_color: Option<Rgb<u8>>) -> StatefulImage {
-        StatefulImage {
-            resize: Resize::Fit(None),
-            background_color,
-        }
-    }
     pub fn resize(mut self, resize: Resize) -> StatefulImage {
         self.resize = resize;
         self
@@ -203,7 +197,7 @@ impl StatefulWidget for StatefulImage {
             return;
         }
 
-        state.resize_encode_render(&self.resize, self.background_color, area, buf);
+        state.resize_encode_render(&self.resize, state.background_color(), area, buf);
     }
 }
 
@@ -233,6 +227,12 @@ pub enum Resize {
     Scale(Option<FilterType>),
 }
 
+impl Default for Resize {
+    fn default() -> Self {
+        Resize::Fit(None)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Specifies which sides to be clipped when cropping an image.
 pub struct CropOptions {
@@ -250,7 +250,7 @@ impl Resize {
         font_size: FontSize,
         current: Rect,
         area: Rect,
-        background_color: Option<Rgb<u8>>,
+        background_color: Rgba<u8>,
         force: bool,
     ) -> Option<(DynamicImage, Rect)> {
         self.needs_resize(source, font_size, current, area, force)
@@ -259,14 +259,14 @@ impl Resize {
                 let height = (rect.height * font_size.1) as u32;
                 // Resize/Crop/etc. but not necessarily fitting cell size
                 let mut image = self.resize_image(source, width, height);
-                // Pad to cell size
-                if image.width() != width || image.height() != height {
-                    static DEFAULT_BACKGROUND: Rgb<u8> = Rgb([0, 0, 0]);
-                    let color = background_color.unwrap_or(DEFAULT_BACKGROUND);
-                    let mut bg: DynamicImage = ImageBuffer::from_pixel(width, height, color).into();
-                    imageops::overlay(&mut bg, &image, 0, 0);
-                    image = bg;
-                }
+                // Always pad to cell size with background color, Sixel doesn't have transparency
+                // and would get a white background by the sixel library.
+                // Once Sixel gets transparency support, only pad
+                // `if image.width() != width || image.height() != height`.
+                let mut bg: DynamicImage =
+                    ImageBuffer::from_pixel(width, height, background_color).into();
+                imageops::overlay(&mut bg, &image, 0, 0);
+                image = bg;
                 (image, rect)
             })
     }
@@ -378,7 +378,7 @@ fn resize_pixels(width: u16, height: u16, nwidth: u16, nheight: u16) -> (u16, u1
 
 #[cfg(test)]
 mod tests {
-    use image::{ImageBuffer, Rgb};
+    use image::{ImageBuffer, Rgba};
 
     use super::*;
 
@@ -386,8 +386,8 @@ mod tests {
 
     fn s(w: u16, h: u16) -> ImageSource {
         let image: DynamicImage =
-            ImageBuffer::from_pixel(w as _, h as _, Rgb::<u8>([255, 0, 0])).into();
-        ImageSource::new(image, FONT_SIZE)
+            ImageBuffer::from_pixel(w as _, h as _, Rgba::<u8>([255, 0, 0, 255])).into();
+        ImageSource::new(image, FONT_SIZE, [0, 0, 0, 0].into())
     }
 
     fn r(w: u16, h: u16) -> Rect {

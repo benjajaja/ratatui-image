@@ -2,17 +2,38 @@
 use std::fmt::Write;
 
 use base64::{engine::general_purpose, Engine};
-use image::{DynamicImage, Rgb};
+use image::{DynamicImage, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::{FontSize, ImageSource, Resize, Result};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
 
+#[derive(Default, Clone, PartialEq)]
+enum KittyProtoState {
+    #[default]
+    Place,
+    TransmitAndPlace(String),
+}
+
+impl KittyProtoState {
+    // Produce the transmit sequence or None if it has already been produced before.
+    fn make_transmit(&mut self) -> Option<String> {
+        match self {
+            KittyProtoState::TransmitAndPlace(seq) => {
+                let seq = std::mem::take(seq);
+                *self = KittyProtoState::Place;
+                Some(seq)
+            }
+            KittyProtoState::Place => None,
+        }
+    }
+}
+
 // Fixed Kitty protocol (transmits image data on every render!)
 #[derive(Clone, Default)]
 pub struct Kitty {
-    transmit_data: String,
+    proto_state: KittyProtoState,
     unique_id: u32,
     area: Rect,
 }
@@ -27,7 +48,7 @@ impl Kitty {
         source: &ImageSource,
         font_size: FontSize,
         resize: Resize,
-        background_color: Option<Rgb<u8>>,
+        background_color: Rgba<u8>,
         area: Rect,
         id: u32,
         is_tmux: bool,
@@ -45,9 +66,9 @@ impl Kitty {
             None => (&source.image, source.area),
         };
 
-        let transmit_data = transmit_virtual(image, id, is_tmux);
+        let proto_state = KittyProtoState::TransmitAndPlace(transmit_virtual(image, id, is_tmux));
         Ok(Self {
-            transmit_data,
+            proto_state,
             unique_id: id,
             area,
         })
@@ -55,9 +76,11 @@ impl Kitty {
 }
 
 impl ProtocolTrait for Kitty {
-    fn render(&self, area: Rect, buf: &mut Buffer) {
-        let mut seq = Some(self.transmit_data.clone());
-        render(area, self.area, buf, self.unique_id, &mut seq);
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
+        // Transmit only once. This is why self is mut.
+        let seq = self.proto_state.make_transmit();
+
+        render(area, self.area, buf, self.unique_id, seq);
     }
 }
 
@@ -70,13 +93,6 @@ pub struct StatefulKitty {
     hash: u64,
     proto_state: KittyProtoState,
     is_tmux: bool,
-}
-
-#[derive(Default, Clone, PartialEq)]
-enum KittyProtoState {
-    #[default]
-    Place,
-    TransmitAndPlace(String),
 }
 
 impl StatefulKitty {
@@ -94,10 +110,13 @@ impl StatefulKitty {
 }
 
 impl StatefulProtocolTrait for StatefulKitty {
+    fn background_color(&self) -> Rgba<u8> {
+        self.source.background_color
+    }
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.rect, area, false)
     }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -114,25 +133,19 @@ impl StatefulProtocolTrait for StatefulKitty {
             let data = transmit_virtual(&img, self.unique_id, self.is_tmux);
             self.hash = self.source.hash;
             self.rect = rect;
+            // If resized then we must transmit again.
             self.proto_state = KittyProtoState::TransmitAndPlace(data);
         }
     }
     fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        // Transmit only once
-        let mut seq = match &mut self.proto_state {
-            KittyProtoState::TransmitAndPlace(seq) => {
-                let seq = std::mem::take(seq);
-                self.proto_state = KittyProtoState::Place;
-                Some(seq)
-            }
-            KittyProtoState::Place => None,
-        };
+        // Transmit only once. This is why self is mut.
+        let seq = self.proto_state.make_transmit();
 
-        render(area, self.rect, buf, self.unique_id, &mut seq);
+        render(area, self.rect, buf, self.unique_id, seq);
     }
 }
 
-fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<String>) {
+fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<String>) {
     let [id_extra, id_r, id_g, id_b] = id.to_be_bytes();
     // Set the background color to the kitty id
     let id_color = format!("\x1b[38;2;{id_r};{id_g};{id_b}m");
@@ -144,6 +157,8 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<St
     // It could also be made so that each cell starts and ends its own escape sequence
     // with the image id, but maybe that's worse.
     for y in 0..(area.height.min(rect.height)) {
+        // If not transmitted in previous renders, only transmit once at the
+        // first line for obvious reasons.
         let mut symbol = seq.take().unwrap_or_default();
 
         // Save cursor postion, including fg color which is what we want.
@@ -181,8 +196,8 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, seq: &mut Option<St
 /// automatically by kitty.
 fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
     let (w, h) = (img.width(), img.height());
-    let img_rgb8 = img.to_rgb8();
-    let bytes = img_rgb8.as_raw();
+    let img_rgba8 = img.to_rgba8();
+    let bytes = img_rgba8.as_raw();
 
     let mut str = String::new();
 
@@ -205,7 +220,7 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
                 let more = if chunk_count > 1 { 1 } else { 0 };
                 write!(
                     str,
-                    "_Gq=2,i={id},a=T,U=1,f=24,t=d,s={w},v={h},m={more};{payload}"
+                    "_Gq=2,i={id},a=T,U=1,f=32,t=d,s={w},v={h},m={more};{payload}"
                 )
                 .unwrap();
             }

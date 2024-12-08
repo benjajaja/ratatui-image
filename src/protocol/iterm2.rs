@@ -1,14 +1,13 @@
 //! ITerm2 protocol implementation.
 use base64::{engine::general_purpose, Engine};
-use image::{DynamicImage, Rgb};
+use image::{DynamicImage, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::{cmp::min, format, io::Cursor};
 
-use crate::{FontSize, ImageSource, Resize, Result};
+use crate::{errors, picker::cap_parser::Parser, FontSize, ImageSource, Resize, Result};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
 
-// Fixed sixel protocol
 #[derive(Clone, Default)]
 pub struct Iterm2 {
     pub data: String,
@@ -21,7 +20,7 @@ impl Iterm2 {
         source: &ImageSource,
         font_size: FontSize,
         resize: Resize,
-        background_color: Option<Rgb<u8>>,
+        background_color: Rgba<u8>,
         is_tmux: bool,
         area: Rect,
     ) -> Result<Self> {
@@ -38,7 +37,7 @@ impl Iterm2 {
             None => (&source.image, source.area),
         };
 
-        let data = encode(image, is_tmux)?;
+        let data = encode(image, area, is_tmux)?;
         Ok(Self {
             data,
             area,
@@ -47,29 +46,40 @@ impl Iterm2 {
     }
 }
 
-// TODO: change E to sixel_rs::status::Error and map when calling
-fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
+fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String> {
     let mut png: Vec<u8> = vec![];
     img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)?;
 
     let data = general_purpose::STANDARD.encode(&png);
 
-    let (start, end) = if is_tmux {
-        ("\x1bPtmux;\x1b\x1b", "\x1b\\")
-    } else {
-        ("\x1b", "")
-    };
-    Ok(format!(
-        "{start}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07{end}",
+    let (start, escape, end) = Parser::escape_tmux(is_tmux);
+
+    // Transparency needs explicit erasing of stale characters, or they stay behind the rendered
+    // image due to skipping of the following characters _in the buffer_.
+    // DECERA does not work in WezTerm, however ECH and and cursor CUD and CUU do.
+    // For each line, erase `width` characters, then move back and place image.
+    let width = render_area.width;
+    let height = render_area.height;
+    let mut seq = String::from(start);
+    for _ in 0..height {
+        seq.push_str(&format!("\x1b[{width}X\x1b[1B").to_string());
+    }
+    seq.push_str(&format!("\x1b[{height}A").to_string());
+
+    seq.push_str(&format!(
+        "{escape}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07",
         png.len(),
         img.width(),
         img.height(),
         data,
-    ))
+    ));
+    seq.push_str(end);
+
+    Ok::<String, errors::Errors>(seq)
 }
 
 impl ProtocolTrait for Iterm2 {
-    fn render(&self, area: Rect, buf: &mut Buffer) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
         render(self.area, &self.data, area, buf, false)
     }
 }
@@ -141,10 +151,13 @@ impl StatefulIterm2 {
 }
 
 impl StatefulProtocolTrait for StatefulIterm2 {
+    fn background_color(&self) -> Rgba<u8> {
+        self.source.background_color
+    }
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -159,7 +172,7 @@ impl StatefulProtocolTrait for StatefulIterm2 {
             force,
         ) {
             let is_tmux = self.current.is_tmux;
-            match encode(&img, is_tmux) {
+            match encode(&img, rect, is_tmux) {
                 Ok(data) => {
                     self.current = Iterm2 {
                         data,

@@ -8,7 +8,7 @@
 use icy_sixel::{
     sixel_string, DiffusionMethod, MethodForLargest, MethodForRep, PixelFormat, Quality,
 };
-use image::{DynamicImage, Rgb};
+use image::{DynamicImage, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::cmp::min;
 
@@ -28,7 +28,7 @@ impl Sixel {
         source: &ImageSource,
         font_size: FontSize,
         resize: Resize,
-        background_color: Option<Rgb<u8>>,
+        background_color: Rgba<u8>,
         is_tmux: bool,
         area: Rect,
     ) -> Result<Self> {
@@ -59,14 +59,14 @@ const TMUX_START: &str = "\x1bPtmux;";
 // TODO: change E to sixel_rs::status::Error and map when calling
 fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
     let (w, h) = (img.width(), img.height());
-    let img_rgba8 = img.to_rgba8();
-    let bytes = img_rgba8.as_raw();
+    let img_rgb8 = img.to_rgb8();
+    let bytes = img_rgb8.as_raw();
 
     let data = sixel_string(
         bytes,
         w as i32,
         h as i32,
-        PixelFormat::RGBA8888,
+        PixelFormat::RGB888,
         DiffusionMethod::Stucki,
         MethodForLargest::Auto,
         MethodForRep::Auto,
@@ -93,7 +93,7 @@ fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
 }
 
 impl ProtocolTrait for Sixel {
-    fn render(&self, area: Rect, buf: &mut Buffer) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
         render(self.area, &self.data, area, buf, false)
     }
 }
@@ -177,10 +177,13 @@ impl StatefulSixel {
 }
 
 impl StatefulProtocolTrait for StatefulSixel {
+    fn background_color(&self) -> Rgba<u8> {
+        self.source.background_color
+    }
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }

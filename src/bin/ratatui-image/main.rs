@@ -16,7 +16,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
-use ratatui_image::{picker::Picker, protocol::StatefulProtocol, Resize, StatefulImage};
+use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
 
 struct App {
     pub filename: String,
@@ -130,7 +130,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     f.render_widget(block_top, chunks[0]);
 
     let block_bottom = Block::default().borders(Borders::ALL).title("image");
-    let image = StatefulImage::new(None).resize(Resize::Fit(None));
+    let image = StatefulImage::default();
     f.render_stateful_widget(image, block_bottom.inner(chunks[1]), &mut app.image_state);
     f.render_widget(block_bottom, chunks[1]);
 }

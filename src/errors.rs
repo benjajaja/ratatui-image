@@ -4,7 +4,7 @@ use std::sync::mpsc::RecvTimeoutError;
 pub enum Errors {
     #[error("Could not detect font size")]
     NoFontSize,
-    #[error("Could not detect any graphics capabilities")]
+    #[error("Could not detect any graphics nor font capabilities")]
     NoCap,
     #[error("Timeout: {0}")]
     Timeout(#[from] RecvTimeoutError),

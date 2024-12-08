@@ -21,24 +21,22 @@
 
 Compatibility and QA:
 
-Terminal  | Protocol | Fixed | Resize | Notes
-----------|----------|-------|--------|-------
-Xterm     | `Sixel`  | ✔️     | ✔️      | Run with `-ti 340` to make sure sixel support is enabled.
-Foot      | `Sixel`  | ✔️     | ✔️      | Wayland.
-kitty     | `Kitty`  | ✔️     | ✔️      |
-Wezterm   | `iTerm2` | ✔️     | ✔️      | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
-Alacritty | `Sixel`  | ❌    | ❌     | [There is a sixel fork](https://github.com/microo8/alacritty-sixel), but it's stale and does not clear graphics.
-iTerm2    | `iTerm2` | ❔    | ❔     | Untested (needs apple hardware), however should be the same as WezTerm.
-konsole   | `Sixel`  | ❌    | ❌     | [Wontfix: does not clear graphics](https://bugs.kde.org/show_bug.cgi?id=456354), other artifacts.
-Contour   | `Sixel`  | ❌    | ❌     | Does not clear graphics.
-ctx       | `Sixel`  | ❌    | ❌     | Buggy.
-Blackbox  | `Sixel`  | ❔    | ❔     | Untested.
-
-Here, "Fixed" means the `Image` widget, and "Resize" is the `StatefulWidget`.
+Terminal  | Protocol | Fixed | Notes
+----------|----------|-------|-------
+Xterm     | `Sixel`  | ✔️     | Run with `-ti 340` to make sure sixel support is enabled.
+Foot      | `Sixel`  | ✔️     | Wayland.
+Kitty     | `Kitty`  | ✔️     |
+Wezterm   | `iTerm2` | ✔️     | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
+Alacritty | `Sixel`  | ❌    | [There is a sixel fork](https://github.com/microo8/alacritty-sixel), but it's probably never getting merged, and does not clear graphics.
+iTerm2    | `iTerm2` | ❔    | Feedback from mac users wanted.
+Konsole   | `Sixel`  | ❌    | [Possibly fixed in 24.12](https://bugs.kde.org/show_bug.cgi?id=456354)
+Contour   | `Sixel`  | ❌    | Does not clear graphics.
+ctx       | `Sixel`  | ❌    | Buggy.
+Blackbox  | `Sixel`  | ❔    | Untested.
 
 A basic [screenshot test](./assets/screenshot_xterm.png) is run with xterm on Xvfb in the CI (or `cargo make screenshot-xvfb && cargo make screenshot-diff`).
 
-Halfblocks should work in all terminals.
+Halfblocks should work in all terminals, even if the font size could not be detected, with a 4:8 pixel ratio.
 
 ### Projects that use ratatui-image
 
@@ -63,6 +61,13 @@ Halfblocks should work in all terminals.
   CLI utility that draws images on terminals by using X11/wayland child windows, sixels, kitty,
   and/or iterm2 protocols (any means necessary). There exists several wrapper or bindings crates.
   More battle-tested but essentially stateful, which makes it hard to use with immediate-mode.
+
+### Contributing
+
+PRs and issues/discussions welcome!
+
+You can run an aproximation of the CI with `cargo make ci`. I must manually approve CI runs for new 
+PRs to prevent github-action attacks. The demo is useful to test that everything works correctly.
 
 License: {{license}}
 

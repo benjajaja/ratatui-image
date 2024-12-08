@@ -1,7 +1,7 @@
 //! Halfblocks protocol implementations.
 //! Uses the unicode character `▀` combined with foreground and background color. Assumes that the
 //! font aspect ratio is roughly 1:2. Should work in all terminals.
-use image::{imageops::FilterType, DynamicImage, Rgb};
+use image::{imageops::FilterType, DynamicImage, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
@@ -30,7 +30,7 @@ impl Halfblocks {
         source: &ImageSource,
         font_size: FontSize,
         resize: Resize,
-        background_color: Option<Rgb<u8>>,
+        background_color: Rgba<u8>,
         area: Rect,
     ) -> Result<Self> {
         let resized = resize.resize(
@@ -81,7 +81,7 @@ fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
 }
 
 impl ProtocolTrait for Halfblocks {
-    fn render(&self, area: Rect, buf: &mut Buffer) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
         for (i, hb) in self.data.iter().enumerate() {
             let x = i as u16 % self.area.width;
             let y = i as u16 / self.area.width;
@@ -115,10 +115,13 @@ impl StatefulHalfblocks {
 }
 
 impl StatefulProtocolTrait for StatefulHalfblocks {
+    fn background_color(&self) -> Rgba<u8> {
+        self.source.background_color
+    }
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
     }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Option<Rgb<u8>>, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -139,6 +142,6 @@ impl StatefulProtocolTrait for StatefulHalfblocks {
         }
     }
     fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        Halfblocks::render(&self.current, area, buf);
+        Halfblocks::render(&mut self.current, area, buf);
     }
 }

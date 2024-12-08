@@ -12,7 +12,7 @@ mod termion;
 #[cfg(feature = "termwiz")]
 mod termwiz;
 
-use std::{error::Error, num::Wrapping as w, path::PathBuf, time::Duration};
+use std::{env, error::Error, num::Wrapping as w, path::PathBuf, time::Duration};
 
 use image::DynamicImage;
 use ratatui::{
@@ -46,13 +46,15 @@ enum ShowImages {
     Resized,
 }
 
-struct App<'a> {
-    title: &'a str,
+
+struct App {
+    title: String,
     should_quit: bool,
     tick_rate: Duration,
     background: String,
     split_percent: u16,
     show_images: ShowImages,
+
 
     image_source_path: PathBuf,
     image_static_offset: (u16, u16),
@@ -69,12 +71,19 @@ fn size() -> Rect {
     Rect::new(0, 0, 30, 16)
 }
 
-impl<'a> App<'a> {
-    pub fn new<B: Backend>(title: &'a str, _: &mut Terminal<B>) -> App<'a> {
+impl App {
+    pub fn new<B: Backend>(_: &mut Terminal<B>) -> Self {
+        let title = format!(
+            "Demo ({})",
+            env::var("TERM").unwrap_or("unknown".to_string())
+        );
+
         let ada = "./assets/Ada.png";
         let image_source = image::io::Reader::open(ada).unwrap().decode().unwrap();
 
         let mut picker = Picker::from_query_stdio().unwrap();
+        // Set completely transparent background (experimental, only works for iTerm2 and Kitty).
+        picker.set_background_color([0, 0, 0, 0]);
 
         let image_static = picker
             .new_protocol(image_source.clone(), size(), Resize::Fit(None))
@@ -140,6 +149,7 @@ impl<'a> App<'a> {
             'o' => {
                 let path = match self.image_source_path.to_str() {
                     Some("./assets/Ada.png") => "./assets/Jenkins.jpg",
+                    Some("./assets/Jenkins.jpg") => "./assets/NixOS.png",
                     _ => "./assets/Ada.png",
                 };
                 self.image_source = image::io::Reader::open(path).unwrap().decode().unwrap();
@@ -209,7 +219,9 @@ impl<'a> App<'a> {
 }
 
 fn ui(f: &mut Frame<'_>, app: &mut App) {
-    let outer_block = Block::default().borders(Borders::TOP).title(app.title);
+    let outer_block = Block::default()
+        .borders(Borders::TOP)
+        .title(app.title.as_str());
 
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -236,11 +248,11 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     match app.show_images {
         ShowImages::Resized => {}
         _ => {
-            let image = Image::new(&app.image_static);
+            let image = Image::new(&mut app.image_static);
             // Let it be surrounded by styled text.
             let offset_area = Rect {
-                x: area.x + 2,
-                y: area.y + 2,
+                x: area.x + 1,
+                y: area.y + 1,
                 width: area.width.saturating_sub(2),
                 height: area.height.saturating_sub(2),
             };
@@ -252,11 +264,11 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(left_chunks[1]);
-
     app.render_resized_image(f, Resize::Crop(None), chunks_left_bottom[0]);
     app.render_resized_image(f, Resize::Scale(None), chunks_left_bottom[1]);
     app.render_resized_image(f, Resize::Fit(None), right_chunks[0]);
     let block_right_bottom = block("Help");
+
     let area = block_right_bottom.inner(right_chunks[1]);
     f.render_widget(
         paragraph(vec![

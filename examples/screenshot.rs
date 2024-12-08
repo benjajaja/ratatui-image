@@ -3,7 +3,6 @@ use std::{
     process::{Command, Stdio},
 };
 
-use image::Rgb;
 use ratatui::{
     backend::CrosstermBackend,
     crossterm::{
@@ -37,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut picker = Picker::from_query_stdio()?;
-    picker.set_background_color(Some(Rgb::<u8>([255, 0, 255])));
+    picker.set_background_color([255, 0, 255, 255]);
     if false {
         assert_eq!(
             ASSERT_FONT_SIZE,
@@ -91,7 +90,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         block.inner(area),
     );
 
-    let image = Image::new(&app.image);
+    let image = Image::new(&mut app.image);
     f.render_widget(image, block.inner(area));
     f.render_widget(block, area);
 }
