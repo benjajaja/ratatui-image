@@ -26,28 +26,10 @@ impl Halfblocks {
     /// The "resolution" is determined by the font size of the terminal. Smaller fonts will result
     /// in more half-blocks for the same image size. To get a size independent of the font size,
     /// the image could be resized in relation to the font size beforehand.
-    pub fn from_source(
-        source: &ImageSource,
-        font_size: FontSize,
-        resize: Resize,
-        background_color: Rgba<u8>,
-        area: Rect,
-    ) -> Result<Self> {
-        let resized = resize.resize(
-            source,
-            font_size,
-            Rect::default(),
-            area,
-            background_color,
-            false,
-        );
-        let (image, area) = match resized {
-            Some((ref image, desired)) => (image, desired),
-            None => (&source.image, source.area),
-        };
-
-        let data = encode(image, area);
-
+    /// Also note that the font-size is probably just some arbitrary size with a 1:2 ratio when the
+    /// protocol is Halfblocks, and not the actual font size of the terminal.
+    pub fn new(image: DynamicImage, area: Rect) -> Result<Self> {
+        let data = encode(&image, area);
         Ok(Self { data, area })
     }
 }
@@ -119,27 +101,24 @@ impl StatefulProtocolTrait for StatefulHalfblocks {
         self.source.background_color
     }
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
+        resize.needs_resize(
+            &self.source,
+            self.font_size,
+            self.current.area,
+            area,
+            self.source.hash != self.hash,
+        )
     }
     fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
 
-        let force = self.source.hash != self.hash;
-        if let Some((img, rect)) = resize.resize(
-            &self.source,
-            self.font_size,
-            self.current.area,
-            area,
-            background_color,
-            force,
-        ) {
-            let data = encode(&img, rect);
-            let current = Halfblocks { data, area: rect };
-            self.current = current;
-            self.hash = self.source.hash;
-        }
+        let img = resize.resize(&self.source, self.font_size, area, background_color);
+        let data = encode(&img, area);
+        let current = Halfblocks { data, area };
+        self.current = current;
+        self.hash = self.source.hash;
     }
     fn render(&mut self, area: Rect, buf: &mut Buffer) {
         Halfblocks::render(&mut self.current, area, buf);

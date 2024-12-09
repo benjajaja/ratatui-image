@@ -40,33 +40,8 @@ pub struct Kitty {
 
 impl Kitty {
     /// Create a FixedKitty from an image.
-    ///
-    /// The "resolution" is determined by the font size of the terminal. Smaller fonts will result
-    /// in more half-blocks for the same image size. To get a size independent of the font size,
-    /// the image could be resized in relation to the font size beforehand.
-    pub fn from_source(
-        source: &ImageSource,
-        font_size: FontSize,
-        resize: Resize,
-        background_color: Rgba<u8>,
-        area: Rect,
-        id: u32,
-        is_tmux: bool,
-    ) -> Result<Self> {
-        let resized = resize.resize(
-            source,
-            font_size,
-            Rect::default(),
-            area,
-            background_color,
-            false,
-        );
-        let (image, area) = match resized {
-            Some((ref image, desired)) => (image, desired),
-            None => (&source.image, source.area),
-        };
-
-        let proto_state = KittyProtoState::TransmitAndPlace(transmit_virtual(image, id, is_tmux));
+    pub fn new(image: DynamicImage, area: Rect, id: u32, is_tmux: bool) -> Result<Self> {
+        let proto_state = KittyProtoState::TransmitAndPlace(transmit_virtual(&image, id, is_tmux));
         Ok(Self {
             proto_state,
             unique_id: id,
@@ -114,28 +89,25 @@ impl StatefulProtocolTrait for StatefulKitty {
         self.source.background_color
     }
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(&self.source, self.font_size, self.rect, area, false)
+        resize.needs_resize(
+            &self.source,
+            self.font_size,
+            self.rect,
+            area,
+            self.source.hash != self.hash,
+        )
     }
     fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
 
-        let force = self.source.hash != self.hash;
-        if let Some((img, rect)) = resize.resize(
-            &self.source,
-            self.font_size,
-            self.rect,
-            area,
-            background_color,
-            force,
-        ) {
-            let data = transmit_virtual(&img, self.unique_id, self.is_tmux);
-            self.hash = self.source.hash;
-            self.rect = rect;
-            // If resized then we must transmit again.
-            self.proto_state = KittyProtoState::TransmitAndPlace(data);
-        }
+        let img = resize.resize(&self.source, self.font_size, area, background_color);
+        let data = transmit_virtual(&img, self.unique_id, self.is_tmux);
+        self.hash = self.source.hash;
+        self.rect = area;
+        // If resized then we must transmit again.
+        self.proto_state = KittyProtoState::TransmitAndPlace(data);
     }
     fn render(&mut self, area: Rect, buf: &mut Buffer) {
         // Transmit only once. This is why self is mut.

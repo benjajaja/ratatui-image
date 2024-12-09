@@ -24,28 +24,8 @@ pub struct Sixel {
 }
 
 impl Sixel {
-    pub fn from_source(
-        source: &ImageSource,
-        font_size: FontSize,
-        resize: Resize,
-        background_color: Rgba<u8>,
-        is_tmux: bool,
-        area: Rect,
-    ) -> Result<Self> {
-        let resized = resize.resize(
-            source,
-            font_size,
-            Rect::default(),
-            area,
-            background_color,
-            false,
-        );
-        let (image, area) = match resized {
-            Some((ref image, desired)) => (image, desired),
-            None => (&source.image, source.area),
-        };
-
-        let data = encode(image, is_tmux)?;
+    pub fn new(image: DynamicImage, area: Rect, is_tmux: bool) -> Result<Self> {
+        let data = encode(&image, is_tmux)?;
         Ok(Self {
             data,
             area,
@@ -181,35 +161,32 @@ impl StatefulProtocolTrait for StatefulSixel {
         self.source.background_color
     }
     fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(&self.source, self.font_size, self.current.area, area, false)
+        resize.needs_resize(
+            &self.source,
+            self.font_size,
+            self.current.area,
+            area,
+            self.source.hash != self.hash,
+        )
     }
     fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
 
-        let force = self.source.hash != self.hash;
-        if let Some((img, rect)) = resize.resize(
-            &self.source,
-            self.font_size,
-            self.current.area,
-            area,
-            background_color,
-            force,
-        ) {
-            let is_tmux = self.current.is_tmux;
-            match encode(&img, is_tmux) {
-                Ok(data) => {
-                    self.current = Sixel {
-                        data,
-                        area: rect,
-                        is_tmux,
-                    };
-                    self.hash = self.source.hash;
-                }
-                Err(_err) => {
-                    // TODO: save err in struct and expose in trait?
-                }
+        let img = resize.resize(&self.source, self.font_size, area, background_color);
+        let is_tmux = self.current.is_tmux;
+        match encode(&img, is_tmux) {
+            Ok(data) => {
+                self.current = Sixel {
+                    data,
+                    area,
+                    is_tmux,
+                };
+                self.hash = self.source.hash;
+            }
+            Err(_err) => {
+                // TODO: save err in struct and expose in trait?
             }
         }
     }

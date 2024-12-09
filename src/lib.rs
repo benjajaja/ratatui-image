@@ -243,35 +243,34 @@ pub struct CropOptions {
 }
 
 impl Resize {
-    /// Resize if [`ImageSource`]'s "desired" doesn't fit into `area`, or is different than `current`
+    /// Resize [`ImageSource`] to fit the `area`.
     fn resize(
         &self,
         source: &ImageSource,
         font_size: FontSize,
-        current: Rect,
         area: Rect,
         background_color: Rgba<u8>,
-        force: bool,
-    ) -> Option<(DynamicImage, Rect)> {
-        self.needs_resize(source, font_size, current, area, force)
-            .map(|rect| {
-                let width = (rect.width * font_size.0) as u32;
-                let height = (rect.height * font_size.1) as u32;
-                // Resize/Crop/etc. but not necessarily fitting cell size
-                let mut image = self.resize_image(source, width, height);
-                // Always pad to cell size with background color, Sixel doesn't have transparency
-                // and would get a white background by the sixel library.
-                // Once Sixel gets transparency support, only pad
-                // `if image.width() != width || image.height() != height`.
-                let mut bg: DynamicImage =
-                    ImageBuffer::from_pixel(width, height, background_color).into();
-                imageops::overlay(&mut bg, &image, 0, 0);
-                image = bg;
-                (image, rect)
-            })
+    ) -> DynamicImage {
+        let width = (area.width * font_size.0) as u32;
+        let height = (area.height * font_size.1) as u32;
+
+        // Resize/Crop/etc., fitting a multiple of font-size, but not necessarily the area.
+        let mut image = self.resize_image(source, width, height);
+
+        // Always pad to area size with background color, Sixel doesn't have transparency
+        // and would get a white background by the sixel library.
+        // Once Sixel gets transparency support, only pad
+        // `if image.width() != width || image.height() != height`.
+        let mut bg: DynamicImage = ImageBuffer::from_pixel(width, height, background_color).into();
+        imageops::overlay(&mut bg, &image, 0, 0);
+        image = bg;
+        image
     }
 
     /// Check if [`ImageSource`]'s "desired" fits into `area` and is different than `current`.
+    ///
+    /// The returned `Rect` is the area the image needs to be resized to, depending on the resize
+    /// type.
     pub fn needs_resize(
         &self,
         image: &ImageSource,
@@ -331,7 +330,7 @@ impl Resize {
 
     fn needs_resize_rect(&self, desired: Rect, area: Rect) -> Rect {
         let (width, height) = match self {
-            Self::Fit(_) => resize_pixels(
+            Self::Fit(_) => fit_area_proportionally(
                 desired.width,
                 desired.height,
                 min(area.width, desired.width),
@@ -342,7 +341,9 @@ impl Resize {
                 min(desired.width, area.width),
                 min(desired.height, area.height),
             ),
-            Self::Scale(_) => resize_pixels(desired.width, desired.height, area.width, area.height),
+            Self::Scale(_) => {
+                fit_area_proportionally(desired.width, desired.height, area.width, area.height)
+            }
         };
         Rect::new(0, 0, width, height)
     }
@@ -356,7 +357,7 @@ impl Resize {
 /// aspect ratio), or will shrink so that both dimensions are
 /// completely contained within the given `width` and `height`,
 /// with empty space on one axis.
-fn resize_pixels(width: u16, height: u16, nwidth: u16, nheight: u16) -> (u16, u16) {
+fn fit_area_proportionally(width: u16, height: u16, nwidth: u16, nheight: u16) -> (u16, u16) {
     let wratio = nwidth as f64 / width as f64;
     let hratio = nheight as f64 / height as f64;
 

@@ -170,42 +170,28 @@ impl Picker {
         resize: Resize,
     ) -> Result<Protocol> {
         let source = ImageSource::new(image, self.font_size, self.background_color);
+        let (image, area) =
+            match resize.needs_resize(&source, self.font_size, source.area, size, false) {
+                Some(area) => {
+                    let image = resize.resize(&source, self.font_size, size, self.background_color);
+                    (image, area)
+                }
+                None => (source.image, size),
+            };
+
         match self.protocol_type {
-            ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::from_source(
-                &source,
-                self.font_size,
-                resize,
-                self.background_color,
-                size,
-            )?)),
-            ProtocolType::Sixel => Ok(Protocol::Sixel(Sixel::from_source(
-                &source,
-                self.font_size,
-                resize,
-                self.background_color,
-                self.is_tmux,
-                size,
-            )?)),
+            ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::new(image, area)?)),
+            ProtocolType::Sixel => Ok(Protocol::Sixel(Sixel::new(image, area, self.is_tmux)?)),
             ProtocolType::Kitty => {
                 self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
-                Ok(Protocol::Kitty(Kitty::from_source(
-                    &source,
-                    self.font_size,
-                    resize,
-                    self.background_color,
-                    size,
+                Ok(Protocol::Kitty(Kitty::new(
+                    image,
+                    area,
                     self.kitty_counter,
                     self.is_tmux,
                 )?))
             }
-            ProtocolType::Iterm2 => Ok(Protocol::ITerm2(Iterm2::from_source(
-                &source,
-                self.font_size,
-                resize,
-                self.background_color,
-                self.is_tmux,
-                size,
-            )?)),
+            ProtocolType::Iterm2 => Ok(Protocol::ITerm2(Iterm2::new(image, area, self.is_tmux)?)),
         }
     }
 
