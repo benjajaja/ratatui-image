@@ -18,7 +18,7 @@ use image::DynamicImage;
 use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style, Styled, Stylize},
+    style::{Color, Stylize},
     text::{Line, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
