@@ -57,6 +57,10 @@ impl ProtocolTrait for Kitty {
 
         render(area, self.area, buf, self.unique_id, seq);
     }
+
+    fn area(&self) -> Rect {
+        self.area
+    }
 }
 
 #[derive(Clone)]
@@ -84,6 +88,19 @@ impl StatefulKitty {
     }
 }
 
+impl ProtocolTrait for StatefulKitty {
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
+        // Transmit only once. This is why self is mut.
+        let seq = self.proto_state.make_transmit();
+
+        render(area, self.rect, buf, self.unique_id, seq);
+    }
+
+    fn area(&self) -> Rect {
+        self.rect
+    }
+}
+
 impl StatefulProtocolTrait for StatefulKitty {
     fn background_color(&self) -> Rgba<u8> {
         self.source.background_color
@@ -108,12 +125,6 @@ impl StatefulProtocolTrait for StatefulKitty {
         self.rect = area;
         // If resized then we must transmit again.
         self.proto_state = KittyProtoState::TransmitAndPlace(data);
-    }
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        // Transmit only once. This is why self is mut.
-        let seq = self.proto_state.make_transmit();
-
-        render(area, self.rect, buf, self.unique_id, seq);
     }
 }
 

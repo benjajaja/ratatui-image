@@ -76,6 +76,10 @@ impl ProtocolTrait for Sixel {
     fn render(&mut self, area: Rect, buf: &mut Buffer) {
         render(self.area, &self.data, area, buf, false)
     }
+
+    fn area(&self) -> Rect {
+        self.area
+    }
 }
 
 fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) {
@@ -156,6 +160,16 @@ impl StatefulSixel {
     }
 }
 
+impl ProtocolTrait for StatefulSixel {
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
+        render(self.current.area, &self.current.data, area, buf, true);
+    }
+
+    fn area(&self) -> Rect {
+        self.current.area
+    }
+}
+
 impl StatefulProtocolTrait for StatefulSixel {
     fn background_color(&self) -> Rgba<u8> {
         self.source.background_color
@@ -189,8 +203,5 @@ impl StatefulProtocolTrait for StatefulSixel {
                 // TODO: save err in struct and expose in trait?
             }
         }
-    }
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        render(self.current.area, &self.current.data, area, buf, true);
     }
 }

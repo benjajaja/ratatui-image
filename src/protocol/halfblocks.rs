@@ -75,6 +75,9 @@ impl ProtocolTrait for Halfblocks {
                 .map(|cell| cell.set_fg(hb.upper).set_bg(hb.lower).set_char('▀'));
         }
     }
+    fn area(&self) -> Rect {
+        self.area
+    }
 }
 
 #[derive(Clone)]
@@ -93,6 +96,15 @@ impl StatefulHalfblocks {
             current: Halfblocks::default(),
             hash: u64::default(),
         }
+    }
+}
+impl ProtocolTrait for StatefulHalfblocks {
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
+        Halfblocks::render(&mut self.current, area, buf);
+    }
+
+    fn area(&self) -> Rect {
+        self.current.area
     }
 }
 
@@ -119,8 +131,5 @@ impl StatefulProtocolTrait for StatefulHalfblocks {
         let current = Halfblocks { data, area };
         self.current = current;
         self.hash = self.source.hash;
-    }
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        Halfblocks::render(&mut self.current, area, buf);
     }
 }
