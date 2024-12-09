@@ -46,7 +46,6 @@ enum ShowImages {
     Resized,
 }
 
-
 struct App {
     title: String,
     should_quit: bool,
@@ -54,7 +53,6 @@ struct App {
     background: String,
     split_percent: u16,
     show_images: ShowImages,
-
 
     image_source_path: PathBuf,
     image_static_offset: (u16, u16),
