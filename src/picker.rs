@@ -171,7 +171,7 @@ impl Picker {
     ) -> Result<Protocol> {
         let source = ImageSource::new(image, self.font_size, self.background_color);
         let (image, area) =
-            match resize.needs_resize(&source, self.font_size, source.area, size, false) {
+            match resize.needs_resize(&source, self.font_size, source.desired, size, false) {
                 Some(area) => {
                     let image = resize.resize(&source, self.font_size, size, self.background_color);
                     (image, area)

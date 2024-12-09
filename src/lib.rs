@@ -279,7 +279,7 @@ impl Resize {
         area: Rect,
         force: bool,
     ) -> Option<Rect> {
-        let desired = image.area;
+        let desired = image.desired;
         // Check if resize is needed at all.
         if !matches!(self, &Resize::Scale(_))
             && desired.width <= area.width
@@ -293,7 +293,17 @@ impl Resize {
             }
         }
 
-        let rect = self.needs_resize_rect(desired, area);
+        let (width, height) = self.needs_resize_pixels(
+            &image.image,
+            (area.width as u32) * (font_size.0 as u32),
+            (area.height as u32) * (font_size.1 as u32),
+        );
+        let rect = ImageSource::round_pixel_size_to_cells(width, height, font_size);
+        debug_assert!(rect.width <= area.width, "needs_resize exceeds area width");
+        debug_assert!(
+            rect.height <= area.height,
+            "needs_resize exceeds area height"
+        );
         if force || rect != current {
             return Some(rect);
         }
@@ -328,24 +338,18 @@ impl Resize {
         }
     }
 
-    fn needs_resize_rect(&self, desired: Rect, area: Rect) -> Rect {
-        let (width, height) = match self {
+    fn needs_resize_pixels(&self, image: &DynamicImage, width: u32, height: u32) -> (u32, u32) {
+        match self {
             Self::Fit(_) => fit_area_proportionally(
-                desired.width,
-                desired.height,
-                min(area.width, desired.width),
-                min(area.height, desired.height),
+                image.width(),
+                image.height(),
+                min(width, image.width()),
+                min(height, image.height()),
             ),
 
-            Self::Crop(_) => (
-                min(desired.width, area.width),
-                min(desired.height, area.height),
-            ),
-            Self::Scale(_) => {
-                fit_area_proportionally(desired.width, desired.height, area.width, area.height)
-            }
-        };
-        Rect::new(0, 0, width, height)
+            Self::Crop(_) => (min(image.width(), width), min(image.height(), height)),
+            Self::Scale(_) => fit_area_proportionally(image.width(), image.height(), width, height),
+        }
     }
 }
 
@@ -357,7 +361,7 @@ impl Resize {
 /// aspect ratio), or will shrink so that both dimensions are
 /// completely contained within the given `width` and `height`,
 /// with empty space on one axis.
-fn fit_area_proportionally(width: u16, height: u16, nwidth: u16, nheight: u16) -> (u16, u16) {
+fn fit_area_proportionally(width: u32, height: u32, nwidth: u32, nheight: u32) -> (u32, u32) {
     let wratio = nwidth as f64 / width as f64;
     let hratio = nheight as f64 / height as f64;
 
@@ -368,12 +372,12 @@ fn fit_area_proportionally(width: u16, height: u16, nwidth: u16, nheight: u16) -
 
     if nw > u64::from(u16::MAX) {
         let ratio = u16::MAX as f64 / width as f64;
-        (u16::MAX, max((height as f64 * ratio).round() as u16, 1))
+        (u32::MAX, max((height as f64 * ratio).round() as u32, 1))
     } else if nh > u64::from(u16::MAX) {
         let ratio = u16::MAX as f64 / height as f64;
-        (max((width as f64 * ratio).round() as u16, 1), u16::MAX)
+        (max((width as f64 * ratio).round() as u32, 1), u32::MAX)
     } else {
-        (nw as u16, nh as u16)
+        (nw as u32, nh as u32)
     }
 }
 

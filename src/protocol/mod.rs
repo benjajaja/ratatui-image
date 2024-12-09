@@ -170,7 +170,7 @@ pub struct ImageSource {
     /// The original image without resizing.
     pub image: DynamicImage,
     /// The area that the [`ImageSource::image`] covers, but not necessarily fills.
-    pub area: Rect,
+    pub desired: Rect,
     /// TODO: document this; when image changes but it doesn't need a resize, force a render.
     pub hash: u64,
     /// The background color that should be used for padding or background when resizing.
@@ -184,7 +184,8 @@ impl ImageSource {
         font_size: FontSize,
         background_color: Rgba<u8>,
     ) -> ImageSource {
-        let area = ImageSource::round_pixel_size_to_cells(image.width(), image.height(), font_size);
+        let desired =
+            ImageSource::round_pixel_size_to_cells(image.width(), image.height(), font_size);
 
         let mut state = DefaultHasher::new();
         image.as_bytes().hash(&mut state);
@@ -200,13 +201,13 @@ impl ImageSource {
 
         ImageSource {
             image,
-            area,
+            desired,
             hash,
             background_color,
         }
     }
     /// Round an image pixel size to the nearest matching cell size, given a font size.
-    fn round_pixel_size_to_cells(
+    pub fn round_pixel_size_to_cells(
         img_width: u32,
         img_height: u32,
         (char_width, char_height): FontSize,
