@@ -59,11 +59,10 @@ command = "cargo"
 args = ["build", "--features", "${BACKEND}"]
 
 
-[tasks.run-example]
+[tasks.demo]
 command = "cargo"
 args = [
   "run",
-  "--release",
   "--example",
   "demo",
   "--features", "serde,crossterm",

@@ -103,8 +103,10 @@ impl Picker {
                 }
             }
             Err(Errors::NoCap) => Ok(Picker {
-                // This is completely arbitrary, but it doesn't matter much for halfblocks.
-                font_size: (4, 8),
+                // This is completely arbitrary. For halfblocks, it doesn't have to be precise
+                // since we're not rendering pixels. It should be roughly 1:2 ratio, and some
+                // reasonable size.
+                font_size: (10, 20),
                 background_color: DEFAULT_BACKGROUND,
                 protocol_type: ProtocolType::Halfblocks,
                 is_tmux,
@@ -170,10 +172,19 @@ impl Picker {
         resize: Resize,
     ) -> Result<Protocol> {
         let source = ImageSource::new(image, self.font_size, self.background_color);
+
         let (image, area) =
             match resize.needs_resize(&source, self.font_size, source.desired, size, false) {
                 Some(area) => {
-                    let image = resize.resize(&source, self.font_size, size, self.background_color);
+                    // Not exactly sure why this is necessary only for Protocol and not
+                    // StatefulProtocol, but the image proportion comes out wrong if we don't
+                    // divide height by half here.
+                    let font_size = if self.protocol_type == ProtocolType::Halfblocks {
+                        (self.font_size.0, self.font_size.1 / 2)
+                    } else {
+                        self.font_size
+                    };
+                    let image = resize.resize(&source, font_size, size, self.background_color);
                     (image, area)
                 }
                 None => (source.image, size),
