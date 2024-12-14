@@ -187,7 +187,7 @@ impl Picker {
                     let image = resize.resize(&source, font_size, size, self.background_color);
                     (image, area)
                 }
-                None => (source.image, size),
+                None => (source.image, source.desired),
             };
 
         match self.protocol_type {
