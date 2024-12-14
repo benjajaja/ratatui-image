@@ -194,7 +194,7 @@ impl Picker {
             ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::new(image, area)?)),
             ProtocolType::Sixel => Ok(Protocol::Sixel(Sixel::new(image, area, self.is_tmux)?)),
             ProtocolType::Kitty => {
-                self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
+                (self.kitty_counter, _) = self.kitty_counter.overflowing_add(1);
                 Ok(Protocol::Kitty(Kitty::new(
                     image,
                     area,
@@ -217,7 +217,7 @@ impl Picker {
                 StatefulProtocol::Sixel(StatefulSixel::new(source, self.font_size, self.is_tmux))
             }
             ProtocolType::Kitty => {
-                self.kitty_counter = self.kitty_counter.checked_add(1).unwrap_or(1);
+                (self.kitty_counter, _) = self.kitty_counter.overflowing_add(1);
                 StatefulProtocol::Kitty(StatefulKitty::new(
                     source,
                     self.font_size,
