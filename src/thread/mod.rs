@@ -44,7 +44,7 @@ impl StatefulWidget for ThreadImage {
                 // If it needs resizing (grow or shrink) then send it away instead of rendering.
                 // Send the requested area instead of the calculated area
                 // to ensure consistent calculations between the render thread and the UI thread.
-                if protocol.needs_resize(&self.resize, area).is_some() {
+                if let Some(area) = protocol.needs_resize(&self.resize, area) {
                     state.tx.send((protocol, self.resize, area)).unwrap();
                     None
                 } else {

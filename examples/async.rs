@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             match ev {
                 AppEvent::KeyEvent(key) => {
                     if key.kind == KeyEventKind::Press {
-                        if key.code == KeyCode::Esc {
+                        if key.code == KeyCode::Char('q') {
                             break;
                         }
                     }
