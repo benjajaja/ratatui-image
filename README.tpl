@@ -13,7 +13,7 @@
 
 ### Showcase:
 
-![Recording](./assets/Recording.gif)
+![Screen recording](./assets/showcase.gif)
 
 {{readme}}
 
