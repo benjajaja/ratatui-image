@@ -141,6 +141,14 @@ A basic [screenshot test](./assets/screenshot_xterm.png) is run with xterm on Xv
 
 Halfblocks should work in all terminals, even if the font size could not be detected, with a 4:8 pixel ratio.
 
+### Known issues
+Summary | Link
+---------|---------
+Termwiz backend does not work at all | [#1](https://github.com/benjajaja/ratatui-image/issues/1)
+Sixel image rendered on the last line of terminal causes a scroll | [#57](https://github.com/benjajaja/ratatui-image/issues/57)
+Tmux needs a revisit | -
+
+
 ### Projects that use ratatui-image
 
 * [iamb](https://github.com/ulyssa/iamb)
