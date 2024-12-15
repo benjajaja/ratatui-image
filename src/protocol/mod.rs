@@ -69,6 +69,15 @@ impl Protocol {
         };
         inner.render(area, buf);
     }
+    pub fn area(&self) -> Rect {
+        let inner: &dyn ProtocolTrait = match self {
+            Self::Halfblocks(halfblocks) => halfblocks,
+            Self::Sixel(sixel) => sixel,
+            Self::Kitty(kitty) => kitty,
+            Self::ITerm2(iterm2) => iterm2,
+        };
+        inner.area()
+    }
 }
 
 /// A stateful resizing image protocol for the [crate::StatefulImage] widget.
@@ -143,6 +152,9 @@ impl StatefulProtocol {
     /// Render the currently resized and encoded data to the buffer.
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         self.inner_trait_mut().render(area, buf);
+    }
+    pub fn area(&self) -> Rect {
+        self.inner_trait().area()
     }
 }
 
