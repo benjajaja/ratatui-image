@@ -1270,7 +1270,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-image"
-version = "4.0.2-dev"
+version = "4.1.0"
 dependencies = [
  "base64",
  "icy_sixel",
