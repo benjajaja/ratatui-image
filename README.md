@@ -124,18 +124,18 @@ false`). To only support a selection of image formats and cut down dependencies,
 
 Compatibility and QA:
 
-Terminal  | Protocol | Fixed | Notes
-----------|----------|-------|-------
-Xterm     | `Sixel`  | ✔️     | Run with `-ti 340` to make sure sixel support is enabled.
-Foot      | `Sixel`  | ✔️     | Wayland.
-Kitty     | `Kitty`  | ✔️     |
-Wezterm   | `iTerm2` | ✔️     | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
-Alacritty | `Sixel`  | ❌    | [There is a sixel fork](https://github.com/microo8/alacritty-sixel), but it's probably never getting merged, and does not clear graphics.
-iTerm2    | `iTerm2` | ❔    | Feedback from mac users wanted.
-Konsole   | `Sixel`  | ❌    | [Possibly fixed in 24.12](https://bugs.kde.org/show_bug.cgi?id=456354)
-Contour   | `Sixel`  | ❌    | Does not clear graphics.
-ctx       | `Sixel`  | ❌    | Buggy.
-Blackbox  | `Sixel`  | ❔    | Untested.
+Terminal  | Protocol | OK | Notes
+----------|----------|----|-------
+Xterm     | `Sixel`  | ✔️  | Run with `-ti 340` to make sure sixel support is enabled.
+Foot      | `Sixel`  | ✔️  | Wayland.
+Kitty     | `Kitty`  | ✔️  | Reference for the `Kitty` protocol.
+Wezterm   | `iTerm2` | ✔️  | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
+Rio       | `iTerm2` | ✔️  | Also supports `Sixel` but has glitches.
+Alacritty | `Sixel`  | ❌ | [There is a sixel fork](https://github.com/microo8/alacritty-sixel), but it's probably never getting merged, and does not clear graphics.
+iTerm2    | `iTerm2` | ❔ | Feedback from mac users wanted.
+Konsole   | `Sixel`  | ❌ | [Possibly fixed in 24.12](https://bugs.kde.org/show_bug.cgi?id=456354)
+Contour   | `Sixel`  | ❌ | Does not clear graphics.
+ctx       | `Sixel`  | ❌ | Buggy.
 
 A basic [screenshot test](./assets/screenshot_xterm.png) is run with xterm on Xvfb in the CI (or `cargo make screenshot-xvfb && cargo make screenshot-diff`).
 
