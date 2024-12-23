@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .expect("Usage: <program> <path/to/image>");
 
-    let mut picker = Picker::from_query_stdio().unwrap_or_else(|_| {
+    let picker = Picker::from_query_stdio().unwrap_or_else(|_| {
         let font_width = env::args()
             .nth(2)
             .expect("Usage: <program> <path/to/image> <font-width> <font-height>");

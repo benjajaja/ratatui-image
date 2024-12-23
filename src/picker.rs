@@ -34,7 +34,6 @@ pub struct Picker {
     protocol_type: ProtocolType,
     background_color: Rgba<u8>,
     is_tmux: bool,
-    kitty_counter: u32,
 }
 
 /// Serde-friendly protocol-type enum for [Picker].
@@ -96,7 +95,6 @@ impl Picker {
                         background_color: DEFAULT_BACKGROUND,
                         protocol_type,
                         is_tmux,
-                        kitty_counter: rand::random(),
                     })
                 } else {
                     Err(Errors::NoFontSize)
@@ -110,7 +108,6 @@ impl Picker {
                 background_color: DEFAULT_BACKGROUND,
                 protocol_type: ProtocolType::Halfblocks,
                 is_tmux,
-                kitty_counter: rand::random(),
             }),
             Err(err) => Err(err),
         }
@@ -143,7 +140,6 @@ impl Picker {
             background_color: DEFAULT_BACKGROUND,
             protocol_type,
             is_tmux,
-            kitty_counter: rand::random(),
         }
     }
 
@@ -166,7 +162,7 @@ impl Picker {
 
     /// Returns a new protocol for [`crate::Image`] widgets that fits into the given size.
     pub fn new_protocol(
-        &mut self,
+        &self,
         image: DynamicImage,
         size: Rect,
         resize: Resize,
@@ -193,21 +189,18 @@ impl Picker {
         match self.protocol_type {
             ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::new(image, area)?)),
             ProtocolType::Sixel => Ok(Protocol::Sixel(Sixel::new(image, area, self.is_tmux)?)),
-            ProtocolType::Kitty => {
-                (self.kitty_counter, _) = self.kitty_counter.overflowing_add(1);
-                Ok(Protocol::Kitty(Kitty::new(
-                    image,
-                    area,
-                    self.kitty_counter,
-                    self.is_tmux,
-                )?))
-            }
+            ProtocolType::Kitty => Ok(Protocol::Kitty(Kitty::new(
+                image,
+                area,
+                rand::random(),
+                self.is_tmux,
+            )?)),
             ProtocolType::Iterm2 => Ok(Protocol::ITerm2(Iterm2::new(image, area, self.is_tmux)?)),
         }
     }
 
     /// Returns a new *stateful* protocol for [`crate::StatefulImage`] widgets.
-    pub fn new_resize_protocol(&mut self, image: DynamicImage) -> StatefulProtocol {
+    pub fn new_resize_protocol(&self, image: DynamicImage) -> StatefulProtocol {
         let source = ImageSource::new(image, self.font_size, self.background_color);
         match self.protocol_type {
             ProtocolType::Halfblocks => {
@@ -216,15 +209,12 @@ impl Picker {
             ProtocolType::Sixel => {
                 StatefulProtocol::Sixel(StatefulSixel::new(source, self.font_size, self.is_tmux))
             }
-            ProtocolType::Kitty => {
-                (self.kitty_counter, _) = self.kitty_counter.overflowing_add(1);
-                StatefulProtocol::Kitty(StatefulKitty::new(
-                    source,
-                    self.font_size,
-                    self.kitty_counter,
-                    self.is_tmux,
-                ))
-            }
+            ProtocolType::Kitty => StatefulProtocol::Kitty(StatefulKitty::new(
+                source,
+                self.font_size,
+                rand::random(),
+                self.is_tmux,
+            )),
             ProtocolType::Iterm2 => {
                 StatefulProtocol::ITerm2(StatefulIterm2::new(source, self.font_size, self.is_tmux))
             }

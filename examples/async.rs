@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut picker = Picker::from_query_stdio()?;
+    let picker = Picker::from_query_stdio()?;
     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
 
     // Send a [ResizeProtocol] to resize and encode it in a separate thread.
