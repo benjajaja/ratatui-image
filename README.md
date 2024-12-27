@@ -130,6 +130,7 @@ Xterm     | `Sixel`  | ✔️  | Run with `-ti 340` to make sure sixel support i
 Foot      | `Sixel`  | ✔️  | Wayland.
 Kitty     | `Kitty`  | ✔️  | Reference for the `Kitty` protocol.
 Wezterm   | `iTerm2` | ✔️  | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
+Ghostty   | `Kitty`  | ✔️  | Implements `Kitty` with unicode placeholders.
 Rio       | `iTerm2` | ✔️  | Also supports `Sixel` but has glitches.
 Alacritty | `Sixel`  | ❌ | [There is a sixel fork](https://github.com/microo8/alacritty-sixel), but it's probably never getting merged, and does not clear graphics.
 iTerm2    | `iTerm2` | ❔ | Feedback from mac users wanted.
