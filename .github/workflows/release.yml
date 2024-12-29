@@ -12,7 +12,7 @@ jobs:
 
   post-build:
     name: Release
-    needs: [ci, ensure-readme, xvfb]
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
