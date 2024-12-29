@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-image"
-version = "4.1.2"
+version = "4.1.3"
 edition = "2021"
 autoexamples = true
 authors = ["Benjamin Große <ste3ls@gmail.com>"]
