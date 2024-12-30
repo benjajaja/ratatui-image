@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+# [4.1.2] - 2024-12-30
+
+Add a release job to the CI that makes a github release when a `v*.*.*` is pushed.
+The tag itself and pushing to crates.io is done locally.
+
+# [4.1.0] - 2024-12-23 🎄
+
+### Transparency support for Kitty and iTerm2
+
+The image data gains an alpha channel, as well as the background color, which is now transparent by default when the protocol is not Sixel.
+The area behind the image is cleared with the control sequences `ECH`, `CUD`, and `CUU` repeatedly for each row and column.
+This is not particularly efficient, but it works in most terminals.
+`DECERA`, which should erase the entire rectangle with only one sequence, is not implemented correctly (or not at all) in some major terminals.
+
+Sixels could also support transparency, as the spec directly supports it.
+A palette color could be set to transparent, and `icy_sixel` in fact supports this, however this is after the fact that the image has been encoded from an API perspective.
+In other words, we could set a palette color index to be transparent, but we don't control that this color index would match any transparency of the input image.
+This is something that would have to be added to `icy_sixel`.
+
+### Resize: Scale
+
+This feature is brought to you by <taduradnik@proton.me>!
+The scale option scales the image, keeping the aspect ratio, to fit the full size of the given area.
+It is shown in the demo.
+
+### Capability detection
+
+The control sequence parser has improved its "capability parsing".
+In addition to querying Kitty and Sixel protocol support, the "font-size in pixels" is also queried, instead of using `tcgetattr`.
+The motivation is that we already need to query stdin, and `tcgetattr` is not supported on Windows Termial, but the control sequence is.
+
+### Minor fixes and changes
+
+- Foreground color is restored after displaying an image with Kitty protocol.
+- `Picker` must no longer be mutable.
+  It only was mutable so that the kitty image ids would have some sequence, but the start was based off a random number anyway to avoid clashes, so we can also just use a new random id every time.
+  This avoids confusion when a new protocol is created, mutating the picker, but discarding the result.
+- `area() -> Rect` method on protocols.
+  Sometimes it definitely is useful to know how much of the given area a protocol will render to.
+- Some logic fixes unnecessary image "needs-resize" calls.
+
 # [3.0.0] - 2024-11-11
 
 Compatible with `ratatui`: `v0.29.0`.
