@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+# [4.2.0] - 2024-12-31 🎆
+
+Fix Sixel and iTerm2 not working with tmux.
+
 # [4.1.2] - 2024-12-30
 
 Add a release job to the CI that makes a github release when a `v*.*.*` is pushed.
