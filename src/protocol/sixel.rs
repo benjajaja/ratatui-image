@@ -13,7 +13,7 @@ use ratatui::{buffer::Buffer, layout::Rect};
 use std::cmp::min;
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
-use crate::{errors::Errors, FontSize, ImageSource, Resize, Result};
+use crate::{errors::Errors, picker::cap_parser::Parser, FontSize, ImageSource, Resize, Result};
 
 // Fixed sixel protocol
 #[derive(Clone, Default)]
@@ -34,15 +34,13 @@ impl Sixel {
     }
 }
 
-const TMUX_START: &str = "\x1bPtmux;";
-
 // TODO: change E to sixel_rs::status::Error and map when calling
 fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
     let (w, h) = (img.width(), img.height());
     let img_rgb8 = img.to_rgb8();
     let bytes = img_rgb8.as_raw();
 
-    let data = sixel_string(
+    let mut data = sixel_string(
         bytes,
         w as i32,
         h as i32,
@@ -53,21 +51,16 @@ fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
         Quality::HIGH,
     )
     .map_err(|err| Errors::Sixel(err.to_string()))?;
+
     if is_tmux {
+        let (start, escape, end) = Parser::escape_tmux(is_tmux);
         if data.strip_prefix('\x1b').is_none() {
             return Err(Errors::Tmux("sixel string did not start with escape"));
         }
 
-        let mut data_tmux = TMUX_START.to_string();
-        for ch in data.chars() {
-            if ch == '\x1b' {
-                data_tmux.push('\x1b');
-            }
-            data_tmux.push(ch);
-        }
-        data_tmux.push('\x1b');
-        data_tmux.push('\\');
-        return Ok(data_tmux);
+        data.insert_str(0, escape);
+        data.insert_str(0, start);
+        data.push_str(end);
     }
     Ok(data)
 }

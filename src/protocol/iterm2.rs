@@ -42,9 +42,9 @@ fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String
     let height = render_area.height;
     let mut seq = String::from(start);
     for _ in 0..height {
-        seq.push_str(&format!("\x1b[{width}X\x1b[1B").to_string());
+        seq.push_str(&format!("{escape}[{width}X{escape}[1B").to_string());
     }
-    seq.push_str(&format!("\x1b[{height}A").to_string());
+    seq.push_str(&format!("{escape}[{height}A").to_string());
 
     seq.push_str(&format!(
         "{escape}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07",

@@ -5,7 +5,7 @@ use base64::{engine::general_purpose, Engine};
 use image::{DynamicImage, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
 
-use crate::{FontSize, ImageSource, Resize, Result};
+use crate::{picker::cap_parser::Parser, FontSize, ImageSource, Resize, Result};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
 
@@ -182,7 +182,8 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
     let img_rgba8 = img.to_rgba8();
     let bytes = img_rgba8.as_raw();
 
-    let mut str = String::new();
+    let (start, escape, end) = Parser::escape_tmux(is_tmux);
+    let mut data = String::from(start);
 
     // Max chunk size is 4096 bytes of base64 encoded data
     let chunks = bytes.chunks(4096 / 4 * 3);
@@ -191,39 +192,34 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
         let payload = general_purpose::STANDARD.encode(chunk);
         // tmux seems to only allow a limited amount of data in each passthrough sequence, since
         // we're already chunking the data for the kitty protocol that's a good enough chunk size to
-        // use for the passthrough chunks too
-        if is_tmux {
-            str.push_str("\x1bPtmux;\x1b\x1b");
-        } else {
-            str.push('\x1b');
-        }
+        // use for the passthrough chunks too.
+        data.push_str(escape);
+
         match i {
             0 => {
                 // Transmit and virtual-place but keep sending chunks
                 let more = if chunk_count > 1 { 1 } else { 0 };
                 write!(
-                    str,
+                    data,
                     "_Gq=2,i={id},a=T,U=1,f=32,t=d,s={w},v={h},m={more};{payload}"
                 )
                 .unwrap();
             }
             n if n + 1 == chunk_count => {
                 // m=0 means over
-                write!(str, "_Gq=2,m=0;{payload}").unwrap();
+                write!(data, "_Gq=2,m=0;{payload}").unwrap();
             }
             _ => {
                 // Keep adding chunks
-                write!(str, "_Gq=2,m=1;{payload}").unwrap();
+                write!(data, "_Gq=2,m=1;{payload}").unwrap();
             }
         }
-        if is_tmux {
-            str.push_str("\x1b\x1b\\\x1b\\");
-        } else {
-            str.push_str("\x1b\\");
-        }
+        data.push_str(escape);
+        write!(data, "\\").unwrap();
     }
+    data.push_str(end);
 
-    str
+    data
 }
 
 fn add_placeholder(str: &mut String, x: u16, y: u16, id_extra: u8) {
