@@ -41,20 +41,25 @@ Halfblocks should work in all terminals, even if the font size could not be dete
 
 ### Known issues
 Summary | Link
----------|---------
+--------|---------
 Termwiz backend does not work at all | [#1](https://github.com/benjajaja/ratatui-image/issues/1)
 Sixel image rendered on the last line of terminal causes a scroll | [#57](https://github.com/benjajaja/ratatui-image/issues/57)
-Tmux needs a revisit | -
-
+Terminals may or may not take DPI scale into account | [#59 (closed)](https://github.com/benjajaja/ratatui-image/issues/59)
 
 ### Projects that use ratatui-image
 
+* [mdfried](https://github.com/benjajaja/mdfried)
+  A markdown viewer that renders headers bigger (as images), and regular images too.
 * [iamb](https://github.com/ulyssa/iamb)
   A matrix client with vim keybindings.
 * [joshuto](https://github.com/kamiyaa/joshuto)
   A terminal file manager that can preview images.
 * [Aerostream](https://github.com/shigepon7/aerostream)
   A Bluesky client using EventStream.
+
+Many more, see ![crate dependants](https://crates.io/crates/ratatui-image/reverse_dependencies)
+and ![github dependency graph](https://github.com/benjajaja/ratatui-image/network/dependencies)
+(note that github includes a huge number of unrelated dotfile repos).
 
 ### Comparison
 
@@ -75,8 +80,9 @@ Tmux needs a revisit | -
 
 PRs and issues/discussions welcome!
 
-You can run an aproximation of the CI with `cargo make ci`. I must manually approve CI runs for new 
-PRs to prevent github-action attacks. The demo is useful to test that everything works correctly.
+You can run an aproximation of the CI with `cargo make ci`.
+I must manually approve CI runs for new PRs to prevent github-action attacks.
+The demo is useful to test that everything works correctly.
+PRs should be rebased on `master` and **not contain any merge commits**.
 
 License: {{license}}
-

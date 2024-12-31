@@ -24,6 +24,8 @@
 //! TUI from overwriting the image area, even with blank characters.
 //! Other protocols, like Kitty, are essentially stateful, but at least provide a way to re-render
 //! an image that has been loaded, at a different or same position.
+//! Since we have the font-size in pixels, we can precisely map the characters/cells/rows-columns that
+//! will be covered by the image and skip drawing over the image.
 //!
 //! # Quick start
 //! ```rust
