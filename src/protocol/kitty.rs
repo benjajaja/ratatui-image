@@ -183,39 +183,40 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
     let bytes = img_rgba8.as_raw();
 
     let (start, escape, end) = Parser::escape_tmux(is_tmux);
-    let mut data = String::from(start);
 
     // Max chunk size is 4096 bytes of base64 encoded data
-    let chunks = bytes.chunks(4096 / 4 * 3);
+    let chars_per_chunk = 4096;
+    let chunk_size = (chars_per_chunk / 4) * 3;
+    let chunks = bytes.chunks(chunk_size);
     let chunk_count = chunks.len();
+    let reserve_size = (start.len() + chunk_count * (11 + escape.len() + chars_per_chunk)) + 51;
+    let mut data = String::with_capacity(reserve_size);
+    data.push_str(start);
+
     for (i, chunk) in chunks.enumerate() {
-        let payload = general_purpose::STANDARD.encode(chunk);
         // tmux seems to only allow a limited amount of data in each passthrough sequence, since
         // we're already chunking the data for the kitty protocol that's a good enough chunk size to
         // use for the passthrough chunks too.
-        data.push_str(escape);
 
+        data.push_str(escape);
         match i {
             0 => {
                 // Transmit and virtual-place but keep sending chunks
                 let more = if chunk_count > 1 { 1 } else { 0 };
-                write!(
-                    data,
-                    "_Gq=2,i={id},a=T,U=1,f=32,t=d,s={w},v={h},m={more};{payload}"
-                )
-                .unwrap();
+                write!(data, "_Gq=2,i={id},a=T,U=1,f=32,t=d,s={w},v={h},m={more};").unwrap();
             }
             n if n + 1 == chunk_count => {
                 // m=0 means over
-                write!(data, "_Gq=2,m=0;{payload}").unwrap();
+                data.push_str("_Gq=2,m=0;");
             }
             _ => {
                 // Keep adding chunks
-                write!(data, "_Gq=2,m=1;{payload}").unwrap();
+                data.push_str("_Gq=2,m=1;");
             }
         }
+        general_purpose::STANDARD.encode_string(chunk, &mut data);
         data.push_str(escape);
-        write!(data, "\\").unwrap();
+        data.push('\\');
     }
     data.push_str(end);
 

@@ -2,7 +2,8 @@
 use base64::{engine::general_purpose, Engine};
 use image::{DynamicImage, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
-use std::{cmp::min, format, io::Cursor};
+use std::fmt::Write;
+use std::{cmp::min, io::Cursor};
 
 use crate::{errors, picker::cap_parser::Parser, FontSize, ImageSource, Resize, Result};
 
@@ -30,8 +31,6 @@ fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String
     let mut png: Vec<u8> = vec![];
     img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)?;
 
-    let data = general_purpose::STANDARD.encode(&png);
-
     let (start, escape, end) = Parser::escape_tmux(is_tmux);
 
     // Transparency needs explicit erasing of stale characters, or they stay behind the rendered
@@ -42,17 +41,22 @@ fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String
     let height = render_area.height;
     let mut seq = String::from(start);
     for _ in 0..height {
-        seq.push_str(&format!("{escape}[{width}X{escape}[1B").to_string());
+        write!(seq, "{escape}[{width}X{escape}[1B").unwrap();
     }
-    seq.push_str(&format!("{escape}[{height}A").to_string());
+    write!(seq, "{escape}[{height}A").unwrap();
 
-    seq.push_str(&format!(
-        "{escape}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07",
+    write!(
+        seq,
+        "{escape}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:",
         png.len(),
         img.width(),
         img.height(),
-        data,
-    ));
+    )
+    .unwrap();
+
+    general_purpose::STANDARD.encode_string(png, &mut seq);
+
+    seq.push('\x07');
     seq.push_str(end);
 
     Ok::<String, errors::Errors>(seq)
