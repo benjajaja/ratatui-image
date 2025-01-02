@@ -186,9 +186,14 @@ pub struct StatefulImage {
 }
 
 impl StatefulImage {
-    pub fn resize(mut self, resize: Resize) -> StatefulImage {
-        self.resize = resize;
-        self
+    pub const fn resize(self, resize: Resize) -> Self {
+        Self { resize }
+    }
+
+    pub const fn new() -> Self {
+        Self {
+            resize: Resize::Fit(None),
+        }
     }
 }
 
