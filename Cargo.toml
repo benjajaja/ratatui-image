@@ -41,6 +41,13 @@ windows = { version = "0.58.0", default-features = false, features = [
   "Win32_Security",
 ] }
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "encode"
+harness = false
+
 [[bin]]
 name = "ratatui-image"
 path = "./src/bin/ratatui-image/main.rs" # cargo readme needs this for some reason
