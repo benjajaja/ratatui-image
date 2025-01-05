@@ -130,7 +130,7 @@ Terminal  | Protocol | OK | Notes
 ----------|----------|----|-------
 Xterm     | `Sixel`  | ✔️  | Run with `-ti 340` to make sure sixel support is enabled.
 Foot      | `Sixel`  | ✔️  | Wayland.
-Kitty     | `Kitty`  | ✔️  | Reference for the `Kitty` protocol.
+Kitty     | `Kitty`  | ✔️  | Reference for the `Kitty` protocol (requires Kitty 0.28.0 or later).
 Wezterm   | `iTerm2` | ✔️  | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
 Ghostty   | `Kitty`  | ✔️  | Implements `Kitty` with unicode placeholders.
 Rio       | `iTerm2` | ✔️  | Also supports `Sixel` but has glitches.
