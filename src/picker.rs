@@ -440,7 +440,7 @@ fn query_with_timeout(
 
     match rx.recv_timeout(timeout) {
         Ok(result) => Ok(result?),
-        Err(err) => Err(err.into()),
+        Err(_recvtimeout) => Err(Errors::NoStdinResponse),
     }
 }
 

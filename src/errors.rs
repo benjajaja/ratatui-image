@@ -1,13 +1,11 @@
-use std::sync::mpsc::RecvTimeoutError;
-
 #[derive(Debug, thiserror::Error)]
 pub enum Errors {
     #[error("Could not detect font size")]
     NoFontSize,
     #[error("Could not detect any graphics nor font capabilities")]
     NoCap,
-    #[error("Timeout: {0}")]
-    Timeout(#[from] RecvTimeoutError),
+    #[error("No response from stdin")]
+    NoStdinResponse,
     #[error("Sixel error: {0}")]
     Sixel(String),
     #[error("Tmux error: {0}")]
