@@ -26,7 +26,7 @@ use crate::{
 
 pub mod cap_parser;
 
-const DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 0]);
+pub const DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 0]);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Picker {

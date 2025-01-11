@@ -16,7 +16,11 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
-use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
+use ratatui_image::{
+    picker::{Picker, DEFAULT_BACKGROUND},
+    protocol::{ImageSource, StatefulProtocol},
+    Resize, StatefulImage,
+};
 
 struct App {
     pub filename: String,
@@ -130,7 +134,31 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     f.render_widget(block_top, chunks[0]);
 
     let block_bottom = Block::default().borders(Borders::ALL).title("image");
-    let image = StatefulImage::default();
-    f.render_stateful_widget(image, block_bottom.inner(chunks[1]), &mut app.image_state);
+    let image = StatefulImage::default().resize(Resize::Scale(None));
+
+    let chunk_area = block_bottom.inner(chunks[1]);
+    let img_area = Resize::Scale(None).needs_resize(
+        &ImageSource::new(
+            app.image_source.clone(),
+            app.picker.font_size(),
+            DEFAULT_BACKGROUND,
+        ),
+        app.picker.font_size(),
+        app.image_state.area(),
+        chunk_area,
+        true,
+    );
+
+    let mut centered = chunk_area;
+    centered.x = (centered.width - img_area.unwrap().width) / 2;
+    f.render_stateful_widget(image, centered, &mut app.image_state);
     f.render_widget(block_bottom, chunks[1]);
+
+    let mut d_area = f.area();
+    d_area.y = d_area.height - 1;
+    d_area.height = 1;
+    f.render_widget(
+        Paragraph::new(Line::from(format!("{img_area:?} [{chunk_area:?}]"))),
+        d_area,
+    );
 }
