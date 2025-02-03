@@ -1,11 +1,11 @@
 //! Halfblocks protocol implementations.
 //! Uses the unicode character `▀` combined with foreground and background color. Assumes that the
 //! font aspect ratio is roughly 1:2. Should work in all terminals.
-use image::{imageops::FilterType, DynamicImage, Rgba};
+use image::{imageops::FilterType, DynamicImage};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
-use crate::{FontSize, ImageSource, Resize, Result};
+use crate::Result;
 
 // Fixed Halfblocks protocol
 #[derive(Clone, Default)]
@@ -80,56 +80,10 @@ impl ProtocolTrait for Halfblocks {
     }
 }
 
-#[derive(Clone)]
-pub struct StatefulHalfblocks {
-    source: ImageSource,
-    font_size: FontSize,
-    current: Halfblocks,
-    hash: u64,
-}
-
-impl StatefulHalfblocks {
-    pub fn new(source: ImageSource, font_size: FontSize) -> StatefulHalfblocks {
-        StatefulHalfblocks {
-            source,
-            font_size,
-            current: Halfblocks::default(),
-            hash: u64::default(),
-        }
-    }
-}
-impl ProtocolTrait for StatefulHalfblocks {
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        Halfblocks::render(&mut self.current, area, buf);
-    }
-
-    fn area(&self) -> Rect {
-        self.current.area
-    }
-}
-
-impl StatefulProtocolTrait for StatefulHalfblocks {
-    fn background_color(&self) -> Rgba<u8> {
-        self.source.background_color
-    }
-    fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(
-            &self.source,
-            self.font_size,
-            self.current.area,
-            area,
-            self.source.hash != self.hash,
-        )
-    }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
-
-        let img = resize.resize(&self.source, self.font_size, area, background_color);
+impl StatefulProtocolTrait for Halfblocks {
+    fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()> {
         let data = encode(&img, area);
-        let current = Halfblocks { data, area };
-        self.current = current;
-        self.hash = self.source.hash;
+        *self = Halfblocks { data, area };
+        Ok(())
     }
 }

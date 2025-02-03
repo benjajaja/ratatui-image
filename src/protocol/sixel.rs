@@ -8,12 +8,12 @@
 use icy_sixel::{
     sixel_string, DiffusionMethod, MethodForLargest, MethodForRep, PixelFormat, Quality,
 };
-use image::{DynamicImage, Rgba};
+use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::cmp::min;
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
-use crate::{errors::Errors, picker::cap_parser::Parser, FontSize, ImageSource, Resize, Result};
+use crate::{errors::Errors, picker::cap_parser::Parser, Result};
 
 // Fixed sixel protocol
 #[derive(Clone, Default)]
@@ -131,70 +131,14 @@ fn render_area(rect: Rect, area: Rect, overdraw: bool) -> Option<Rect> {
     Some(Rect::new(area.x, area.y, rect.width, rect.height))
 }
 
-#[derive(Clone)]
-pub struct StatefulSixel {
-    source: ImageSource,
-    font_size: FontSize,
-    current: Sixel,
-    hash: u64,
-}
-
-impl StatefulSixel {
-    pub fn new(source: ImageSource, font_size: FontSize, is_tmux: bool) -> StatefulSixel {
-        StatefulSixel {
-            source,
-            font_size,
-            current: Sixel {
-                is_tmux,
-                ..Sixel::default()
-            },
-            hash: u64::default(),
-        }
-    }
-}
-
-impl ProtocolTrait for StatefulSixel {
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        render(self.current.area, &self.current.data, area, buf, true);
-    }
-
-    fn area(&self) -> Rect {
-        self.current.area
-    }
-}
-
-impl StatefulProtocolTrait for StatefulSixel {
-    fn background_color(&self) -> Rgba<u8> {
-        self.source.background_color
-    }
-    fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(
-            &self.source,
-            self.font_size,
-            self.current.area,
+impl StatefulProtocolTrait for Sixel {
+    fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()> {
+        let data = encode(&img, self.is_tmux)?;
+        *self = Sixel {
+            data,
             area,
-            self.source.hash != self.hash,
-        )
-    }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
-
-        let img = resize.resize(&self.source, self.font_size, area, background_color);
-        let is_tmux = self.current.is_tmux;
-        match encode(&img, is_tmux) {
-            Ok(data) => {
-                self.current = Sixel {
-                    data,
-                    area,
-                    is_tmux,
-                };
-                self.hash = self.source.hash;
-            }
-            Err(_err) => {
-                // TODO: save err in struct and expose in trait?
-            }
-        }
+            ..*self
+        };
+        Ok(())
     }
 }

@@ -8,14 +8,13 @@ use std::{
 use image::{imageops, DynamicImage, ImageBuffer, Rgba};
 use ratatui::{buffer::Buffer, layout::Rect};
 
-use crate::FontSize;
-
 use self::{
-    halfblocks::{Halfblocks, StatefulHalfblocks},
-    iterm2::{Iterm2, StatefulIterm2},
+    halfblocks::Halfblocks,
+    iterm2::Iterm2,
     kitty::{Kitty, StatefulKitty},
-    sixel::{Sixel, StatefulSixel},
+    sixel::Sixel,
 };
+use crate::{FontSize, Result};
 
 use super::Resize;
 
@@ -34,21 +33,11 @@ trait ProtocolTrait: Send + Sync {
 }
 
 trait StatefulProtocolTrait: ProtocolTrait {
-    // Get the background color that fills in when resizing.
-    fn background_color(&self) -> Rgba<u8>;
-    /// Check if the current image state would need resizing (grow or shrink) for the given area.
-    ///
-    /// This can be called by the UI thread to check if this [StatefulProtocol] should be sent off
-    /// toprotoco
-    /// some background thread/task to do the resizing and encoding, instead of rendering. The
-    /// thread should then return the [StatefulProtocol] so that it can be rendered.protoco
-    fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect>;
-
     /// Resize the image and encode it for rendering. The result should be stored statefully so
     /// that next call for the given area does not need to redo the work.
     ///
     /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
-    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect);
+    fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()>;
 }
 
 /// A fixed-size image protocol for the [crate::Image] widget.
@@ -85,13 +74,22 @@ impl Protocol {
 /// The [create::thread::ThreadImage] widget also uses this, and is the reason why resizing is
 /// split from rendering.
 #[derive(Clone)]
-pub enum StatefulProtocol {
-    Halfblocks(StatefulHalfblocks),
-    Sixel(StatefulSixel),
-    Kitty(StatefulKitty),
-    ITerm2(StatefulIterm2),
+pub struct StatefulProtocol {
+    source: ImageSource,
+    font_size: FontSize,
+    hash: u64,
+    protocol_type: StatefulProtocolType,
 }
-impl StatefulProtocol {
+
+#[derive(Clone)]
+pub enum StatefulProtocolType {
+    Halfblocks(Halfblocks),
+    Sixel(Sixel),
+    Kitty(StatefulKitty),
+    ITerm2(Iterm2),
+}
+
+impl StatefulProtocolType {
     fn inner_trait(&self) -> &dyn StatefulProtocolTrait {
         match self {
             Self::Halfblocks(halfblocks) => halfblocks,
@@ -108,10 +106,25 @@ impl StatefulProtocol {
             Self::ITerm2(iterm2) => iterm2,
         }
     }
+}
 
+impl StatefulProtocol {
+    pub fn new(
+        source: ImageSource,
+        font_size: FontSize,
+        protocol_type: StatefulProtocolType,
+    ) -> Self {
+        Self {
+            source,
+            font_size,
+            hash: u64::default(),
+            protocol_type,
+        }
+    }
+
+    // Get the background color that fills in when resizing.
     pub fn background_color(&self) -> Rgba<u8> {
-        let proto = self.inner_trait();
-        proto.background_color()
+        self.source.background_color
     }
 
     /// Resize and encode if necessary, and render immediately.
@@ -124,11 +137,10 @@ impl StatefulProtocol {
         area: Rect,
         buf: &mut Buffer,
     ) {
-        let proto = self.inner_trait_mut();
-        if let Some(rect) = proto.needs_resize(resize, area) {
-            proto.resize_encode(resize, background_color, rect);
+        if let Some(rect) = self.needs_resize(resize, area) {
+            self.resize_encode(resize, background_color, rect);
         }
-        proto.render(area, buf);
+        self.render(area, buf);
     }
 
     /// Check if the current image state would need resizing (grow or shrink) for the given area.
@@ -137,7 +149,13 @@ impl StatefulProtocol {
     /// to some background thread/task to do the resizing and encoding, instead of rendering. The
     /// thread should then return the [StatefulProtocol] so that it can be rendered.protoco
     pub fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        self.inner_trait_mut().needs_resize(resize, area)
+        resize.needs_resize(
+            &self.source,
+            self.font_size,
+            self.area(),
+            area,
+            self.source.hash != self.hash,
+        )
     }
 
     /// Resize the image and encode it for rendering. The result should be stored statefully so
@@ -145,16 +163,39 @@ impl StatefulProtocol {
     ///
     /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
     pub fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
-        self.inner_trait_mut()
-            .resize_encode(resize, background_color, area)
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
+        let img = resize.resize(&self.source, self.font_size, area, background_color);
+
+        // TODO: save err in struct
+        if self
+            .protocol_type
+            .inner_trait_mut()
+            .resize_encode(img, area)
+            .is_ok()
+        {
+            self.hash = self.source.hash
+        }
     }
 
     /// Render the currently resized and encoded data to the buffer.
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        self.inner_trait_mut().render(area, buf);
+        self.protocol_type.inner_trait_mut().render(area, buf);
     }
+
+    /// If the protocol type is kitty, return its unique id
+    pub fn kitty_id(&self) -> Option<u32> {
+        if let StatefulProtocolType::Kitty(kitty) = &self.protocol_type {
+            Some(kitty.unique_id)
+        } else {
+            None
+        }
+    }
+
     pub fn area(&self) -> Rect {
-        self.inner_trait().area()
+        self.protocol_type.inner_trait().area()
     }
 }
 

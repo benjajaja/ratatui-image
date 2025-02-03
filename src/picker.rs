@@ -6,23 +6,23 @@ use std::{
     time::Duration,
 };
 
-use cap_parser::{Capability, Parser};
-use image::{DynamicImage, Rgba};
-use ratatui::layout::Rect;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 use crate::{
     errors::Errors,
     protocol::{
-        halfblocks::{Halfblocks, StatefulHalfblocks},
-        iterm2::{Iterm2, StatefulIterm2},
+        halfblocks::Halfblocks,
+        iterm2::Iterm2,
         kitty::{Kitty, StatefulKitty},
-        sixel::{Sixel, StatefulSixel},
-        Protocol, StatefulProtocol,
+        sixel::Sixel,
+        Protocol, StatefulProtocol, StatefulProtocolType,
     },
     FontSize, ImageSource, Resize, Result,
 };
+use cap_parser::{Capability, Parser};
+use image::{DynamicImage, Rgba};
+use rand::random;
+use ratatui::layout::Rect;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 pub mod cap_parser;
 
@@ -202,23 +202,21 @@ impl Picker {
     /// Returns a new *stateful* protocol for [`crate::StatefulImage`] widgets.
     pub fn new_resize_protocol(&self, image: DynamicImage) -> StatefulProtocol {
         let source = ImageSource::new(image, self.font_size, self.background_color);
-        match self.protocol_type {
-            ProtocolType::Halfblocks => {
-                StatefulProtocol::Halfblocks(StatefulHalfblocks::new(source, self.font_size))
+        let protocol_type = match self.protocol_type {
+            ProtocolType::Halfblocks => StatefulProtocolType::Halfblocks(Halfblocks::default()),
+            ProtocolType::Sixel => StatefulProtocolType::Sixel(Sixel {
+                is_tmux: self.is_tmux,
+                ..Sixel::default()
+            }),
+            ProtocolType::Kitty => {
+                StatefulProtocolType::Kitty(StatefulKitty::new(random(), self.is_tmux))
             }
-            ProtocolType::Sixel => {
-                StatefulProtocol::Sixel(StatefulSixel::new(source, self.font_size, self.is_tmux))
-            }
-            ProtocolType::Kitty => StatefulProtocol::Kitty(StatefulKitty::new(
-                source,
-                self.font_size,
-                rand::random(),
-                self.is_tmux,
-            )),
-            ProtocolType::Iterm2 => {
-                StatefulProtocol::ITerm2(StatefulIterm2::new(source, self.font_size, self.is_tmux))
-            }
-        }
+            ProtocolType::Iterm2 => StatefulProtocolType::ITerm2(Iterm2 {
+                is_tmux: self.is_tmux,
+                ..Iterm2::default()
+            }),
+        };
+        StatefulProtocol::new(source, self.font_size, protocol_type)
     }
 }
 

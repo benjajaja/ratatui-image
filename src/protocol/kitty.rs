@@ -1,11 +1,10 @@
 /// https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholders
 use std::fmt::Write;
 
+use crate::{picker::cap_parser::Parser, Result};
 use base64::{engine::general_purpose, Engine};
-use image::{DynamicImage, Rgba};
+use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
-
-use crate::{picker::cap_parser::Parser, FontSize, ImageSource, Resize, Result};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
 
@@ -65,23 +64,17 @@ impl ProtocolTrait for Kitty {
 
 #[derive(Clone)]
 pub struct StatefulKitty {
-    source: ImageSource,
-    font_size: FontSize,
     pub unique_id: u32,
     rect: Rect,
-    hash: u64,
     proto_state: KittyProtoState,
     is_tmux: bool,
 }
 
 impl StatefulKitty {
-    pub fn new(source: ImageSource, font_size: FontSize, id: u32, is_tmux: bool) -> StatefulKitty {
+    pub fn new(id: u32, is_tmux: bool) -> StatefulKitty {
         StatefulKitty {
-            source,
-            font_size,
             unique_id: id,
             rect: Rect::default(),
-            hash: u64::default(),
             proto_state: KittyProtoState::default(),
             is_tmux,
         }
@@ -102,29 +95,12 @@ impl ProtocolTrait for StatefulKitty {
 }
 
 impl StatefulProtocolTrait for StatefulKitty {
-    fn background_color(&self) -> Rgba<u8> {
-        self.source.background_color
-    }
-    fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(
-            &self.source,
-            self.font_size,
-            self.rect,
-            area,
-            self.source.hash != self.hash,
-        )
-    }
-    fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
-
-        let img = resize.resize(&self.source, self.font_size, area, background_color);
+    fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()> {
         let data = transmit_virtual(&img, self.unique_id, self.is_tmux);
-        self.hash = self.source.hash;
         self.rect = area;
         // If resized then we must transmit again.
         self.proto_state = KittyProtoState::TransmitAndPlace(data);
+        Ok(())
     }
 }
 
