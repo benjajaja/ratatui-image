@@ -10,8 +10,8 @@ pub enum Errors {
     Sixel(String),
     #[error("Tmux error: {0}")]
     Tmux(&'static str),
-    #[error("IO error: {0}")]
-    IO(#[from] std::io::Error),
+    #[error("Io error: {0}")]
+    Io(#[from] std::io::Error),
     #[error("Image error: {0}")]
     Image(#[from] image::error::ImageError),
 }
@@ -19,7 +19,7 @@ pub enum Errors {
 #[cfg(not(windows))]
 impl From<rustix::io::Errno> for Errors {
     fn from(errno: rustix::io::Errno) -> Self {
-        Errors::IO(std::io::Error::from(errno))
+        Errors::Io(std::io::Error::from(errno))
     }
 }
 

@@ -48,6 +48,7 @@ pub enum Protocol {
     Kitty(Kitty),
     ITerm2(Iterm2),
 }
+
 impl Protocol {
     pub(crate) fn render(&mut self, area: Rect, buf: &mut Buffer) {
         let inner: &mut dyn ProtocolTrait = match self {
@@ -73,12 +74,12 @@ impl Protocol {
 ///
 /// The [create::thread::ThreadImage] widget also uses this, and is the reason why resizing is
 /// split from rendering.
-#[derive(Clone)]
 pub struct StatefulProtocol {
     source: ImageSource,
     font_size: FontSize,
     hash: u64,
     protocol_type: StatefulProtocolType,
+    last_encoding_result: Option<Result<()>>,
 }
 
 #[derive(Clone)]
@@ -119,7 +120,21 @@ impl StatefulProtocol {
             font_size,
             hash: u64::default(),
             protocol_type,
+            last_encoding_result: None,
         }
+    }
+
+    pub fn protocol_type(&self) -> &StatefulProtocolType {
+        &self.protocol_type
+    }
+
+    pub fn protocol_type_owned(self) -> StatefulProtocolType {
+        self.protocol_type
+    }
+
+    /// This returns the latest Result returned when encoding, and none if there was no encoding since the last result read. It is encouraged but not required to handle it
+    pub fn last_encoding_result(&mut self) -> Option<Result<()>> {
+        self.last_encoding_result.take()
     }
 
     // Get the background color that fills in when resizing.
@@ -170,28 +185,21 @@ impl StatefulProtocol {
         let img = resize.resize(&self.source, self.font_size, area, background_color);
 
         // TODO: save err in struct
-        if self
+        let result = self
             .protocol_type
             .inner_trait_mut()
-            .resize_encode(img, area)
-            .is_ok()
-        {
+            .resize_encode(img, area);
+
+        if result.is_ok() {
             self.hash = self.source.hash
         }
+
+        self.last_encoding_result = Some(result)
     }
 
     /// Render the currently resized and encoded data to the buffer.
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         self.protocol_type.inner_trait_mut().render(area, buf);
-    }
-
-    /// If the protocol type is kitty, return its unique id
-    pub fn kitty_id(&self) -> Option<u32> {
-        if let StatefulProtocolType::Kitty(kitty) = &self.protocol_type {
-            Some(kitty.unique_id)
-        } else {
-            None
-        }
     }
 
     pub fn area(&self) -> Rect {
