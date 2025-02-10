@@ -289,24 +289,20 @@ impl Resize {
     ) -> Option<Rect> {
         let desired = image.desired;
         // Check if resize is needed at all.
-        if !matches!(self, &Resize::Scale(_))
+        if !force
+            && !matches!(self, &Resize::Scale(_))
             && desired.width <= area.width
             && desired.height <= area.height
             && desired == current
         {
             let width = (desired.width * font_size.0) as u32;
             let height = (desired.height * font_size.1) as u32;
-            if !force && (image.image.width() == width || image.image.height() == height) {
+            if image.image.width() == width || image.image.height() == height {
                 return None;
             }
         }
 
-        let (width, height) = self.needs_resize_pixels(
-            &image.image,
-            (area.width as u32) * (font_size.0 as u32),
-            (area.height as u32) * (font_size.1 as u32),
-        );
-        let rect = ImageSource::round_pixel_size_to_cells(width, height, font_size);
+        let rect = self.render_area(image, font_size, area);
         debug_assert!(rect.width <= area.width, "needs_resize exceeds area width");
         debug_assert!(
             rect.height <= area.height,
@@ -318,11 +314,11 @@ impl Resize {
         None
     }
 
-    pub fn render_area(&self, image: &ImageSource, font_size: FontSize, area: Rect) -> Rect {
+    pub fn render_area(&self, image: &ImageSource, font_size: FontSize, available: Rect) -> Rect {
         let (width, height) = self.needs_resize_pixels(
             &image.image,
-            (area.width as u32) * (font_size.0 as u32),
-            (area.height as u32) * (font_size.1 as u32),
+            (available.width as u32) * (font_size.0 as u32),
+            (available.height as u32) * (font_size.1 as u32),
         );
         ImageSource::round_pixel_size_to_cells(width, height, font_size)
     }
