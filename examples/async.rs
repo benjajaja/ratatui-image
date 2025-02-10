@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tx_main_render = tx_main.clone();
     thread::spawn(move || loop {
         if let Ok((mut protocol, resize, area)) = rec_worker.recv() {
-            protocol.resize_encode(&resize, protocol.background_color(), area);
+            protocol.resize_encode(&resize, area);
             tx_main_render.send(AppEvent::Redraw(protocol)).unwrap();
         }
     });
