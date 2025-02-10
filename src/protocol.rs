@@ -196,6 +196,10 @@ impl StatefulProtocol {
         self.protocol_type.inner_trait_mut().render(area, buf);
     }
 
+    pub fn size_for(&self, resize: &Resize, area: Rect) -> Rect {
+        resize.render_area(&self.source, self.font_size, area)
+    }
+
     fn last_encoding_area(&self) -> Rect {
         self.protocol_type.inner_trait().area()
     }
