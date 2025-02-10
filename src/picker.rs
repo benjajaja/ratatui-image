@@ -74,7 +74,7 @@ impl Picker {
     /// let mut picker = Picker::from_query_stdio();
     /// ```
     ///
-    pub fn from_query_stdio() -> Result<Picker> {
+    pub fn from_query_stdio() -> Result<Self> {
         // Detect tmux, and only if positive then take some risky guess for iTerm2 support.
         let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();
 
@@ -90,7 +90,7 @@ impl Picker {
                     .unwrap_or(ProtocolType::Halfblocks);
 
                 if let Some(font_size) = font_size {
-                    Ok(Picker {
+                    Ok(Self {
                         font_size,
                         background_color: DEFAULT_BACKGROUND,
                         protocol_type,
@@ -100,7 +100,7 @@ impl Picker {
                     Err(Errors::NoFontSize)
                 }
             }
-            Err(Errors::NoCap) => Ok(Picker {
+            Err(Errors::NoCap) => Ok(Self {
                 // This is completely arbitrary. For halfblocks, it doesn't have to be precise
                 // since we're not rendering pixels. It should be roughly 1:2 ratio, and some
                 // reasonable size.
@@ -124,7 +124,7 @@ impl Picker {
     ///
     /// let mut picker = Picker::from_fontsize(user_fontsize);
     /// ```
-    pub fn from_fontsize(font_size: FontSize) -> Picker {
+    pub fn from_fontsize(font_size: FontSize) -> Self {
         // Detect tmux, and if positive then take some risky guess for iTerm2 support.
         let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();
 
@@ -135,7 +135,7 @@ impl Picker {
             .or(iterm2_proto)
             .unwrap_or(ProtocolType::Halfblocks);
 
-        Picker {
+        Self {
             font_size,
             background_color: DEFAULT_BACKGROUND,
             protocol_type,

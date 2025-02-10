@@ -147,8 +147,8 @@ pub struct Image<'a> {
 }
 
 impl<'a> Image<'a> {
-    pub fn new(image: &'a mut Protocol) -> Image<'a> {
-        Image { image }
+    pub fn new(image: &'a mut Protocol) -> Self {
+        Self { image }
     }
 }
 
@@ -205,7 +205,7 @@ impl StatefulWidget for StatefulImage {
             return;
         }
 
-        state.resize_encode_render(&self.resize, state.background_color(), area, buf);
+        state.resize_encode_render(&self.resize, area, buf);
     }
 }
 
@@ -237,7 +237,7 @@ pub enum Resize {
 
 impl Default for Resize {
     fn default() -> Self {
-        Resize::Fit(None)
+        Self::Fit(None)
     }
 }
 
@@ -316,6 +316,15 @@ impl Resize {
             return Some(rect);
         }
         None
+    }
+
+    pub fn render_area(&self, image: &ImageSource, font_size: FontSize, area: Rect) -> Rect {
+        let (width, height) = self.needs_resize_pixels(
+            &image.image,
+            (area.width as u32) * (font_size.0 as u32),
+            (area.height as u32) * (font_size.1 as u32),
+        );
+        ImageSource::round_pixel_size_to_cells(width, height, font_size)
     }
 
     fn resize_image(&self, source: &ImageSource, width: u32, height: u32) -> DynamicImage {

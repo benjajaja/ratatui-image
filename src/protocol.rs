@@ -145,15 +145,9 @@ impl StatefulProtocol {
     /// Resize and encode if necessary, and render immediately.
     ///
     /// This blocks the UI thread but requires neither threads nor async.
-    pub fn resize_encode_render(
-        &mut self,
-        resize: &Resize,
-        background_color: Rgba<u8>,
-        area: Rect,
-        buf: &mut Buffer,
-    ) {
+    pub fn resize_encode_render(&mut self, resize: &Resize, area: Rect, buf: &mut Buffer) {
         if let Some(rect) = self.needs_resize(resize, area) {
-            self.resize_encode(resize, background_color, rect);
+            self.resize_encode(resize, rect);
         }
         self.render(area, buf);
     }
@@ -167,7 +161,7 @@ impl StatefulProtocol {
         resize.needs_resize(
             &self.source,
             self.font_size,
-            self.area(),
+            self.last_encoding_area(),
             area,
             self.source.hash != self.hash,
         )
@@ -177,12 +171,12 @@ impl StatefulProtocol {
     /// that next call for the given area does not need to redo the work.
     ///
     /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
-    pub fn resize_encode(&mut self, resize: &Resize, background_color: Rgba<u8>, area: Rect) {
+    pub fn resize_encode(&mut self, resize: &Resize, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
 
-        let img = resize.resize(&self.source, self.font_size, area, background_color);
+        let img = resize.resize(&self.source, self.font_size, area, self.background_color());
 
         // TODO: save err in struct
         let result = self
@@ -202,7 +196,7 @@ impl StatefulProtocol {
         self.protocol_type.inner_trait_mut().render(area, buf);
     }
 
-    pub fn area(&self) -> Rect {
+    fn last_encoding_area(&self) -> Rect {
         self.protocol_type.inner_trait().area()
     }
 }

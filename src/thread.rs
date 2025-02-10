@@ -20,15 +20,20 @@ pub struct ThreadImage {
 }
 
 impl ThreadImage {
-    pub fn resize(mut self, resize: Resize) -> ThreadImage {
-        self.resize = resize;
-        self
+    pub const fn resize(self, resize: Resize) -> Self {
+        Self { resize }
+    }
+
+    pub const fn new() -> Self {
+        Self {
+            resize: Resize::Fit(None),
+        }
     }
 }
 
 impl Default for ThreadImage {
     fn default() -> Self {
-        ThreadImage {
+        Self {
             resize: Resize::Fit(None),
         }
     }
@@ -72,7 +77,7 @@ impl ThreadProtocol {
         tx: Sender<(StatefulProtocol, Resize, Rect)>,
         inner: StatefulProtocol,
     ) -> ThreadProtocol {
-        ThreadProtocol {
+        Self {
             inner: Some(inner),
             tx,
         }
