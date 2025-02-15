@@ -45,7 +45,11 @@ impl StatefulWidget for ThreadImage {
                 // Send the requested area instead of the calculated area
                 // to ensure consistent calculations between the render thread and the UI thread.
                 if let Some(area) = protocol.needs_resize(&self.resize, area) {
-                    state.tx.send((protocol, self.resize, area)).unwrap();
+                    state.id.1 += 1;
+                    state
+                        .tx
+                        .send((protocol, self.resize, area, state.id))
+                        .unwrap();
                     None
                 } else {
                     protocol.render(area, buf);
@@ -58,26 +62,54 @@ impl StatefulWidget for ThreadImage {
     }
 }
 
+/// An ID to track if an incoming resized/encoded image matches last render requirements.
+///
+/// The first element is the generation, which is incremented by [ThreadProtocol::set_new_protocol]
+/// if the image is replaced. The second element is the render counter.
+pub type RenderId = (usize, usize);
+
 /// The state of a ThreadImage.
 ///
 /// Has `inner` [ResizeProtocol] that is sent off to the `tx` mspc channel to do the
 /// `resize_encode()` work.
+/// The `id` is used to discard stale updates. For example, while a large image is being resized by the thread,
+/// in the meantime the source image could be replaced with a small image that takes less time to
+/// resize.
 pub struct ThreadProtocol {
     inner: Option<StatefulProtocol>,
-    tx: Sender<(StatefulProtocol, Resize, Rect)>,
+    tx: Sender<(StatefulProtocol, Resize, Rect, RenderId)>,
+    id: RenderId,
 }
 
 impl ThreadProtocol {
+    /// Create a new ThreadProtocol from a [std::sync::mpsc::Sender] and an inner
+    /// [StatefulProtocol].
     pub fn new(
-        tx: Sender<(StatefulProtocol, Resize, Rect)>,
+        tx: Sender<(StatefulProtocol, Resize, Rect, RenderId)>,
         inner: StatefulProtocol,
     ) -> ThreadProtocol {
         ThreadProtocol {
             inner: Some(inner),
             tx,
+            id: (0, 0),
         }
     }
-    pub fn set_protocol(&mut self, proto: StatefulProtocol) {
+    /// Update the protocol (resized/encoded image).
+    ///
+    /// Typically, this will be called by the thread that processed the
+    /// [StatefulProtocol::resize_encode], with the [RenderId] to discard stale resizes.
+    pub fn update_protocol(&mut self, proto: StatefulProtocol, id: RenderId) {
+        if id == self.id {
+            self.inner = Some(proto);
+        }
+    }
+    /// Set a new protocol (image).
+    ///
+    /// Typically, this would be called if the source image is being changed, to avoid that calls
+    /// to [ThreadProtocol::update_protocol] originating from the previous image overwriting the
+    /// protocol.
+    pub fn set_new_protocol(&mut self, proto: StatefulProtocol) {
+        self.id = (self.id.0 + 1, 0);
         self.inner = Some(proto);
     }
 }

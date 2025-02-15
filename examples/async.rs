@@ -19,7 +19,7 @@ use ratatui::{
 use ratatui_image::{
     picker::Picker,
     protocol::StatefulProtocol,
-    thread::{ThreadImage, ThreadProtocol},
+    thread::{RenderId, ThreadImage, ThreadProtocol},
     Resize,
 };
 
@@ -29,7 +29,7 @@ struct App {
 
 enum AppEvent {
     KeyEvent(KeyEvent),
-    Redraw(StatefulProtocol),
+    Redraw(StatefulProtocol, RenderId),
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
 
     // Send a [ResizeProtocol] to resize and encode it in a separate thread.
-    let (tx_worker, rec_worker) = mpsc::channel::<(StatefulProtocol, Resize, Rect)>();
+    let (tx_worker, rec_worker) = mpsc::channel::<(StatefulProtocol, Resize, Rect, RenderId)>();
 
     // Send UI-events and the [ResizeProtocol] result back to main thread.
     let (tx_main, rec_main) = mpsc::channel();
@@ -52,9 +52,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Resize and encode in background thread.
     let tx_main_render = tx_main.clone();
     thread::spawn(move || loop {
-        if let Ok((mut protocol, resize, area)) = rec_worker.recv() {
+        if let Ok((mut protocol, resize, area, id)) = rec_worker.recv() {
             protocol.resize_encode(&resize, protocol.background_color(), area);
-            tx_main_render.send(AppEvent::Redraw(protocol)).unwrap();
+            tx_main_render.send(AppEvent::Redraw(protocol, id)).unwrap();
         }
     });
 
@@ -87,10 +87,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if key.code == KeyCode::Char('q') {
                             break;
                         }
+                        if key.code == KeyCode::Char('r') {
+                            let dyn_img =
+                                image::io::Reader::open("./assets/Jenkins.jpg")?.decode()?;
+                            let protocol = picker.new_resize_protocol(dyn_img);
+                            app.async_state.set_new_protocol(protocol);
+                        }
                     }
                 }
-                AppEvent::Redraw(protocol) => {
-                    app.async_state.set_protocol(protocol);
+                AppEvent::Redraw(protocol, id) => {
+                    app.async_state.update_protocol(protocol, id);
                 }
             }
         }
