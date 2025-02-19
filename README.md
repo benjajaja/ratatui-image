@@ -73,6 +73,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // This would be your typical `loop {` in a real app:
     terminal.draw(|f| ui(f, &mut app))?;
 
+    // It is recommended to handle the encoding result:
+    app.image.last_encoding_result().unwrap()?;
+
     Ok(())
 }
 

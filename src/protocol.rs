@@ -196,6 +196,7 @@ impl StatefulProtocol {
         self.protocol_type.inner_trait_mut().render(area, buf);
     }
 
+    /// Get the are that the image will be resized to for a given [Rect].
     pub fn size_for(&self, resize: &Resize, area: Rect) -> Rect {
         resize.render_area(&self.source, self.font_size, area)
     }
