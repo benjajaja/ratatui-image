@@ -12,14 +12,13 @@ use ratatui::{
         execute,
         terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     },
-    layout::Rect,
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
 use ratatui_image::{
+    errors::Errors,
     picker::Picker,
-    protocol::StatefulProtocol,
-    thread::{ThreadImage, ThreadProtocol},
+    thread::{ResizeRequest, ResizeResponse, ThreadImage, ThreadProtocol},
     Resize,
 };
 
@@ -29,7 +28,7 @@ struct App {
 
 enum AppEvent {
     KeyEvent(KeyEvent),
-    Redraw(StatefulProtocol),
+    Redraw(Result<ResizeResponse, Errors>),
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
 
     // Send a [ResizeProtocol] to resize and encode it in a separate thread.
-    let (tx_worker, rec_worker) = mpsc::channel::<(StatefulProtocol, Resize, Rect)>();
+    let (tx_worker, rec_worker) = mpsc::channel::<ResizeRequest>();
 
     // Send UI-events and the [ResizeProtocol] result back to main thread.
     let (tx_main, rec_main) = mpsc::channel();
@@ -52,9 +51,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Resize and encode in background thread.
     let tx_main_render = tx_main.clone();
     thread::spawn(move || loop {
-        if let Ok((mut protocol, resize, area)) = rec_worker.recv() {
-            protocol.resize_encode(&resize, area);
-            tx_main_render.send(AppEvent::Redraw(protocol)).unwrap();
+        if let Ok(request) = rec_worker.recv() {
+            tx_main_render
+                .send(AppEvent::Redraw(request.resize_encode()))
+                .unwrap();
         }
     });
 
@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mut app = App {
-        async_state: ThreadProtocol::new(tx_worker, picker.new_resize_protocol(dyn_img)),
+        async_state: ThreadProtocol::new(tx_worker, Some(picker.new_resize_protocol(dyn_img))),
     };
 
     loop {
@@ -89,8 +89,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 }
-                AppEvent::Redraw(protocol) => {
-                    app.async_state.set_protocol(protocol);
+                AppEvent::Redraw(completed) => {
+                    let _ = app.async_state.update_resized_protocol(completed?);
                 }
             }
         }
