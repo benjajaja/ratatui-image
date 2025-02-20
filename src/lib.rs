@@ -55,10 +55,8 @@
 //!
 //!     // This would be your typical `loop {` in a real app:
 //!     terminal.draw(|f| ui(f, &mut app))?;
-//!
-//!     // It is recommended to handle the encoding result:
+//!     // It is recommended to handle the encoding result
 //!     app.image.last_encoding_result().unwrap()?;
-//!
 //!     Ok(())
 //! }
 //!
@@ -207,11 +205,11 @@ impl StatefulWidget for StatefulImage {
             return;
         }
 
-        state.resize_encode_render(&self.resize, area, buf);
+        state.resize_encode_render(self.resize, area, buf);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 /// Resize method
 pub enum Resize {
     /// Fit to area.
@@ -243,7 +241,7 @@ impl Default for Resize {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Specifies which sides to be clipped when cropping an image.
 pub struct CropOptions {
     /// If `true`, the top side should be clipped.
