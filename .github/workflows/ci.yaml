@@ -20,36 +20,7 @@ env:
   CLICOLOR_FORCE: 1
 
 jobs:
-  ci:
-    name: CI
-    strategy:
-      matrix:
-        platform: [ubuntu-latest, windows-latest, macos-latest]
-      fail-fast: true
-    runs-on: ${{ matrix.platform }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.81.0
-          profile: default
-          override: true
-      - uses: davidB/rust-cargo-make@v1
-      - name: CI
-        uses: actions-rs/cargo@v1
-        with:
-          command: make
-          args: ci-all
-      - name: Windows CI
-        if: matrix.platform == 'windows-latest'
-        uses: actions-rs/cargo@v1
-        with:
-          command: make
-          args: ci-windows
-
-  ensure-readme:
+  ensure-readme-up-to-date:
     name: Ensure readme is up-to-date
     runs-on: ubuntu-latest
     steps:
@@ -67,37 +38,67 @@ jobs:
       - name: Ensure no changes
         run: git diff --exit-code .
 
-  xvfb:
-    name: Xvfb
+  nix-flake-test:
+    name: Flake check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+
+      - name: Cachix
+        uses: cachix/cachix-action@v12
         with:
-          toolchain: 1.81.0
-          profile: default
-          override: true
-      - uses: davidB/rust-cargo-make@v1
-      - name: Install terminals and tools
-        # xwd is in x11-apps, convert seems to be installed
-        run: sudo apt-get install -y x11-apps xterm
-      - name: Screenshot
-        run: cargo make screenshot-xvfb && test -f ./target/screenshot_xterm.png
-      - name: Upload screenshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshot.png
-          path: target/**/screenshot_*.png
-          if-no-files-found: error
-      - name: Diff
+          name: ratatui-image-ci
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: Flake check
         run: |
-          cargo install dify@0.6.0
-          cargo make screenshot-diff
-      - name: Upload diff
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+          nix flake show
+          nix flake check --print-build-logs
+
+  nix-build:
+    name: Nix build
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_path: ${{ steps.upload-artifact.outputs.artifact_path }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+
+      - name: Cachix
+        uses: cachix/cachix-action@v12
         with:
-          name: diff.png
-          path: target/**/diff_*.png
+          name: ratatui-image-ci
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: Build package
+        run: |
+          nix build . --print-build-logs
+
+  nix-build-windows:
+    name: Nix build (windows)
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_path: ${{ steps.upload-artifact.outputs.artifact_path }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+
+      - name: Cachix
+        uses: cachix/cachix-action@v12
+        with:
+          name: ratatui-image-ci
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: Build package
+        run: |
+          nix build .#windows --print-build-logs
