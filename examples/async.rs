@@ -83,10 +83,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(ev) = rec_main.try_recv() {
             match ev {
                 AppEvent::KeyEvent(key) => {
-                    if key.kind == KeyEventKind::Press {
-                        if key.code == KeyCode::Char('q') {
-                            break;
-                        }
+                    if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
+                        break;
                     }
                 }
                 AppEvent::Redraw(completed) => {

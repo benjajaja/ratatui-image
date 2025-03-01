@@ -54,6 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     terminal.draw(|f| ui(f, &mut app))?;
     std::thread::sleep(std::time::Duration::from_secs(1)); // let the terminal actually draw.
+    #[allow(clippy::zombie_processes)] // TODO: fix this!
     let xwd = Command::new("xwd")
         .args(["-root", "-silent"])
         .stdout(Stdio::piped())

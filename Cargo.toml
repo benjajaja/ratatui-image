@@ -14,7 +14,7 @@ exclude = ["assets/*"]
 rust-version = "1.81.0"
 
 [features]
-default = ["image-defaults"]
+default = ["image-defaults", "crossterm"]
 crossterm = ["ratatui/crossterm"]
 image-defaults = ["image/default"]
 termion = ["ratatui/termion"]
