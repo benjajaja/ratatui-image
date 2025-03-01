@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+# [5.0.0] - 2025-03-01
+
+Add `StatefulProtocol::size_for`, that can be used to get the size that an image will be rendered to.
+This allows positioning the image before it has been rendered, for example centering the image widget with the usual ratatui layout options.
+
+ThreadImage and ThreadProtocol work with `ResizeRequest` and `ResizeResponse` instead of some tuples.
+They internally track an ID so that a response for a stale area is discarded correctly.
+
+Huge internal refactor that removes duplicated code across image protocols.
+
+- `Errors` variant case names have been fixed.
+- `StatefulProtocol` becomes a struct (was enum).
+- `StatefulProtocol::area` which returned the last rendered area has been removed, use `size_for` for accurate results.
+- `StatefulProtocol` methods has some parameters removed.
+- All protocols except kitty lose their `Stateful...` struct implementation, as one struct can share both protocol implementations.
+
 # [4.2.0] - 2024-12-31 🎆
 
 Fix Sixel and iTerm2 not working with tmux.
