@@ -145,7 +145,7 @@ impl StatefulProtocol {
     /// Resize and encode if necessary, and render immediately.
     ///
     /// This blocks the UI thread but requires neither threads nor async.
-    pub fn resize_encode_render(&mut self, resize: Resize, area: Rect, buf: &mut Buffer) {
+    pub fn resize_encode_render(&mut self, resize: &Resize, area: Rect, buf: &mut Buffer) {
         if let Some(rect) = self.needs_resize(resize, area) {
             self.resize_encode(resize, rect);
         }
@@ -157,7 +157,7 @@ impl StatefulProtocol {
     /// This can be called by the UI thread to check if this [StatefulProtocol] should be sent off
     /// to some background thread/task to do the resizing and encoding, instead of rendering. The
     /// thread should then return the [StatefulProtocol] so that it can be rendered.protoco
-    pub fn needs_resize(&mut self, resize: Resize, area: Rect) -> Option<Rect> {
+    pub fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(
             &self.source,
             self.font_size,
@@ -171,7 +171,7 @@ impl StatefulProtocol {
     /// that next call for the given area does not need to redo the work.
     ///
     /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
-    pub fn resize_encode(&mut self, resize: Resize, area: Rect) {
+    pub fn resize_encode(&mut self, resize: &Resize, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }

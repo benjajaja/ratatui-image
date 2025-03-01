@@ -52,7 +52,7 @@ impl StatefulWidget for ThreadImage {
             return;
         }
 
-        state.resize_encode_render(self.resize, area, buf);
+        state.resize_encode_render(&self.resize, area, buf);
     }
 }
 
@@ -66,7 +66,7 @@ pub struct ResizeRequest {
 
 impl ResizeRequest {
     pub fn resize_encode(mut self) -> Result<ResizeResponse, Errors> {
-        self.protocol.resize_encode(self.resize, self.area);
+        self.protocol.resize_encode(&self.resize, self.area);
         self.protocol
             .last_encoding_result()
             .expect("The resize has just been performed")?;
@@ -117,23 +117,24 @@ impl ThreadProtocol {
     }
 
     /// If the image needs to resize it sends a `ResizeRequest`. Else it renders the image
-    pub fn resize_encode_render(&mut self, resize: Resize, area: Rect, buf: &mut Buffer) {
+    pub fn resize_encode_render(&mut self, resize: &Resize, area: Rect, buf: &mut Buffer) {
         if let Some(rect) = self.needs_resize(resize, area) {
             self.resize_encode(resize, rect);
         } else {
             self.render(area, buf);
         }
     }
-    pub fn needs_resize(&mut self, resize: Resize, area: Rect) -> Option<Rect> {
+    pub fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
         self.inner
             .as_mut()
             .and_then(|protocol| protocol.needs_resize(resize, area))
     }
 
     /// Senda a `ResizeRequest` through the channel if there already isn't a pending `ResizeRequest`
-    pub fn resize_encode(&mut self, resize: Resize, area: Rect) {
+    pub fn resize_encode(&mut self, resize: &Resize, area: Rect) {
         let _ = self.inner.take().map(|protocol| {
             self.increment_id();
+            let resize = resize.clone();
             let _ = self.tx.send(ResizeRequest {
                 protocol,
                 resize,

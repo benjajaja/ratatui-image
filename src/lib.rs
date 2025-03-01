@@ -205,11 +205,11 @@ impl StatefulWidget for StatefulImage {
             return;
         }
 
-        state.resize_encode_render(self.resize, area, buf);
+        state.resize_encode_render(&self.resize, area, buf);
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 /// Resize method
 pub enum Resize {
     /// Fit to area.
