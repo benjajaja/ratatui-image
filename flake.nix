@@ -24,7 +24,7 @@
       with pkgs; {
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "ratatui-image";
-          version = "0.1.0";
+          version = "5.0.0";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
         };
