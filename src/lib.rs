@@ -105,10 +105,13 @@
 //! [ratatui]: https://github.com/ratatui-org/ratatui
 //! [sixel]: https://en.wikipedia.org/wiki/Sixel
 //! [`render_stateful_widget`]: https://docs.rs/ratatui/latest/ratatui/terminal/struct.Frame.html#method.render_stateful_widget
-use std::cmp::{max, min};
+use std::{
+    cmp::{max, min},
+    marker::PhantomData,
+};
 
 use image::{imageops, DynamicImage, ImageBuffer, Rgba};
-use protocol::{ImageSource, Protocol, StatefulProtocol};
+use protocol::{ImageSource, Protocol};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -162,6 +165,31 @@ impl Widget for Image<'_> {
     }
 }
 
+pub trait ResizeEncodeRender {
+    /// Resize and encode if necessary, and render immediately.
+    fn resize_encode_render(&mut self, resize: Resize, area: Rect, buf: &mut Buffer) {
+        if let Some(rect) = self.needs_resize(resize, area) {
+            self.resize_encode(resize, rect);
+        }
+        self.render(area, buf);
+    }
+
+    /// Resize the image and encode it for rendering. The result should be stored statefully so
+    /// that next call for the given area does not need to redo the work.
+    ///
+    /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
+    fn resize_encode(&mut self, resize: Resize, area: Rect);
+
+    /// Render the currently resized and encoded data to the buffer.
+    fn render(&mut self, area: Rect, buf: &mut Buffer);
+    /// Check if the current image state would need resizing (grow or shrink) for the given area.
+    ///
+    /// This can be called by the UI thread to check if this [StatefulProtocol] should be sent off
+    /// to some background thread/task to do the resizing and encoding, instead of rendering. The
+    /// thread should then return the [StatefulProtocol] so that it can be rendered.protoco
+    fn needs_resize(&self, resize: Resize, area: Rect) -> Option<Rect>;
+}
+
 /// Resizeable image widget that uses a [StatefulProtocol] state.
 ///
 /// This stateful widget reacts to area resizes and resizes its image data accordingly.
@@ -181,35 +209,53 @@ impl Widget for Image<'_> {
 ///     );
 /// }
 /// ```
-#[derive(Default)]
-pub struct StatefulImage {
+pub struct StatefulImage<T>
+where
+    T: ResizeEncodeRender,
+{
     resize: Resize,
+    phantom: PhantomData<T>,
 }
 
-impl StatefulImage {
+impl<T> Default for StatefulImage<T>
+where
+    T: ResizeEncodeRender,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl<T> StatefulImage<T>
+where
+    T: ResizeEncodeRender,
+{
     pub const fn resize(self, resize: Resize) -> Self {
-        Self { resize }
+        Self { resize, ..self }
     }
 
     pub const fn new() -> Self {
         Self {
             resize: Resize::Fit(None),
+            phantom: PhantomData,
         }
     }
 }
 
-impl StatefulWidget for StatefulImage {
-    type State = StatefulProtocol;
+impl<T> StatefulWidget for StatefulImage<T>
+where
+    T: ResizeEncodeRender,
+{
+    type State = T;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         if area.width == 0 || area.height == 0 {
             return;
         }
 
-        state.resize_encode_render(&self.resize, area, buf);
+        state.resize_encode_render(self.resize, area, buf);
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 /// Resize method
 pub enum Resize {
     /// Fit to area.
