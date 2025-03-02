@@ -14,7 +14,7 @@ use self::{
     kitty::{Kitty, StatefulKitty},
     sixel::Sixel,
 };
-use crate::{FontSize, Result};
+use crate::{FontSize, ResizeEncodeRender, Result};
 
 use super::Resize;
 
@@ -124,6 +124,10 @@ impl StatefulProtocol {
         }
     }
 
+    pub fn size_for(&self, resize: &Resize, area: Rect) -> Rect {
+        resize.render_area(&self.source, self.font_size, area)
+    }
+
     pub fn protocol_type(&self) -> &StatefulProtocolType {
         &self.protocol_type
     }
@@ -142,36 +146,13 @@ impl StatefulProtocol {
         self.source.background_color
     }
 
-    /// Resize and encode if necessary, and render immediately.
-    ///
-    /// This blocks the UI thread but requires neither threads nor async.
-    pub fn resize_encode_render(&mut self, resize: &Resize, area: Rect, buf: &mut Buffer) {
-        if let Some(rect) = self.needs_resize(resize, area) {
-            self.resize_encode(resize, rect);
-        }
-        self.render(area, buf);
+    fn last_encoding_area(&self) -> Rect {
+        self.protocol_type.inner_trait().area()
     }
+}
 
-    /// Check if the current image state would need resizing (grow or shrink) for the given area.
-    ///
-    /// This can be called by the UI thread to check if this [StatefulProtocol] should be sent off
-    /// to some background thread/task to do the resizing and encoding, instead of rendering. The
-    /// thread should then return the [StatefulProtocol] so that it can be rendered.protoco
-    pub fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
-        resize.needs_resize(
-            &self.source,
-            self.font_size,
-            self.last_encoding_area(),
-            area,
-            self.source.hash != self.hash,
-        )
-    }
-
-    /// Resize the image and encode it for rendering. The result should be stored statefully so
-    /// that next call for the given area does not need to redo the work.
-    ///
-    /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
-    pub fn resize_encode(&mut self, resize: &Resize, area: Rect) {
+impl ResizeEncodeRender for StatefulProtocol {
+    fn resize_encode(&mut self, resize: &Resize, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -191,20 +172,20 @@ impl StatefulProtocol {
         self.last_encoding_result = Some(result)
     }
 
-    /// Render the currently resized and encoded data to the buffer.
-    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer) {
         self.protocol_type.inner_trait_mut().render(area, buf);
     }
 
-    pub fn size_for(&self, resize: &Resize, area: Rect) -> Rect {
-        resize.render_area(&self.source, self.font_size, area)
-    }
-
-    fn last_encoding_area(&self) -> Rect {
-        self.protocol_type.inner_trait().area()
+    fn needs_resize(&mut self, resize: &Resize, area: Rect) -> Option<Rect> {
+        resize.needs_resize(
+            &self.source,
+            self.font_size,
+            self.last_encoding_area(),
+            area,
+            self.source.hash != self.hash,
+        )
     }
 }
-
 #[derive(Clone)]
 /// Image source for [crate::protocol::StatefulProtocol]s
 ///

@@ -195,7 +195,7 @@ impl App {
     }
 
     pub fn on_tick(&mut self) {}
-
+    const IMAGE: StatefulImage<StatefulProtocol> = StatefulImage::new();
     fn render_resized_image(&mut self, f: &mut Frame<'_>, resize: Resize, area: Rect) {
         let (state, name, color) = match resize {
             Resize::Fit(_) => (&mut self.image_fit_state, "Fit", Color::Magenta),
@@ -207,10 +207,7 @@ impl App {
         f.render_widget(paragraph(self.background.as_str().bg(color)), inner_area);
         match self.show_images {
             ShowImages::Fixed => (),
-            _ => {
-                let image = StatefulImage::default().resize(resize);
-                f.render_stateful_widget(image, inner_area, state);
-            }
+            _ => f.render_stateful_widget(Self::IMAGE.resize(resize), inner_area, state),
         };
         f.render_widget(block, area);
     }

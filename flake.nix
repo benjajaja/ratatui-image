@@ -34,6 +34,7 @@
             cargo-semver-checks
             cargo-release
             cargo-make
+            rust-analyzer
             # Add additional build inputs here
           ] ++ lib.optionals pkgs.stdenv.isDarwin [
             # Additional darwin specific inputs can be set here
@@ -49,6 +50,7 @@
             "cargo"
             "llvm-tools"
             "rustc"
+            "clippy"
           ]);
 
         # Build *just* the cargo dependencies, so we can reuse
