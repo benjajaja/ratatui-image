@@ -186,9 +186,6 @@ and ![github dependency graph](https://github.com/benjajaja/ratatui-image/networ
 
 PRs and issues/discussions welcome!
 
-You can run an aproximation of the CI with `cargo make ci`.
-I must manually approve CI runs for new PRs to prevent github-action attacks.
-The demo is useful to test that everything works correctly.
-PRs should be rebased on `master` and **not contain any merge commits**.
+There are some specific rules for a PR to be reviewed at all, please see [CONTRIBUTING.md](CONTRIBUTING.md) for reference.
 
 License: MIT
