@@ -167,7 +167,7 @@ impl Widget for Image<'_> {
 
 pub trait ResizeEncodeRender {
     /// Resize and encode if necessary, and render immediately.
-    fn resize_encode_render(&mut self, resize: Resize, area: Rect, buf: &mut Buffer) {
+    fn resize_encode_render(&mut self, resize: &Resize, area: Rect, buf: &mut Buffer) {
         if let Some(rect) = self.needs_resize(resize, area) {
             self.resize_encode(resize, rect);
         }
@@ -178,7 +178,7 @@ pub trait ResizeEncodeRender {
     /// that next call for the given area does not need to redo the work.
     ///
     /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
-    fn resize_encode(&mut self, resize: Resize, area: Rect);
+    fn resize_encode(&mut self, resize: &Resize, area: Rect);
 
     /// Render the currently resized and encoded data to the buffer.
     fn render(&mut self, area: Rect, buf: &mut Buffer);
@@ -187,7 +187,7 @@ pub trait ResizeEncodeRender {
     /// This can be called by the UI thread to check if this [StatefulProtocol] should be sent off
     /// to some background thread/task to do the resizing and encoding, instead of rendering. The
     /// thread should then return the [StatefulProtocol] so that it can be rendered.protoco
-    fn needs_resize(&self, resize: Resize, area: Rect) -> Option<Rect>;
+    fn needs_resize(&self, resize: &Resize, area: Rect) -> Option<Rect>;
 }
 
 /// Resizeable image widget that uses a [StatefulProtocol] state.
@@ -251,11 +251,11 @@ where
             return;
         }
 
-        state.resize_encode_render(self.resize, area, buf);
+        state.resize_encode_render(&self.resize, area, buf);
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 /// Resize method
 pub enum Resize {
     /// Fit to area.

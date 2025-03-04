@@ -102,7 +102,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-const IMAGE: StatefulImage<ThreadProtocol> = StatefulImage::new();
 fn ui(f: &mut Frame<'_>, app: &mut App) {
     let area = f.area();
     let block = Block::default().borders(Borders::ALL).title("Async test");
@@ -111,6 +110,10 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         Paragraph::new("PartiallyHiddenScreenshotParagraphBackground\n".repeat(10)),
         block.inner(area),
     );
-    f.render_stateful_widget(IMAGE, block.inner(area), &mut app.async_state);
+    f.render_stateful_widget(
+        StatefulImage::new(),
+        block.inner(area),
+        &mut app.async_state,
+    );
     f.render_widget(block, area);
 }

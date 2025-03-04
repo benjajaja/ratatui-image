@@ -25,7 +25,7 @@ pub struct ResizeRequest {
 
 impl ResizeRequest {
     pub fn resize_encode(mut self) -> Result<ResizeResponse, Errors> {
-        self.protocol.resize_encode(self.resize, self.area);
+        self.protocol.resize_encode(&self.resize, self.area);
         self.protocol
             .last_encoding_result()
             .expect("The resize has just been performed")?;
@@ -101,19 +101,19 @@ impl ThreadProtocol {
 }
 
 impl ResizeEncodeRender for ThreadProtocol {
-    fn needs_resize(&self, resize: Resize, area: Rect) -> Option<Rect> {
+    fn needs_resize(&self, resize: &Resize, area: Rect) -> Option<Rect> {
         self.inner
             .as_ref()
             .and_then(|protocol| protocol.needs_resize(resize, area))
     }
 
     /// Senda a `ResizeRequest` through the channel if there already isn't a pending `ResizeRequest`
-    fn resize_encode(&mut self, resize: Resize, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, area: Rect) {
         let _ = self.inner.take().map(|protocol| {
             self.increment_id();
             let _ = self.tx.send(ResizeRequest {
                 protocol,
-                resize,
+                resize: resize.clone(),
                 area,
                 id: self.id,
             });
