@@ -18,8 +18,8 @@ use ratatui::{
 use ratatui_image::{
     errors::Errors,
     picker::Picker,
-    thread::{ResizeRequest, ResizeResponse, ThreadImage, ThreadProtocol},
-    Resize,
+    thread::{ResizeRequest, ResizeResponse, ThreadProtocol},
+    StatefulImage,
 };
 
 struct App {
@@ -110,8 +110,10 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         Paragraph::new("PartiallyHiddenScreenshotParagraphBackground\n".repeat(10)),
         block.inner(area),
     );
-
-    let image = ThreadImage::default().resize(Resize::Fit(None));
-    f.render_stateful_widget(image, block.inner(area), &mut app.async_state);
+    f.render_stateful_widget(
+        StatefulImage::new(),
+        block.inner(area),
+        &mut app.async_state,
+    );
     f.render_widget(block, area);
 }

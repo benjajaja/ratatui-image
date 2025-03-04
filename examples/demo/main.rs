@@ -207,10 +207,7 @@ impl App {
         f.render_widget(paragraph(self.background.as_str().bg(color)), inner_area);
         match self.show_images {
             ShowImages::Fixed => (),
-            _ => {
-                let image = StatefulImage::default().resize(resize);
-                f.render_stateful_widget(image, inner_area, state);
-            }
+            _ => f.render_stateful_widget(StatefulImage::new().resize(resize), inner_area, state),
         };
         f.render_widget(block, area);
     }
