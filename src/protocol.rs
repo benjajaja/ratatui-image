@@ -152,7 +152,7 @@ impl StatefulProtocol {
 }
 
 impl ResizeEncodeRender for StatefulProtocol {
-    fn resize_encode(&mut self, resize: Resize, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -176,7 +176,7 @@ impl ResizeEncodeRender for StatefulProtocol {
         self.protocol_type.inner_trait_mut().render(area, buf);
     }
 
-    fn needs_resize(&self, resize: Resize, area: Rect) -> Option<Rect> {
+    fn needs_resize(&self, resize: &Resize, area: Rect) -> Option<Rect> {
         resize.needs_resize(
             &self.source,
             self.font_size,
