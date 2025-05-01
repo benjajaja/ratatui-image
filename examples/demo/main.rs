@@ -77,7 +77,7 @@ impl App {
         );
 
         let ada = "./assets/Ada.png";
-        let image_source = image::io::Reader::open(ada).unwrap().decode().unwrap();
+        let image_source = image::ImageReader::open(ada).unwrap().decode().unwrap();
 
         let mut picker = Picker::from_query_stdio().unwrap();
         // Set completely transparent background (experimental, only works for iTerm2 and Kitty).
@@ -150,7 +150,7 @@ impl App {
                     Some("./assets/Jenkins.jpg") => "./assets/NixOS.png",
                     _ => "./assets/Ada.png",
                 };
-                self.image_source = image::io::Reader::open(path).unwrap().decode().unwrap();
+                self.image_source = image::ImageReader::open(path).unwrap().decode().unwrap();
                 self.image_source_path = path.into();
                 self.reset_images();
             }
