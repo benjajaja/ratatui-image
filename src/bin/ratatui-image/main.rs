@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let image_source = image::io::Reader::open(&filename)?.decode()?;
+    let image_source = image::ImageReader::open(&filename)?.decode()?;
 
     let image_state = picker.new_resize_protocol(image_source.clone());
 

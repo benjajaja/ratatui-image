@@ -22,7 +22,7 @@ termwiz = ["ratatui/termwiz"]
 serde = ["dep:serde"]
 
 [dependencies]
-image = { version = "^0.25.1", default-features = false, features = ["jpeg"] }
+image = { version = "^0.25.6", default-features = false, features = ["jpeg"] }
 icy_sixel = { version = "^0.1.1" }
 serde = { version = "^1.0", optional = true, features = ["derive"] }
 base64 = { version = "^0.21.2" }

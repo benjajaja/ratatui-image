@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "Font size must be fixed to a specific size: {ASSERT_FONT_SIZE:?}",
         );
     }
-    let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
+    let dyn_img = image::ImageReader::open("./assets/Ada.png")?.decode()?;
     let image = picker.new_protocol(
         dyn_img,
         Rect::new(0, 0, SCREEN_SIZE.0 - 10, SCREEN_SIZE.1 - 4),

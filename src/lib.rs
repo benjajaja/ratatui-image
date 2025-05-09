@@ -46,7 +46,7 @@
 //!     let mut picker = Picker::from_fontsize((8, 12));
 //!
 //!     // Load an image with the image crate.
-//!     let dyn_img = image::io::Reader::open("./assets/Ada.png")?.decode()?;
+//!     let dyn_img = image::ImageReader::open("./assets/Ada.png")?.decode()?;
 //!
 //!     // Create the Protocol which will be used by the widget.
 //!     let image = picker.new_resize_protocol(dyn_img);
