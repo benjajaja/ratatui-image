@@ -146,11 +146,11 @@ pub type FontSize = (u16, u16);
 /// }
 /// ```
 pub struct Image<'a> {
-    image: &'a mut Protocol,
+    image: &'a Protocol,
 }
 
 impl<'a> Image<'a> {
-    pub fn new(image: &'a mut Protocol) -> Self {
+    pub fn new(image: &'a Protocol) -> Self {
         Self { image }
     }
 }

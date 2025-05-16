@@ -63,7 +63,7 @@ fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
 }
 
 impl ProtocolTrait for Halfblocks {
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
+    fn render(&self, area: Rect, buf: &mut Buffer) {
         for (i, hb) in self.data.iter().enumerate() {
             let x = i as u16 % self.area.width;
             let y = i as u16 / self.area.width;

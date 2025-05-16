@@ -66,7 +66,7 @@ fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
 }
 
 impl ProtocolTrait for Sixel {
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
+    fn render(&self, area: Rect, buf: &mut Buffer) {
         render(self.area, &self.data, area, buf, false)
     }
 

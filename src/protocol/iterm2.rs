@@ -59,7 +59,7 @@ fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String
 }
 
 impl ProtocolTrait for Iterm2 {
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
+    fn render(&self, area: Rect, buf: &mut Buffer) {
         render(self.area, &self.data, area, buf, false)
     }
 
