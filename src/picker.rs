@@ -373,6 +373,7 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
 
     let mut parser = Parser::new();
     let mut capabilities = vec![];
+    let mut cursor_position_reports = vec![];
     'out: loop {
         let mut charbuf: [u8; 50] = [0; 50];
         let result = io::stdin().read(&mut charbuf);
@@ -380,10 +381,14 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
             Ok(read) => {
                 for ch in charbuf.iter().take(read) {
                     let mut more_caps = parser.push(char::from(*ch));
-                    if more_caps[..] == [Capability::Status] {
-                        break 'out;
-                    } else {
-                        capabilities.append(&mut more_caps);
+                    match more_caps[..] {
+                        [Capability::Status] => {
+                            break 'out;
+                        }
+                        [Capability::CursorPositionReport(x, y)] => {
+                            cursor_position_reports.push((x, y));
+                        }
+                        _ => capabilities.append(&mut more_caps),
                     }
                 }
             }
@@ -391,6 +396,16 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
                 return Err(err.into());
             }
         }
+    }
+
+    match cursor_position_reports[..] {
+        [a, b, c] => {
+            if a != b && b != c {
+                // Only care if both "width part" and "scale part" is supported, for now.
+                capabilities.push(Capability::TextSizingProtocol);
+            }
+        }
+        _ => {}
     }
 
     if capabilities.is_empty() {

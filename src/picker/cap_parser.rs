@@ -8,9 +8,11 @@ pub struct Parser {
 #[derive(Debug, PartialEq)]
 pub enum Response {
     Unknown,
+    CSIResponse,
     Kitty,
     DeviceAttributes,
     CellSize,
+    CursorPositionReport,
     Status,
 }
 
@@ -20,6 +22,8 @@ pub enum Capability {
     Sixel,
     RectangularOps,
     CellSize(Option<(u16, u16)>),
+    CursorPositionReport(u16, u16),
+    TextSizingProtocol,
     Status, // Might as well call this "End" internally.
 }
 
@@ -70,6 +74,18 @@ impl Parser {
         // iTerm2 proprietary, unknown response, untested so far.
         //write!(buf, "{escape}[1337n").unwrap();
 
+        const BEL: &str = "\u{7}";
+        // CPR
+        // https://sw.kovidgoyal.net/kitty/text-sizing-protocol/#detecting-if-the-terminal-supports-this-protocol
+        // We need to write CPR, a resized space, and CPR again, to see if it moved the cursor. Do
+        // it again for the scaling part of the protocol.
+        // If unsupported, all the CPRs will be the same.
+        write!(
+            buf,
+            "{escape}[6n{escape}]66;w=2; {BEL}{escape}[6n{escape}]66;s=2; {BEL}{escape}[6n"
+        )
+        .unwrap();
+
         // End with Device Status Report, implemented by all terminals, ensure that there is some
         // response and we don't hang reading forever.
         write!(buf, "{escape}[5n").unwrap();
@@ -85,43 +101,76 @@ impl Parser {
                         // If the current sequence hasn't been identified yet, start a new one on Esc.
                         return self.restart();
                     }
-                    ("[", '?') => {
-                        self.sequence = Response::DeviceAttributes;
-                    }
                     ("_Gi=31", ';') => {
                         self.sequence = Response::Kitty;
                     }
-                    ("[6", ';') => {
-                        self.sequence = Response::CellSize;
-                    }
-                    ("[", '0') => {
-                        self.sequence = Response::Status;
+
+                    ("[", _) => {
+                        self.sequence = Response::CSIResponse;
                     }
                     _ => {}
                 };
                 self.data.push(next);
             }
-            Response::DeviceAttributes => match next {
-                'c' => {
-                    let mut caps = vec![];
-                    let inner: Vec<&str> = (self.data[2..]).split(';').collect();
-                    for cap in inner {
-                        match cap {
-                            "4" => caps.push(Capability::Sixel),
-                            "28" => caps.push(Capability::RectangularOps),
-                            _ => {}
+            Response::CSIResponse => {
+                if self.data == "[0" && next == 'n' {
+                    self.restart();
+                    return vec![Capability::Status];
+                }
+                match next {
+                    'c' if self.data.starts_with("[?") => {
+                        let mut caps = vec![];
+                        let inner: Vec<&str> = (self.data[2..]).split(';').collect();
+                        for cap in inner {
+                            match cap {
+                                "4" => caps.push(Capability::Sixel),
+                                "28" => caps.push(Capability::RectangularOps),
+                                _ => {}
+                            }
+                        }
+                        self.restart();
+                        return caps;
+                    }
+                    't' => {
+                        let mut cell_size = None;
+                        println!("t split: {}", self.data);
+                        let inner: Vec<&str> = self.data.split(';').collect();
+                        if let [_, h, w] = inner[..] {
+                            if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
+                                if w > 0 && h > 0 {
+                                    cell_size = Some((w, h));
+                                }
+                            }
+                        }
+                        self.restart();
+                        return vec![Capability::CellSize(cell_size)];
+                    }
+                    'R' => {
+                        let mut cursor_pos = None;
+                        let inner: Vec<&str> = self.data[1..].split(';').collect();
+                        if let [x, w] = inner[..] {
+                            if let (Ok(x), Ok(y)) = (x.parse::<u16>(), w.parse::<u16>()) {
+                                cursor_pos = Some((y, x));
+                            }
+                        }
+                        if let Some((x, y)) = cursor_pos {
+                            self.restart();
+                            return vec![Capability::CursorPositionReport(x, y)];
+                        } else {
+                            println!("BAD CursorPositionReport: {}", self.data);
+                            self.restart();
+                            return vec![];
                         }
                     }
-                    self.restart();
-                    return caps;
-                }
-                '\x1b' => {
-                    return self.restart();
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
+                    '\x1b' => {
+                        // Give up?
+                        return self.restart();
+                    }
+                    _ => {
+                        self.data.push(next);
+                    }
+                };
+            }
 
             Response::Kitty => match next {
                 '\\' => {
@@ -136,37 +185,10 @@ impl Parser {
                     self.data.push(next);
                 }
             },
-
-            Response::CellSize => match next {
-                't' => {
-                    let mut cell_size = None;
-                    let inner: Vec<&str> = self.data.split(';').collect();
-                    if let [_, h, w] = inner[..] {
-                        if let (Ok(h), Ok(w)) = (h.parse::<u16>(), w.parse::<u16>()) {
-                            if w > 0 && h > 0 {
-                                cell_size = Some((w, h));
-                            }
-                        }
-                    }
-                    self.restart();
-                    return vec![Capability::CellSize(cell_size)];
-                }
-                '\x1b' => {
-                    return self.restart();
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
-            Response::Status => match next {
-                'n' => return vec![Capability::Status],
-                '\x1b' => {
-                    return self.restart();
-                }
-                _ => {
-                    self.data.push(next);
-                }
-            },
+            _ => {
+                debug_assert!(false, "parse while in terminated state");
+                self.restart();
+            }
         };
         vec![]
     }
@@ -188,11 +210,14 @@ mod tests {
         for (name, str, expected) in vec![
             (
                 "all",
-                "\x1b_Gi=31;OK\x1b\\\x1b[?64;4c\x1b[6;7;14t\x1b[0n",
+                "\x1b_Gi=31;OK\x1b\\\x1b[?64;4c\x1b[6;7;14t\x1b[6;6R\x1b[7;7R\x1b[6;6R\x1b[0n",
                 vec![
                     Capability::Kitty,
                     Capability::Sixel,
                     Capability::CellSize(Some((14, 7))),
+                    Capability::CursorPositionReport(6, 6),
+                    Capability::CursorPositionReport(7, 7),
+                    Capability::CursorPositionReport(6, 6),
                     Capability::Status,
                 ],
             ),
