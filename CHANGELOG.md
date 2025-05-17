@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+# [6.0.0] - 2025-05-17
+
+`Image::new` uses a non-mutable borrow.
+
+The mutability was only required for the Kitty protocol, necessary to track wether the image has already been transmitted or only needs placement.
+
+Overall this change should remove the need to use locks when using threads or tokio.
+
 # [5.0.0] - 2025-03-01
 
 Add `StatefulProtocol::size_for`, that can be used to get the size that an image will be rendered to.
