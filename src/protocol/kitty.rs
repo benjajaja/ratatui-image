@@ -1,7 +1,7 @@
 /// https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholders
 use std::fmt::Write;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use crate::{picker::cap_parser::Parser, Result};
 use base64::{engine::general_purpose, Engine};

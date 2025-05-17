@@ -91,7 +91,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         block.inner(area),
     );
 
-    let image = Image::new(&mut app.image);
+    let image = Image::new(&app.image);
     f.render_widget(image, block.inner(area));
     f.render_widget(block, area);
 }
