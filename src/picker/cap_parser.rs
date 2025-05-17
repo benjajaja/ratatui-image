@@ -16,7 +16,7 @@ pub enum Response {
     Status,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Capability {
     Kitty,
     Sixel,
@@ -31,6 +31,15 @@ pub enum Capability {
 pub struct DeviceAttributeResponse {
     pub sixel: bool,
     pub rectangular_ops: bool,
+}
+
+/// Extra query options
+pub struct QueryStdioOptions {
+    /// Query for [Text Sizing Protocol]. The result can be checked by searching for
+    /// [Capability::TextSizingProtocol] in [crate::picker::Picker::capabilities].
+    ///
+    /// [Text Sizing Protocol] <https://sw.kovidgoyal.net/kitty/text-sizing-protocol//>
+    pub text_sizing_protocol: bool,
 }
 
 impl Default for Parser {
@@ -56,7 +65,7 @@ impl Parser {
             true => ("\x1bPtmux;", "\x1b\x1b", "\x1b\\"),
         }
     }
-    pub fn query(is_tmux: bool) -> String {
+    pub fn query(is_tmux: bool, options: QueryStdioOptions) -> String {
         let (start, escape, end) = Parser::escape_tmux(is_tmux);
 
         let mut buf = String::with_capacity(100);
@@ -74,17 +83,19 @@ impl Parser {
         // iTerm2 proprietary, unknown response, untested so far.
         //write!(buf, "{escape}[1337n").unwrap();
 
-        const BEL: &str = "\u{7}";
-        // CPR
-        // https://sw.kovidgoyal.net/kitty/text-sizing-protocol/#detecting-if-the-terminal-supports-this-protocol
-        // We need to write CPR, a resized space, and CPR again, to see if it moved the cursor. Do
-        // it again for the scaling part of the protocol.
-        // If unsupported, all the CPRs will be the same.
-        write!(
-            buf,
-            "{escape}[6n{escape}]66;w=2; {BEL}{escape}[6n{escape}]66;s=2; {BEL}{escape}[6n"
-        )
-        .unwrap();
+        if options.text_sizing_protocol {
+            const BEL: &str = "\u{7}";
+            // CPR
+            // https://sw.kovidgoyal.net/kitty/text-sizing-protocol/#detecting-if-the-terminal-supports-this-protocol
+            // We need to write CPR, a resized space, and CPR again, to see if it moved the cursor. Do
+            // it again for the scaling part of the protocol.
+            // If unsupported, all the CPRs will be the same.
+            write!(
+                buf,
+                "{escape}[6n{escape}]66;w=2; {BEL}{escape}[6n{escape}]66;s=2; {BEL}{escape}[6n"
+            )
+            .unwrap();
+        }
 
         // End with Device Status Report, implemented by all terminals, ensure that there is some
         // response and we don't hang reading forever.
