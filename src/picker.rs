@@ -17,7 +17,7 @@ use crate::{
     },
     FontSize, ImageSource, Resize, Result,
 };
-use cap_parser::{Capability, Parser};
+use cap_parser::{Capability, Parser, QueryStdioOptions};
 use image::{DynamicImage, Rgba};
 use rand::random;
 use ratatui::layout::Rect;
@@ -28,12 +28,13 @@ pub mod cap_parser;
 
 const DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 0]);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Picker {
     font_size: FontSize,
     protocol_type: ProtocolType,
     background_color: Rgba<u8>,
     is_tmux: bool,
+    capabilities: Vec<Capability>,
 }
 
 /// Serde-friendly protocol-type enum for [Picker].
@@ -75,12 +76,26 @@ impl Picker {
     /// ```
     ///
     pub fn from_query_stdio() -> Result<Self> {
+        Picker::from_query_stdio_with_options(QueryStdioOptions {
+            text_sizing_protocol: false,
+        })
+    }
+
+    /// This should ONLY be used if [Capability::TextSizingProtocol] is needed for some external
+    /// reason.
+    ///
+    /// Query for additional capabilities, currently supports querying for [Text Sizing Protocol].
+    ///
+    /// The result can be checked by searching for [Capability::TextSizingProtocol] in [Picker::capabilities].
+    ///
+    /// [Text Sizing Protocol] <https://sw.kovidgoyal.net/kitty/text-sizing-protocol//>
+    pub fn from_query_stdio_with_options(options: QueryStdioOptions) -> Result<Self> {
         // Detect tmux, and only if positive then take some risky guess for iTerm2 support.
         let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();
 
         // Write and read to stdin to query protocol capabilities and font-size.
-        match query_with_timeout(is_tmux, Duration::from_secs(1)) {
-            Ok((capability_proto, font_size)) => {
+        match query_with_timeout(is_tmux, Duration::from_secs(1), options) {
+            Ok((capability_proto, font_size, caps)) => {
                 // If some env var says that we should try iTerm2, then disregard protocol-from-capabilities.
                 let iterm2_proto = iterm2_from_env();
 
@@ -95,6 +110,7 @@ impl Picker {
                         background_color: DEFAULT_BACKGROUND,
                         protocol_type,
                         is_tmux,
+                        capabilities: caps,
                     })
                 } else {
                     Err(Errors::NoFontSize)
@@ -108,6 +124,7 @@ impl Picker {
                 background_color: DEFAULT_BACKGROUND,
                 protocol_type: ProtocolType::Halfblocks,
                 is_tmux,
+                capabilities: Vec::new(),
             }),
             Err(err) => Err(err),
         }
@@ -140,24 +157,33 @@ impl Picker {
             background_color: DEFAULT_BACKGROUND,
             protocol_type,
             is_tmux,
+            capabilities: Vec::new(),
         }
     }
 
-    pub fn protocol_type(self) -> ProtocolType {
+    /// Returns the current protocol type.
+    pub fn protocol_type(&self) -> ProtocolType {
         self.protocol_type
     }
 
+    /// Force a protocol type.
     pub fn set_protocol_type(&mut self, protocol_type: ProtocolType) {
         self.protocol_type = protocol_type;
     }
 
-    pub fn font_size(self) -> FontSize {
+    /// Returns the [FontSize] detected by [Picker::from_query_stdio].
+    pub fn font_size(&self) -> FontSize {
         self.font_size
     }
 
-    // Change the default background color (transparent black).
+    /// Change the default background color (transparent black).
     pub fn set_background_color<T: Into<Rgba<u8>>>(&mut self, background_color: T) {
         self.background_color = background_color.into();
+    }
+
+    /// Returns the capabilities detected by [Picker::from_query_stdio].
+    pub fn capabilities(&self) -> &Vec<Capability> {
+        &self.capabilities
     }
 
     /// Returns a new protocol for [`crate::Image`] widgets that fits into the given size.
@@ -359,7 +385,10 @@ fn font_size_fallback() -> Option<FontSize> {
     None
 }
 
-fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
+fn query_stdio_capabilities(
+    is_tmux: bool,
+    options: QueryStdioOptions,
+) -> Result<(Option<ProtocolType>, Option<FontSize>, Vec<Capability>)> {
     // Send several control sequences at once:
     // `_Gi=...`: Kitty graphics support.
     // `[c`: Capabilities including sixels.
@@ -367,12 +396,13 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
     // `[1337n`: iTerm2 (some terminals implement the protocol but sadly not this custom CSI)
     // `[5n`: Device Status Report, implemented by all terminals, ensure that there is some
     // response and we don't hang reading forever.
-    let query = Parser::query(is_tmux);
+    let query = Parser::query(is_tmux, options);
     io::stdout().write_all(query.as_bytes())?;
     io::stdout().flush()?;
 
     let mut parser = Parser::new();
     let mut capabilities = vec![];
+    let mut cursor_position_reports = vec![];
     'out: loop {
         let mut charbuf: [u8; 50] = [0; 50];
         let result = io::stdin().read(&mut charbuf);
@@ -380,16 +410,27 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
             Ok(read) => {
                 for ch in charbuf.iter().take(read) {
                     let mut more_caps = parser.push(char::from(*ch));
-                    if more_caps[..] == [Capability::Status] {
-                        break 'out;
-                    } else {
-                        capabilities.append(&mut more_caps);
+                    match more_caps[..] {
+                        [Capability::Status] => {
+                            break 'out;
+                        }
+                        [Capability::CursorPositionReport(x, y)] => {
+                            cursor_position_reports.push((x, y));
+                        }
+                        _ => capabilities.append(&mut more_caps),
                     }
                 }
             }
             Err(err) => {
                 return Err(err.into());
             }
+        }
+    }
+
+    if let [a, b, c] = cursor_position_reports[..] {
+        if a != b && b != c {
+            // Only care if both "width part" and "scale part" is supported, for now.
+            capabilities.push(Capability::TextSizingProtocol);
         }
     }
 
@@ -405,21 +446,22 @@ fn query_stdio_capabilities(is_tmux: bool) -> Result<(Option<ProtocolType>, Opti
         proto = Some(ProtocolType::Sixel);
     }
 
-    for cap in capabilities {
+    for cap in &capabilities {
         if let Capability::CellSize(Some((w, h))) = cap {
-            font_size = Some((w, h));
+            font_size = Some((*w, *h));
         }
     }
     // In case some terminal didn't support the cell-size query.
     font_size = font_size.or_else(font_size_fallback);
 
-    Ok((proto, font_size))
+    Ok((proto, font_size, capabilities))
 }
 
 fn query_with_timeout(
     is_tmux: bool,
     timeout: Duration,
-) -> Result<(Option<ProtocolType>, Option<FontSize>)> {
+    options: QueryStdioOptions,
+) -> Result<(Option<ProtocolType>, Option<FontSize>, Vec<Capability>)> {
     use std::{sync::mpsc, thread};
     let (tx, rx) = mpsc::channel();
 
@@ -428,7 +470,7 @@ fn query_with_timeout(
             enable_raw_mode()
                 .map_err(Errors::into)
                 .and_then(|disable_raw_mode| {
-                    let result = query_stdio_capabilities(is_tmux);
+                    let result = query_stdio_capabilities(is_tmux, options);
                     // Always try to return to raw_mode.
                     disable_raw_mode()?;
                     result

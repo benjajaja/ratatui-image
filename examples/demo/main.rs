@@ -140,8 +140,8 @@ impl App {
                 }
             }
             'i' => {
-                self.picker
-                    .set_protocol_type(self.picker.protocol_type().next());
+                let next = self.picker.protocol_type().next();
+                self.picker.set_protocol_type(next);
                 self.reset_images();
             }
             'o' => {
