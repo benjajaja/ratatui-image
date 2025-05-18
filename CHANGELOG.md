@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+# [7.0.0] - 2025-05-18
+
+`Picker` has a new field / method `capabilities`, which return the precise capabilities detected by `Picker::from_query_stdio`.
+Since the struct now holds a `Vec`, `Picker` is no longer derives `Copy` (but still derives `Clone`).
+This uncovered some unnecessary copying on a method that previously consumed self for no good reason.
+
+Add `Picker::from_query_stdio_with_options` to specifically query for [Text Sizing Protocol](https://sw.kovidgoyal.net/kitty/text-sizing-protocol/#detecting-if-the-terminal-supports-this-protocol).
+Not used in this library, but rather an optional convencience feature so that stdio must not be queried twice by some programs.
+The capability, if detected, is `Capability::TextSizingProtocol` and can be read from `Picker::capabilities()`.
+
 # [6.0.0] - 2025-05-17
 
 `Image::new` uses a non-mutable borrow.
