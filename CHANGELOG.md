@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+# [8.0.0] - 2025-05-18
+
+Fix `TextSizingProtocol` detection (was incorrectly detecting support on Foot terminal).
+
+Separate "stdio query response" from "capability", as they do not match one-to-one.
+Moved `Capability` into the `picker` module, as the interpretation is done there.
+
 # [7.0.0] - 2025-05-18
 
 `Picker` has a new field / method `capabilities`, which return the precise capabilities detected by `Picker::from_query_stdio`.
