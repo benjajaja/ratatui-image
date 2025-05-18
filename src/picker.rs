@@ -17,7 +17,7 @@ use crate::{
     },
     FontSize, ImageSource, Resize, Result,
 };
-use cap_parser::{Capability, Parser, QueryStdioOptions};
+use cap_parser::{Parser, QueryStdioOptions, Response};
 use image::{DynamicImage, Rgba};
 use rand::random;
 use ratatui::layout::Rect;
@@ -25,6 +25,20 @@ use ratatui::layout::Rect;
 use serde::{Deserialize, Serialize};
 
 pub mod cap_parser;
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Capability {
+    /// Reports supporting kitty graphics protocol.
+    Kitty,
+    /// Reports supporting sixel graphics protocol.
+    Sixel,
+    /// Reports supporting rectangular ops.
+    RectangularOps,
+    /// Reports font size in pixels.
+    CellSize(Option<(u16, u16)>),
+    /// Reports supporting text sizing protocol.
+    TextSizingProtocol,
+}
 
 const DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 0]);
 
@@ -385,6 +399,12 @@ fn font_size_fallback() -> Option<FontSize> {
     None
 }
 
+/// Query the terminal, by writing and reading to stdin and stdout.
+/// The terminal must be in "raw mode" and should probably be reset to "cooked mode" when this
+/// operation has completed.
+///
+/// The returned [ProtocolType] and [FontSize] may be included in the list of [Capability]s,
+/// but the burden of picking out the right one or a font-size fallback is already resolved here.
 fn query_stdio_capabilities(
     is_tmux: bool,
     options: QueryStdioOptions,
@@ -401,8 +421,7 @@ fn query_stdio_capabilities(
     io::stdout().flush()?;
 
     let mut parser = Parser::new();
-    let mut capabilities = vec![];
-    let mut cursor_position_reports = vec![];
+    let mut responses = vec![];
     'out: loop {
         let mut charbuf: [u8; 50] = [0; 50];
         let result = io::stdin().read(&mut charbuf);
@@ -411,13 +430,10 @@ fn query_stdio_capabilities(
                 for ch in charbuf.iter().take(read) {
                     let mut more_caps = parser.push(char::from(*ch));
                     match more_caps[..] {
-                        [Capability::Status] => {
+                        [Response::Status] => {
                             break 'out;
                         }
-                        [Capability::CursorPositionReport(x, y)] => {
-                            cursor_position_reports.push((x, y));
-                        }
-                        _ => capabilities.append(&mut more_caps),
+                        _ => responses.append(&mut more_caps),
                     }
                 }
             }
@@ -427,32 +443,75 @@ fn query_stdio_capabilities(
         }
     }
 
-    if let [a, b, c] = cursor_position_reports[..] {
-        if a != b && b != c {
-            // Only care if both "width part" and "scale part" is supported, for now.
-            capabilities.push(Capability::TextSizingProtocol);
-        }
-    }
+    interpret_parser_responses(responses)
+}
 
-    if capabilities.is_empty() {
+fn interpret_parser_responses(
+    responses: Vec<Response>,
+) -> Result<(Option<ProtocolType>, Option<FontSize>, Vec<Capability>)> {
+    if responses.is_empty() {
         return Err(Errors::NoCap);
     }
 
+    let mut capabilities = Vec::new();
+
     let mut proto = None;
     let mut font_size = None;
-    if capabilities.contains(&Capability::Kitty) {
-        proto = Some(ProtocolType::Kitty);
-    } else if capabilities.contains(&Capability::Sixel) {
-        proto = Some(ProtocolType::Sixel);
-    }
 
-    for cap in &capabilities {
-        if let Capability::CellSize(Some((w, h))) = cap {
-            font_size = Some((*w, *h));
+    let mut cursor_position_reports = vec![];
+    for response in &responses {
+        if let Some(capability) = match response {
+            Response::Kitty => {
+                proto = Some(ProtocolType::Kitty);
+                Some(Capability::Kitty)
+            }
+            Response::Sixel => {
+                if proto.is_none() {
+                    // Only if kitty is not supported.
+                    proto = Some(ProtocolType::Sixel);
+                }
+                Some(Capability::Sixel)
+            }
+            Response::RectangularOps => Some(Capability::RectangularOps),
+            Response::CellSize(cell_size) => {
+                if let Some((w, h)) = cell_size {
+                    font_size = Some((*w, *h));
+                }
+                Some(Capability::CellSize(*cell_size))
+            }
+            Response::CursorPositionReport(x, y) => {
+                cursor_position_reports.push((x, y));
+                None
+            }
+            Response::Status => None,
+        } {
+            capabilities.push(capability);
         }
     }
+
     // In case some terminal didn't support the cell-size query.
     font_size = font_size.or_else(font_size_fallback);
+
+    if let [(x1, _y1), (x2, _y2), (x3, _y3)] = cursor_position_reports[..] {
+        // Test if the cursor advanced exactly two columns (instead of one) on both the width and
+        // scaling queries of the protocol.
+        // The documentation is a bit ambiguous, as it only says the cursor positions "need to be
+        // different from each other".
+        // However from my testing on Kitty and other terminals that do not support the feature,
+        // the cursor always advances at least one column since it is printing a space, so the CPRs
+        // will always be different from each other (unless we would move the cursor to a known
+        // position or something like that - and this also begs the question of needing to do this
+        // anyway, for the edge case of the cursor being at the very end of a line).
+        // My interpretation is that the cursor should advance 2 columns, instead of one, with both
+        // queries, and only then can we interpret it as supported.
+        // The Foot terminal notably reports a 2 column movement but fortunately only for the `w=2`
+        // query.
+        //
+        // The row part can be ignored.
+        if *x2 == x1 + 2 && *x3 == x2 + 2 {
+            capabilities.push(Capability::TextSizingProtocol);
+        }
+    }
 
     Ok((proto, font_size, capabilities))
 }
@@ -488,7 +547,9 @@ fn query_with_timeout(
 mod tests {
     use std::assert_eq;
 
-    use crate::picker::{Picker, ProtocolType};
+    use crate::picker::{Capability, Picker, ProtocolType};
+
+    use super::{cap_parser::Response, interpret_parser_responses};
 
     #[test]
     fn test_cycle_protocol() {
@@ -506,5 +567,30 @@ mod tests {
     #[test]
     fn test_from_query_stdio_no_hang() {
         let _ = Picker::from_query_stdio();
+    }
+
+    #[test]
+    fn test_interpret_parser_responses_text_sizing_protocol() {
+        let (_, _, caps) = interpret_parser_responses(vec![
+            // Example response from Kitty.
+            Response::CursorPositionReport(1, 1),
+            Response::CursorPositionReport(3, 1),
+            Response::CursorPositionReport(5, 1),
+        ])
+        .unwrap();
+        assert!(caps.contains(&Capability::TextSizingProtocol));
+    }
+
+    #[test]
+    fn test_interpret_parser_responses_text_sizing_protocol_incomplete() {
+        let (_, _, caps) = interpret_parser_responses(vec![
+            // Example response from Foot, notably moves 2 columns only on `w=2` query, but not
+            // `s=2`.
+            Response::CursorPositionReport(1, 22),
+            Response::CursorPositionReport(3, 22),
+            Response::CursorPositionReport(4, 22),
+        ])
+        .unwrap();
+        assert!(!caps.contains(&Capability::TextSizingProtocol));
     }
 }
