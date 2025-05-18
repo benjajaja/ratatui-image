@@ -100,7 +100,7 @@
 //! * `image-defaults` (default) just enables `image/defaults` (`image` has `default-features =
 //! false`). To only support a selection of image formats and cut down dependencies, disable this
 //!   feature, add `image` to your crate, and enable its features/formats as desired. See
-//!   https://doc.rust-lang.org/cargo/reference/features.html#feature-unification.
+//!   <https://doc.rust-lang.org/cargo/reference/features.html#feature-unification/>.
 //!
 //! [ratatui]: https://github.com/ratatui-org/ratatui
 //! [sixel]: https://en.wikipedia.org/wiki/Sixel
@@ -177,20 +177,20 @@ pub trait ResizeEncodeRender {
     /// Resize the image and encode it for rendering. The result should be stored statefully so
     /// that next call for the given area does not need to redo the work.
     ///
-    /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
+    /// This can be done in a background thread, and the result is stored in this [protocol::StatefulProtocol].
     fn resize_encode(&mut self, resize: &Resize, area: Rect);
 
     /// Render the currently resized and encoded data to the buffer.
     fn render(&mut self, area: Rect, buf: &mut Buffer);
     /// Check if the current image state would need resizing (grow or shrink) for the given area.
     ///
-    /// This can be called by the UI thread to check if this [StatefulProtocol] should be sent off
+    /// This can be called by the UI thread to check if this [protocol::StatefulProtocol] should be sent off
     /// to some background thread/task to do the resizing and encoding, instead of rendering. The
-    /// thread should then return the [StatefulProtocol] so that it can be rendered.protoco
+    /// thread should then return the [protocol::StatefulProtocol] so that it can be rendered.
     fn needs_resize(&self, resize: &Resize, area: Rect) -> Option<Rect>;
 }
 
-/// Resizeable image widget that uses a [StatefulProtocol] state.
+/// Resizeable image widget that uses a [protocol::StatefulProtocol] state.
 ///
 /// This stateful widget reacts to area resizes and resizes its image data accordingly.
 ///

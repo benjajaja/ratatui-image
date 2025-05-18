@@ -72,7 +72,7 @@ impl Protocol {
 
 /// A stateful resizing image protocol for the [crate::StatefulImage] widget.
 ///
-/// The [create::thread::ThreadImage] widget also uses this, and is the reason why resizing is
+/// The [crate::thread::ThreadProtocol] widget also uses this, and is the reason why resizing is
 /// split from rendering.
 pub struct StatefulProtocol {
     source: ImageSource,

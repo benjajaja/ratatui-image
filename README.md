@@ -117,7 +117,7 @@ The lib also includes a binary that renders an image file, but it is focused on 
 * `image-defaults` (default) just enables `image/defaults` (`image` has `default-features =
 false`). To only support a selection of image formats and cut down dependencies, disable this
   feature, add `image` to your crate, and enable its features/formats as desired. See
-  https://doc.rust-lang.org/cargo/reference/features.html#feature-unification.
+  <https://doc.rust-lang.org/cargo/reference/features.html#feature-unification/>.
 
 [ratatui]: https://github.com/ratatui-org/ratatui
 [sixel]: https://en.wikipedia.org/wiki/Sixel
