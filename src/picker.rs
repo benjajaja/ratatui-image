@@ -525,16 +525,12 @@ fn query_with_timeout(
     let (tx, rx) = mpsc::channel();
 
     thread::spawn(move || {
-        let _ = tx.send(
-            enable_raw_mode()
-                .map_err(Errors::into)
-                .and_then(|disable_raw_mode| {
-                    let result = query_stdio_capabilities(is_tmux, options);
-                    // Always try to return to raw_mode.
-                    disable_raw_mode()?;
-                    result
-                }),
-        );
+        let _ = tx.send(enable_raw_mode().and_then(|disable_raw_mode| {
+            let result = query_stdio_capabilities(is_tmux, options);
+            // Always try to return to raw_mode.
+            disable_raw_mode()?;
+            result
+        }));
     });
 
     match rx.recv_timeout(timeout) {
