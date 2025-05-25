@@ -1,7 +1,7 @@
 [package]
 name = "ratatui-image"
 version = "8.0.0"
-edition = "2021"
+edition = "2024"
 autoexamples = true
 authors = ["Benjamin Große <ste3ls@gmail.com>"]
 description = "An image widget for ratatui, supporting sixels, kitty, iterm2, and unicode-halfblocks"
@@ -11,7 +11,7 @@ homepage = "https://github.com/benjajaja/ratatui-image"
 readme = "README.md"
 license = "MIT"
 exclude = ["assets/*"]
-rust-version = "1.81.0"
+rust-version = "1.86.0"
 
 [features]
 default = ["image-defaults", "crossterm"]
