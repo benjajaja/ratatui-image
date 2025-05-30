@@ -28,11 +28,12 @@ Foot      | `Sixel`  | ✔️ | Wayland.
 Kitty     | `Kitty`  | ✔️ | Reference for the `Kitty` protocol (requires Kitty 0.28.0 or later).
 Wezterm   | `iTerm2` | ✔️ | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
 Ghostty   | `Kitty`  | ✔️ | Implements `Kitty` with unicode placeholders.
+iTerm2    | `iTerm2` | ✔️ | Reference for the `iTerm2` protocol. Mac only.
 Rio       | `iTerm2` | ✔️ | Also supports `Sixel` but has glitches.
 mlterm    | `Sixel`  | ✔️ | Quite slow but no glitches.
+Black Box | `Sixel`  | ✔️ | Confirmed only with the flatpak version, most distro packages don't enable Sixel support.
 Alacritty | `Sixel`  | ❌ | [There is a sixel fork](https://github.com/microo8/alacritty-sixel), but it's probably never getting merged, and does not clear graphics.
-iTerm2    | `iTerm2` | ❔ | Feedback from mac users wanted.
-Konsole   | `Sixel`  | ❌ | [Possibly fixed in 24.12](https://bugs.kde.org/show_bug.cgi?id=456354)
+Konsole   | `Sixel`  | ❌ | [Not really fixed in 24.12](https://bugs.kde.org/show_bug.cgi?id=456354)
 Contour   | `Sixel`  | ❌ | Does not clear graphics.
 ctx       | `Sixel`  | ❌ | Buggy.
 
