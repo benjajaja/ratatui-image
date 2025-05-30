@@ -212,15 +212,7 @@ impl Picker {
         let (image, area) =
             match resize.needs_resize(&source, self.font_size, source.desired, size, false) {
                 Some(area) => {
-                    // Not exactly sure why this is necessary only for Protocol and not
-                    // StatefulProtocol, but the image proportion comes out wrong if we don't
-                    // divide height by half here.
-                    let font_size = if self.protocol_type == ProtocolType::Halfblocks {
-                        (self.font_size.0, self.font_size.1 / 2)
-                    } else {
-                        self.font_size
-                    };
-                    let image = resize.resize(&source, font_size, size, self.background_color);
+                    let image = resize.resize(&source, self.font_size, area, self.background_color);
                     (image, area)
                 }
                 None => (source.image, source.desired),
