@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+# [8.0.1] - 2025-05-30
+
+Fix halfblocks not having the same size as other protocols.
+
 # [8.0.0] - 2025-05-18
 
 Fix `TextSizingProtocol` detection (was incorrectly detecting support on Foot terminal).
