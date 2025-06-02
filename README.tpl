@@ -32,6 +32,7 @@ iTerm2    | `iTerm2` | ✔️ | Reference for the `iTerm2` protocol. Mac only.
 Rio       | `iTerm2` | ✔️ | Also supports `Sixel` but has glitches.
 mlterm    | `Sixel`  | ✔️ | Quite slow but no glitches.
 Black Box | `Sixel`  | ✔️ | Confirmed only with the flatpak version, most distro packages don't enable Sixel support.
+Bobcat    | `iTerm2` | ✔️ | Works on all versions and builds. Falls back to `Sixel` if `TERM_PROGRAM` variable is not set.
 Alacritty | `Sixel`  | ❌ | [There is a sixel fork](https://github.com/microo8/alacritty-sixel), but it's probably never getting merged, and does not clear graphics.
 Konsole   | `Sixel`  | ❌ | [Not really fixed in 24.12](https://bugs.kde.org/show_bug.cgi?id=456354)
 Contour   | `Sixel`  | ❌ | Does not clear graphics.
