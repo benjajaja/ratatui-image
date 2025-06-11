@@ -16,17 +16,17 @@ use std::{env, error::Error, num::Wrapping as w, path::PathBuf, time::Duration};
 
 use image::DynamicImage;
 use ratatui::{
+    Frame, Terminal,
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Stylize},
     text::{Line, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use ratatui_image::{
+    Image, Resize, StatefulImage,
     picker::Picker,
     protocol::{Protocol, StatefulProtocol},
-    Image, Resize, StatefulImage,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {

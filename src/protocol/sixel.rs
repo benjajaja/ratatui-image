@@ -6,14 +6,14 @@
 //! [supports]: https://arewesixelyet.com
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel
 use icy_sixel::{
-    sixel_string, DiffusionMethod, MethodForLargest, MethodForRep, PixelFormat, Quality,
+    DiffusionMethod, MethodForLargest, MethodForRep, PixelFormat, Quality, sixel_string,
 };
 use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::cmp::min;
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
-use crate::{errors::Errors, picker::cap_parser::Parser, Result};
+use crate::{Result, errors::Errors, picker::cap_parser::Parser};
 
 // Fixed sixel protocol
 #[derive(Clone, Default)]

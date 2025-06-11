@@ -4,18 +4,18 @@ use std::{
 };
 
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     crossterm::{
         execute,
         terminal::{
-            disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetSize,
+            EnterAlternateScreen, LeaveAlternateScreen, SetSize, disable_raw_mode, enable_raw_mode,
         },
     },
     layout::Rect,
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
-use ratatui_image::{picker::Picker, protocol::Protocol, Image, Resize};
+use ratatui_image::{Image, Resize, picker::Picker, protocol::Protocol};
 struct App {
     image: Protocol,
 }

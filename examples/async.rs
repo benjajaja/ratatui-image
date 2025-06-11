@@ -6,20 +6,20 @@ use std::{
 };
 
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     crossterm::{
         event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
         execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     },
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
 use ratatui_image::{
+    StatefulImage,
     errors::Errors,
     picker::Picker,
     thread::{ResizeRequest, ResizeResponse, ThreadProtocol},
-    StatefulImage,
 };
 
 struct App {
@@ -50,11 +50,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Resize and encode in background thread.
     let tx_main_render = tx_main.clone();
-    thread::spawn(move || loop {
-        if let Ok(request) = rec_worker.recv() {
-            tx_main_render
-                .send(AppEvent::Redraw(request.resize_encode()))
-                .unwrap();
+    thread::spawn(move || {
+        loop {
+            if let Ok(request) = rec_worker.recv() {
+                tx_main_render
+                    .send(AppEvent::Redraw(request.resize_encode()))
+                    .unwrap();
+            }
         }
     });
 

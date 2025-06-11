@@ -1,10 +1,10 @@
 /// https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholders
 use std::fmt::Write;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::{picker::cap_parser::Parser, Result};
-use base64::{engine::general_purpose, Engine};
+use crate::{Result, picker::cap_parser::Parser};
+use base64::{Engine, engine::general_purpose};
 use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
 

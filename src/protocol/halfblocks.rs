@@ -1,7 +1,7 @@
 //! Halfblocks protocol implementations.
 //! Uses the unicode character `▀` combined with foreground and background color. Assumes that the
 //! font aspect ratio is roughly 1:2. Should work in all terminals.
-use image::{imageops::FilterType, DynamicImage};
+use image::{DynamicImage, imageops::FilterType};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};

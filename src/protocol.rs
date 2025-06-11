@@ -5,7 +5,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use image::{imageops, DynamicImage, ImageBuffer, Rgba};
+use image::{DynamicImage, ImageBuffer, Rgba, imageops};
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use self::{

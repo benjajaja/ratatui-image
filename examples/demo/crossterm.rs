@@ -5,16 +5,16 @@ use std::{
 };
 
 use ratatui::{
+    Terminal,
     backend::{Backend, CrosstermBackend},
     crossterm::{
         event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
         execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     },
-    Terminal,
 };
 
-use crate::{ui, App};
+use crate::{App, ui};
 
 pub fn run() -> Result<(), Box<dyn Error>> {
     let original_hook = std::panic::take_hook();

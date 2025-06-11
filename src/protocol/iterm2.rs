@@ -1,10 +1,10 @@
 //! ITerm2 protocol implementation.
-use base64::{engine::general_purpose, Engine};
+use base64::{Engine, engine::general_purpose};
 use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::{cmp::min, format, io::Cursor};
 
-use crate::{errors, picker::cap_parser::Parser, Result};
+use crate::{Result, errors, picker::cap_parser::Parser};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
 

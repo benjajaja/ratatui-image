@@ -110,7 +110,7 @@ use std::{
     marker::PhantomData,
 };
 
-use image::{imageops, DynamicImage, ImageBuffer, Rgba};
+use image::{DynamicImage, ImageBuffer, Rgba, imageops};
 use protocol::{ImageSource, Protocol};
 use ratatui::{
     buffer::Buffer,
