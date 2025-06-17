@@ -26,7 +26,7 @@ pub enum Response {
 /// Extra query options
 pub struct QueryStdioOptions {
     /// Query for [Text Sizing Protocol]. The result can be checked by searching for
-    /// [Capability::TextSizingProtocol] in [crate::picker::Picker::capabilities].
+    /// [crate::picker::Capability::TextSizingProtocol] in [crate::picker::Picker::capabilities].
     ///
     /// [Text Sizing Protocol] <https://sw.kovidgoyal.net/kitty/text-sizing-protocol//>
     pub text_sizing_protocol: bool,
