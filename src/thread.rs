@@ -7,7 +7,7 @@
 #[cfg(not(feature = "tokio"))]
 use std::sync::mpsc::Sender;
 #[cfg(feature = "tokio")]
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::UnboundedSender as Sender;
 
 use image::Rgba;
 use ratatui::prelude::{Buffer, Rect};
@@ -101,16 +101,6 @@ impl ThreadProtocol {
     fn increment_id(&mut self) {
         self.id = self.id.wrapping_add(1);
     }
-
-    #[cfg(not(feature = "tokio"))]
-    fn send(&mut self, request: ResizeRequest) {
-        _ = self.tx.send(request);
-    }
-
-    #[cfg(feature = "tokio")]
-    fn send(&mut self, request: ResizeRequest) {
-        _ = self.tx.blocking_send(request);
-    }
 }
 
 impl ResizeEncodeRender for ThreadProtocol {
@@ -124,7 +114,7 @@ impl ResizeEncodeRender for ThreadProtocol {
     fn resize_encode(&mut self, resize: &Resize, area: Rect) {
         let _ = self.inner.take().map(|protocol| {
             self.increment_id();
-            self.send(ResizeRequest {
+            _ = self.tx.send(ResizeRequest {
                 protocol,
                 resize: resize.clone(),
                 area,

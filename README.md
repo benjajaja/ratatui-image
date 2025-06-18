@@ -111,13 +111,14 @@ The lib also includes a binary that renders an image file, but it is focused on 
 
 ## Features
 * `crossterm` or `termion` should match your ratatui backend. `termwiz` is available, but not
-  working correctly with ratatu-image.
+  working correctly with ratatui-image.
 * `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
   useful to save it in some user configuration.
 * `image-defaults` (default) just enables `image/defaults` (`image` has `default-features =
 false`). To only support a selection of image formats and cut down dependencies, disable this
   feature, add `image` to your crate, and enable its features/formats as desired. See
   <https://doc.rust-lang.org/cargo/reference/features.html#feature-unification/>.
+* `tokio` whether to use tokio's `UnboundedSender` in `ThreadProtocol`
 
 [ratatui]: https://github.com/ratatui-org/ratatui
 [sixel]: https://en.wikipedia.org/wiki/Sixel
