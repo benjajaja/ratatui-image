@@ -295,6 +295,7 @@ fn iterm2_from_env() -> Option<ProtocolType> {
             || term_program.contains("Hyper")
             || term_program.contains("rio")
             || term_program.contains("Bobcat")
+            || term_program.contains("WarpTerminal")
     }) {
         return Some(ProtocolType::Iterm2);
     }
