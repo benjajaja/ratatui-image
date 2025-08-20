@@ -92,7 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn ui(f: &mut Frame<'_>, app: &mut App) {
     let area = f.area();
-    let block = Block::default().borders(Borders::ALL).title("Async test");
+    let block = Block::default().borders(Borders::ALL).title("Thread test");
 
     f.render_widget(
         Paragraph::new("PartiallyHiddenScreenshotParagraphBackground\n".repeat(10)),

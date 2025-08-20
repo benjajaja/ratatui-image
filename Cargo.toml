@@ -14,7 +14,7 @@ exclude = ["assets/*"]
 rust-version = "1.86.0"
 
 [features]
-default = ["image-defaults"]
+default = ["image-defaults", "crossterm"]
 crossterm = ["ratatui/crossterm"]
 image-defaults = ["image/default"]
 termion = ["ratatui/termion"]
@@ -62,7 +62,7 @@ name = "thread"
 required-features = ["crossterm"]
 
 [[example]]
-name = "async"
+name = "tokio"
 required-features = ["crossterm", "tokio"]
 
 [dev-dependencies]
