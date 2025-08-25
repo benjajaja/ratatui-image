@@ -1,18 +1,12 @@
 use std::{
-    io,
     sync::mpsc::{self},
     thread,
     time::Duration,
 };
 
 use ratatui::{
-    Frame, Terminal,
-    backend::CrosstermBackend,
-    crossterm::{
-        event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-        execute,
-        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
-    },
+    Frame,
+    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     widgets::{Block, Borders, Paragraph},
 };
 use ratatui_image::{
@@ -32,12 +26,7 @@ enum AppEvent {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen,)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = ratatui::init();
 
     let picker = Picker::from_query_stdio()?;
     let dyn_img = image::ImageReader::open("./assets/Ada.png")?.decode()?;
@@ -96,17 +85,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // restore terminal
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
-    terminal.show_cursor()?;
+    ratatui::restore();
 
     Ok(())
 }
 
 fn ui(f: &mut Frame<'_>, app: &mut App) {
     let area = f.area();
-    let block = Block::default().borders(Borders::ALL).title("Async test");
+    let block = Block::default().borders(Borders::ALL).title("Thread test");
 
     f.render_widget(
         Paragraph::new("PartiallyHiddenScreenshotParagraphBackground\n".repeat(10)),

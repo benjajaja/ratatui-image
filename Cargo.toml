@@ -20,6 +20,7 @@ image-defaults = ["image/default"]
 termion = ["ratatui/termion"]
 termwiz = ["ratatui/termwiz"]
 serde = ["dep:serde"]
+tokio = ["dep:tokio"]
 
 [dependencies]
 image = { version = "^0.25.6", default-features = false, features = ["jpeg"] }
@@ -29,6 +30,7 @@ base64 = { version = "^0.21.2" }
 rand = { version = "^0.8.5" }
 ratatui = { version = "^0.29.0", default-features = false, features = [] }
 thiserror = { version = "1.0.59" }
+tokio = { version = "1.45.1", default-features = false, optional = true, features = ["sync"]}
 
 [target.'cfg(not(windows))'.dependencies]
 rustix = { version = "^0.38.4", features = ["stdio", "termios", "fs"] }
@@ -56,8 +58,18 @@ name = "screenshot"
 required-features = ["crossterm"]
 
 [[example]]
-name = "async"
+name = "thread"
 required-features = ["crossterm"]
+
+[[example]]
+name = "tokio"
+required-features = ["crossterm", "tokio"]
+
+[dev-dependencies]
+color-eyre = "0.6.5"
+crossterm = { version = "0.29.0", features = ["event-stream"] }
+futures = "0.3.31"
+tokio = { version = "1.45.1", features = ["macros", "rt", "rt-multi-thread"] }
 
 [package.metadata.docs.rs]
 features = ["crossterm"]
