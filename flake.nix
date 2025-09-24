@@ -169,7 +169,7 @@
             machine.copy_from_host("${src}/assets/Ada.png", "/tmp/test-assets/assets/Ada.png")
 
             # Run kitty with the main ratatui-image program
-            # Use systemd-run to ensure proper environment
+            # Use systemd-run to ensure proper environment, and add -hold to keep kitty open
             machine.succeed("""
               systemd-run --uid=test --setenv=XDG_RUNTIME_DIR=/run/user/1000 \
                 --setenv=WAYLAND_DISPLAY=wayland-1 \
@@ -178,12 +178,13 @@
                 -o font_size=7 \
                 -o background=#222222 \
                 -o foreground=#ffffff \
+                --hold \
                 ${ratatui-image}/bin/ratatui-image assets/Ada.png &
             """)
 
             # Wait for kitty to appear
             machine.wait_until_succeeds("pgrep kitty")
-            machine.sleep(5)
+            machine.sleep(10)
 
             # Take a screenshot using the machine's screenshot function
             machine.screenshot("kitty-wayland-screenshot")
