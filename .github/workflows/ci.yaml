@@ -128,3 +128,61 @@ jobs:
         with:
           name: kitty-wayland-screenshot
           path: result/kitty-wayland-screenshot.png
+  
+      - name: Upload screenshot to Gist
+        id: gist_upload
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            if (!fs.existsSync('result/kitty-wayland-screenshot.png')) {
+              core.setOutput('image_exists', 'false');
+              return;
+            }
+            
+            const imageBuffer = fs.readFileSync('result/kitty-wayland-screenshot.png');
+            const imageBase64 = imageBuffer.toString('base64');
+            
+            try {
+              // Create a gist with the image
+              const gist = await github.rest.gists.create({
+                files: {
+                  'kitty-wayland-screenshot.png': {
+                    content: imageBase64
+                  }
+                },
+                public: false,
+                description: `Screenshot from GitHub Actions run ${context.runId}`
+              });
+              
+              const imageUrl = `https://gist.githubusercontent.com/${context.actor}/${gist.data.id}/raw/kitty-wayland-screenshot.png`;
+              
+              core.setOutput('image_exists', 'true');
+              core.setOutput('image_url', imageUrl);
+              core.setOutput('gist_url', gist.data.html_url);
+              
+              console.log(`Screenshot uploaded to: ${imageUrl}`);
+            } catch (error) {
+              console.error('Failed to upload to gist:', error);
+              core.setOutput('image_exists', 'false');
+              core.setOutput('upload_error', error.message);
+            }
+      
+      - name: Comment PR with Gist screenshot
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: github.event_name == 'pull_request' && steps.gist_upload.outputs.image_exists == 'true'
+        with:
+          message: |
+            ## 🖼️ Wayland Screenshot Test Results
+            
+            Screenshot generated and uploaded successfully!
+            
+            ![Kitty Wayland Screenshot](${{ steps.gist_upload.outputs.image_url }})
+            
+            📎 **Links:**
+            - 🖼️ [Direct image link](${{ steps.gist_upload.outputs.image_url }})
+            - 📄 [Gist](${{ steps.gist_upload.outputs.gist_url }})
+            - 📦 [Artifact download](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+      
