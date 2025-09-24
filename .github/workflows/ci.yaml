@@ -102,3 +102,150 @@ jobs:
       - name: Build package
         run: |
           nix build .#windows --print-build-logs
+
+  nix-flake-screenshots:
+    name: Screenshot tests
+    runs-on: ubuntu-latest
+    needs: nix-build
+    permissions:
+      contents: read
+      pull-requests: write  # This is needed for PR comments
+    strategy:
+      matrix:
+        terminal: [xterm, kitty, ghostty, foot, wezterm, mlterm, rio]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+
+      - name: Cachix
+        uses: cachix/cachix-action@v12
+        with:
+          name: ratatui-image-ci
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: Run screenshot test for ${{ matrix.terminal }}
+        run: |
+          nix build .#packages.x86_64-linux.screenshot-test-${{ matrix.terminal }} --print-build-logs
+
+      - name: Upload screenshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-${{ matrix.terminal }}
+          path: result/screenshot-${{ matrix.terminal }}.png
+
+      - name: Upload to Imgur
+        if: github.event_name == 'pull_request'
+        id: imgur
+        run: |
+          echo "Uploading screenshot for ${{ matrix.terminal }}..."
+          ls -la result/
+
+          if [ ! -f "result/screenshot-${{ matrix.terminal }}.png" ]; then
+            echo "Error: Screenshot file not found!"
+            exit 1
+          fi
+
+          response=$(curl -s -X POST \
+            -H "Authorization: Client-ID ${{ secrets.IMGUR_CLIENT_ID }}" \
+            -F "image=@result/screenshot-${{ matrix.terminal }}.png" \
+            https://api.imgur.com/3/image)
+
+          echo "Imgur response: $response"
+
+          # Check if upload was successful
+          success=$(echo "$response" | grep -o '"success":[^,]*' | cut -d':' -f2)
+          if [ "$success" != "true" ]; then
+            echo "Error: Imgur upload failed"
+            echo "$response"
+            exit 1
+          fi
+
+          # Extract URL using jq-like parsing (more reliable)
+          imgur_url=$(echo "$response" | sed -n 's/.*"link":"\([^"]*\)".*/\1/p')
+
+          if [ -z "$imgur_url" ]; then
+            echo "Error: Could not extract Imgur URL from response"
+            echo "$response"
+            exit 1
+          fi
+
+          echo "Successfully uploaded to: $imgur_url"
+          echo "imgur_url=$imgur_url" >> $GITHUB_OUTPUT
+          echo "terminal=${{ matrix.terminal }}" >> $GITHUB_OUTPUT
+
+      - name: Save terminal and URL for comment
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p screenshots
+          echo "${{ steps.imgur.outputs.imgur_url }}" > screenshots/${{ matrix.terminal }}.txt
+          echo "Saved URL for ${{ matrix.terminal }}: ${{ steps.imgur.outputs.imgur_url }}"
+
+      - name: Upload screenshot info
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-info-${{ matrix.terminal }}
+          path: screenshots/${{ matrix.terminal }}.txt
+
+  comment-screenshots:
+    name: Comment with all screenshots
+    runs-on: ubuntu-latest
+    needs: nix-flake-screenshots
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Download all screenshot info
+        uses: actions/download-artifact@v4
+        with:
+          pattern: screenshot-info-*
+          path: screenshot-info
+          merge-multiple: true
+
+      - name: Create combined comment
+        id: create-comment
+        run: |
+          echo "Creating comment with screenshots..."
+          ls -la screenshot-info/
+
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "Merge of ${{ github.sha }} to \`master\`" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "Screenshots from all terminal emulators:" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+
+          for terminal in xterm kitty ghostty foot wezterm mlterm rio; do
+            echo "Processing terminal: $terminal"
+            if [ -f "screenshot-info/${terminal}.txt" ]; then
+              echo "Found info file for $terminal"
+              cat "screenshot-info/${terminal}.txt"
+
+              url=$(cat "screenshot-info/${terminal}.txt" | tr -d '\n\r')
+              echo "Extracted URL: '$url'"
+
+              if [ -n "$url" ] && [ "$url" != "" ]; then
+                echo "### ${terminal}" >> $GITHUB_OUTPUT
+                echo "![${terminal} screenshot](${url})" >> $GITHUB_OUTPUT
+                echo "" >> $GITHUB_OUTPUT
+              else
+                echo "### ${terminal}" >> $GITHUB_OUTPUT
+                echo "❌ Screenshot upload failed for ${terminal}" >> $GITHUB_OUTPUT
+                echo "" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "No info file found for $terminal"
+              echo "### ${terminal}" >> $GITHUB_OUTPUT
+              echo "❌ No screenshot available for ${terminal}" >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
+            fi
+          done
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Comment PR with all screenshots
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          message: ${{ steps.create-comment.outputs.message }}

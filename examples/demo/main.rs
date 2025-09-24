@@ -12,7 +12,7 @@ mod termion;
 #[cfg(feature = "termwiz")]
 mod termwiz;
 
-use std::{env, error::Error, num::Wrapping as w, path::PathBuf, time::Duration};
+use std::{env, error::Error, num::Wrapping as w, path::PathBuf, sync::Once, time::Duration};
 
 use image::DynamicImage;
 use ratatui::{
@@ -38,6 +38,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     crate::termwiz::run()?;
     Ok(())
 }
+
+static READY: Once = Once::new();
 
 #[derive(Debug)]
 enum ShowImages {
@@ -194,7 +196,16 @@ impl App {
         self.image_scale_state = self.picker.new_resize_protocol(self.image_source.clone());
     }
 
-    pub fn on_tick(&mut self) {}
+    pub fn on_tick(&mut self) {
+        READY.call_once(|| {
+            // This is normally only set by nixosTest.
+            if env::args().any(|arg| arg == "--tmp-demo-ready") {
+                if let Err(err) = std::fs::File::create("/tmp/demo-ready") {
+                    panic!("{err}");
+                }
+            }
+        });
+    }
 
     fn render_resized_image(&mut self, f: &mut Frame<'_>, resize: Resize, area: Rect) {
         let (state, name, color) = match resize {

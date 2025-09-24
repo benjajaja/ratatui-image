@@ -71,6 +71,13 @@
           inherit cargoArtifacts;
         });
 
+      ratatui-demo = craneLib.buildPackage (commonArgs
+        // {
+          inherit cargoArtifacts;
+          pname = "demo";
+          cargoExtraArgs = "--example demo --features crossterm";
+        });
+
       toolchain = with fenix.packages.${system};
         combine [
           minimal.rustc
@@ -99,9 +106,135 @@
           pkgsCross.mingwW64.windows.pthreads
         ];
       };
+
+      makeScreenshotTest = { terminal, terminalCommand, terminalPackage, setup ? null, xwayland ? false }: pkgs.nixosTest {
+        name = "ratatui-test-wayland-${terminal}";
+
+        nodes.machine = { pkgs, ... }: {
+          virtualisation.memorySize = 4096;
+
+          programs.sway = {
+            enable = true;
+            wrapperFeatures.gtk = true;
+          };
+
+          programs.xwayland.enable = xwayland;
+
+          services.xserver.enable = true;
+          services.displayManager.sddm.enable = true;
+          services.displayManager.sddm.wayland.enable = true;
+
+          services.displayManager.autoLogin = {
+            enable = true;
+            user = "test";
+          };
+
+          services.displayManager.defaultSession = "sway";
+
+          # Create test user
+          users.users.test = {
+            isNormalUser = true;
+            extraGroups = [ "wheel" "video" ];
+            packages = [ ];
+          };
+
+          # Ensure required packages are available
+          environment.systemPackages = with pkgs; [
+            terminalPackage
+          ];
+        };
+
+        testScript = ''
+          machine.wait_for_unit("graphical.target")
+
+          machine.wait_until_succeeds("pgrep -f sway")
+
+          machine.succeed("mkdir -p /tmp/test-assets/assets")
+          machine.copy_from_host("${src}/assets/Ada.png", "/tmp/test-assets/assets/Ada.png")
+
+          machine.wait_until_succeeds("systemd-run --uid=test --setenv=XDG_RUNTIME_DIR=/run/user/1000 --setenv=WAYLAND_DISPLAY=wayland-1 -- swaymsg -t get_version")
+
+          machine.succeed("${if setup != null then setup else "true"}")
+
+          # Use systemd-run to ensure proper environment
+          machine.succeed("""
+            systemd-run --uid=test --setenv=XDG_RUNTIME_DIR=/run/user/1000 \
+              --setenv=WAYLAND_DISPLAY=wayland-1 \
+              --setenv=LIBGL_ALWAYS_SOFTWARE=1 \
+              ${if xwayland then "--setenv=DISPLAY=:0" else ""} \
+              --working-directory=/tmp/test-assets \
+              -- ${terminalCommand}
+          """)
+
+          print("Waiting for /tmp/demo-ready...")
+          machine.wait_until_succeeds("test -f /tmp/demo-ready", timeout=10)
+          machine.succeed("sleep 1")
+
+          machine.screenshot("screenshot-${terminal}")
+          print("Screenshot saved to test output directory as screenshot-${terminal}.png")
+        '';
+      };
+
+      screenshotTests = {
+        screenshot-test-foot = makeScreenshotTest {
+          terminal = "foot";
+          terminalCommand = "foot ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalPackage = pkgs.foot;
+        };
+
+        screenshot-test-kitty = makeScreenshotTest {
+          terminal = "kitty";
+          terminalCommand = "kitty ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalPackage = pkgs.kitty;
+        };
+
+        screenshot-test-wezterm = makeScreenshotTest {
+          terminal = "wezterm";
+          terminalCommand = "wezterm start --always-new-process --cwd /tmp/test-assets -- ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalPackage = pkgs.wezterm;
+        };
+
+        screenshot-test-ghostty = makeScreenshotTest {
+          terminal = "ghostty";
+          terminalCommand = "ghostty -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalPackage = pkgs.ghostty;
+        };
+
+        screenshot-test-mlterm = makeScreenshotTest {
+          terminal = "mlterm";
+          terminalCommand = "mlterm -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalPackage = pkgs.mlterm;
+        };
+
+        screenshot-test-rio = makeScreenshotTest {
+          terminal = "rio";
+          terminalCommand = "rio -w /tmp/test-assets -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalPackage = pkgs.rio;
+          setup = "mkdir -p /home/test/.config/rio && touch /home/test/.config/rio/config.toml"; # Skip welcome screen
+        };
+
+        screenshot-test-xterm = makeScreenshotTest {
+          terminal = "xterm";
+          terminalCommand = "xterm -ti vt340 -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalPackage = pkgs.xterm;
+          xwayland = true;
+        };
+
+        screenshot-test-blackbox = makeScreenshotTest {
+          terminal = "blackbox";
+          terminalCommand = "blackbox -c \"${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
+          terminalPackage = pkgs.blackbox-terminal;
+        };
+
+        screenshot-test-xfce4-terminal = makeScreenshotTest {
+          terminal = "xfce4-terminal";
+          terminalCommand = "xfce4-terminal -e \"${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
+          terminalPackage = pkgs.xfce.xfce4-terminal;
+        };
+      };
+
     in {
       checks = {
-        # Build the crate as part of `nix flake check` for convenience
         inherit ratatui-image;
 
         # Run clippy (and deny all warnings) on the crate source,
@@ -141,7 +274,9 @@
         {
           default = ratatui-image;
           windows = ratatui-image-windows;
+          demo = ratatui-demo;
         }
+        // screenshotTests
         // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
           ratatui-image-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (commonArgs
             // {
