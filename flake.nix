@@ -112,79 +112,25 @@
         # Build the crate as part of `nix flake check` for convenience
         inherit ratatui-image;
 
-        # NixOS test for screenshot functionality with xterm (X11)
-        xterm-screenshot-test-x11 = pkgs.nixosTest {
-          name = "ratatui-image-xterm-screenshot-x11";
+        # NixOS test for screenshot functionality with kitty (Wayland)
+        kitty-screenshot-test-wayland = pkgs.nixosTest {
+          name = "ratatui-image-kitty-screenshot-wayland";
 
           nodes.machine = { pkgs, ... }: {
             imports = [ ];
 
-            # Enable X11 for xterm
-            services.xserver = {
-              enable = true;
-              displayManager.lightdm.enable = true;
-              desktopManager.xfce.enable = true;
-            };
-
-            services.displayManager.autoLogin = {
-              enable = true;
-              user = "test";
-            };
-
-            # Create test user
-            users.users.test = {
-              isNormalUser = true;
-              extraGroups = [ "wheel" ];
-              packages = [ ];
-            };
-
-            # Ensure required packages are available
-            environment.systemPackages = with pkgs; [
-              xterm
-              imagemagick  # for convert command
-              xorg.xwd     # for xwd command
-            ];
-          };
-
-          testScript = ''
-            machine.wait_for_x()
-            machine.wait_for_unit("graphical.target")
-
-            # Copy the Ada.png asset to the test environment
-            machine.succeed("mkdir -p /tmp/test-assets/assets")
-            machine.copy_from_host("${src}/assets/Ada.png", "/tmp/test-assets/assets/Ada.png")
-
-            # Run xterm with the screenshot example
-            machine.succeed("""
-              cd /tmp/test-assets && \
-              DISPLAY=:0 xterm -ti vt340 -fa DejaVu -fs 7 -bg black -fg white \
-                -e '${ratatui-image-screenshot}/bin/screenshot' &
-            """)
-
-            # Wait for the application to start and render
-            machine.sleep(3)
-
-            # Take a screenshot using the machine's screenshot function
-            # This will save it to the test output directory
-            machine.screenshot("xterm-x11-screenshot")
-
-            print("X11 Screenshot test completed successfully!")
-            print("Screenshot saved to test output directory as xterm-x11-screenshot.png")
-          '';
-        };
-
-        # NixOS test for screenshot functionality with xterm (Wayland)
-        xterm-screenshot-test-wayland = pkgs.nixosTest {
-          name = "ratatui-image-xterm-screenshot-wayland";
-
-          nodes.machine = { pkgs, ... }: {
-            imports = [ ];
+            # Increase VM memory to handle the screenshot example
+            virtualisation.memorySize = 2048;
 
             # Enable Wayland with sway
             programs.sway = {
               enable = true;
               wrapperFeatures.gtk = true;
             };
+
+            services.xserver.enable = true;
+            services.displayManager.sddm.enable = true;
+            services.displayManager.sddm.wayland.enable = true;
 
             services.displayManager.autoLogin = {
               enable = true;
@@ -202,37 +148,48 @@
 
             # Ensure required packages are available
             environment.systemPackages = with pkgs; [
-              xterm
-              imagemagick  # for convert command
-              grim        # Wayland screenshot tool
-              wayland-utils
+              kitty
+              grim  # Wayland screenshot tool
             ];
           };
 
           testScript = ''
             machine.wait_for_unit("graphical.target")
-            machine.wait_until_succeeds("pgrep sway")
+
+            # Wait for sway to start
+            machine.wait_until_succeeds("pgrep -f sway")
+            machine.sleep(3)
+
+            # Check what Wayland display is actually available
+            machine.succeed("ls -la /run/user/1000/ || true")
+            machine.succeed("ps aux | grep sway || true")
 
             # Copy the Ada.png asset to the test environment
             machine.succeed("mkdir -p /tmp/test-assets/assets")
             machine.copy_from_host("${src}/assets/Ada.png", "/tmp/test-assets/assets/Ada.png")
 
-            # Run xterm with the screenshot example under XWayland
+            # Run kitty with the main ratatui-image program
+            # Use systemd-run to ensure proper environment
             machine.succeed("""
-              cd /tmp/test-assets && \
-              WAYLAND_DISPLAY=wayland-1 xterm -ti vt340 -fa DejaVu -fs 7 -bg black -fg white \
-                -e '${ratatui-image-screenshot}/bin/screenshot' &
+              systemd-run --uid=test --setenv=XDG_RUNTIME_DIR=/run/user/1000 \
+                --setenv=WAYLAND_DISPLAY=wayland-1 \
+                --working-directory=/tmp/test-assets \
+                -- kitty \
+                -o font_size=7 \
+                -o background=#222222 \
+                -o foreground=#ffffff \
+                ${ratatui-image}/bin/ratatui-image assets/Ada.png &
             """)
 
-            # Wait for the application to start and render
-            machine.sleep(3)
+            # Wait for kitty to appear
+            machine.wait_until_succeeds("pgrep kitty")
+            machine.sleep(5)
 
             # Take a screenshot using the machine's screenshot function
-            # This will save it to the test output directory
-            machine.screenshot("xterm-wayland-screenshot")
+            machine.screenshot("kitty-wayland-screenshot")
 
             print("Wayland Screenshot test completed successfully")
-            print("Screenshot saved to test output directory as xterm-wayland-screenshot.png")
+            print("Screenshot saved to test output directory as kitty-wayland-screenshot.png")
           '';
         };
 
