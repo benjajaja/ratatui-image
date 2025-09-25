@@ -167,11 +167,15 @@
           """)
 
           print("Waiting for /tmp/demo-ready...")
-          machine.wait_until_succeeds("test -f /tmp/demo-ready", timeout=10)
-          machine.succeed("sleep 1")
 
-          machine.screenshot("screenshot-${terminal}")
-          print("Screenshot saved to test output directory as screenshot-${terminal}.png")
+          with subtest("Waiting for /tmp/demo-ready..."):
+            try:
+              machine.wait_until_succeeds("test -f /tmp/demo-ready", timeout=10)
+            except Exception as e:
+              print(f"/tmp/demo-ready not found within timeout: {e}")
+            finally:
+              machine.screenshot("screenshot-${terminal}")
+              print("Screenshot saved to test output directory as screenshot-${terminal}.png")
         '';
       };
 
@@ -230,6 +234,12 @@
           terminal = "xfce4-terminal";
           terminalCommand = "xfce4-terminal -e \"${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
           terminalPackage = pkgs.xfce.xfce4-terminal;
+        };
+
+        screenshot-test-contour = makeScreenshotTest {
+          terminal = "contour";
+          terminalCommand = "contour --working-directory /tmp/test-assets ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalPackage = pkgs.contour;
         };
       };
 

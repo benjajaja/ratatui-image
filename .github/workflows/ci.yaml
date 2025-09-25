@@ -112,7 +112,7 @@ jobs:
       pull-requests: write  # This is needed for PR comments
     strategy:
       matrix:
-        terminal: [xterm, kitty, ghostty, foot, wezterm, mlterm, rio]
+        terminal: [xterm, kitty, ghostty, foot, wezterm, mlterm, rio, contour]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -218,7 +218,7 @@ jobs:
           echo "Screenshots from all terminal emulators:" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
 
-          for terminal in xterm kitty ghostty foot wezterm mlterm rio; do
+          for terminal in xterm kitty ghostty foot wezterm mlterm rio contour; do
             echo "Processing terminal: $terminal"
             if [ -f "screenshot-info/${terminal}.txt" ]; then
               echo "Found info file for $terminal"
