@@ -142,24 +142,24 @@ false`). To only support a selection of image formats and cut down dependencies,
 
 Compatibility and QA:
 
-Terminal  | Protocol | OK | Notes
-----------|----------|----|-------
-Xterm     | `Sixel`  | ✔️ | Run with `-ti 340` to make sure sixel support is enabled.
-Foot      | `Sixel`  | ✔️ | Wayland.
-Kitty     | `Kitty`  | ✔️ | Reference for the `Kitty` protocol (requires Kitty 0.28.0 or later).
-Wezterm   | `iTerm2` | ✔️ | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
-Ghostty   | `Kitty`  | ✔️ | Implements `Kitty` with unicode placeholders.
-iTerm2    | `iTerm2` | ✔️ | Reference for the `iTerm2` protocol. Mac only.
-Rio       | `iTerm2` | ✔️ | Also supports `Sixel` but has glitches.
-mlterm    | `Sixel`  | ✔️ | Quite slow but no glitches.
-Black Box | `Sixel`  | ✔️ | Confirmed only with the flatpak version, most distro packages don't enable Sixel support.
-Bobcat    | `iTerm2` | ✔️ | Works on all versions and builds. Falls back to `Sixel` if `TERM_PROGRAM` variable is not set.
-Alacritty | `Sixel`  | ❌ | [There is a sixel fork](https://github.com/microo8/alacritty-sixel), but it's probably never getting merged, and does not clear graphics.
-Konsole   | `Sixel`  | ❌ | [Not really fixed in 24.12](https://bugs.kde.org/show_bug.cgi?id=456354)
-Contour   | `Sixel`  | ❌ | Does not clear graphics.
-ctx       | `Sixel`  | ❌ | Buggy.
+Terminal  | Protocol | OK | QA | Notes
+----------|----------|----|----|------
+Xterm     | `Sixel`  | ✔️ | ✔️ | Run with `-ti 340` to make sure sixel support is enabled.
+Foot      | `Sixel`  | ✔️ | ✔️ | Wayland.
+Kitty     | `Kitty`  | ✔️ | ✔️ | Reference for the `Kitty` protocol (requires Kitty 0.28.0 or later).
+Wezterm   | `iTerm2` | ✔️ | ❌ | Also would support `Sixel` and `Kitty`, but only `iTerm2` actually works bug-free.
+Ghostty   | `Kitty`  | ✔️ | ✔️ | Implements `Kitty` with unicode placeholders.
+iTerm2    | `iTerm2` | ✔️ | -  | Reference for the `iTerm2` protocol. Mac only.
+Rio       | `iTerm2` | ✔️ | ✔️ | Also supports `Sixel` but has glitches.
+mlterm    | `Sixel`  | ✔️ | ✔️ | Quite slow but no glitches.
+Black Box | `Sixel`  | ✔️ | -  | Confirmed only with the flatpak version, most distro packages don't enable Sixel support.
+Bobcat    | `iTerm2` | ✔️ | -  | Works on all versions and builds. Falls back to `Sixel` if `TERM_PROGRAM` variable is not set.
+Alacritty | `Sixel`  | ❌ | -  | [There is a sixel fork](https://github.com/microo8/alacritty-sixel), but it's probably never getting merged, and does not clear graphics.
+Konsole   | `Sixel`  | ❌ | -  | [Not really fixed in 24.12](https://bugs.kde.org/show_bug.cgi?id=456354)
+Contour   | `Sixel`  | ❌ | ❌ | Does not clear graphics.
+ctx       | `Sixel`  | ❌ | ❌ | Buggy.
 
-A basic [screenshot test](./assets/screenshot_xterm.png) is run with xterm on Xvfb in the CI (or `cargo make screenshot-xvfb && cargo make screenshot-diff`).
+"QA" means that there is a flake VM test that runs the demo and takes a screenshot, posted as PR comment. A `-` means it's not possible or applicable to add a screenshot-test.
 
 Halfblocks should work in all terminals, even if the font size could not be detected, with a 4:8 pixel ratio.
 
