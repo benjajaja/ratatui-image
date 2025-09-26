@@ -111,7 +111,7 @@ jobs:
     steps:
       - id: set-terminals
         run: |
-          echo 'terminals=["xterm-vt340", "kitty", "ghostty", "foot", "wezterm", "mlterm", "rio", "contour", "xterm"]' >> $GITHUB_OUTPUT
+          echo 'terminals=["xterm-vt340", "kitty", "ghostty", "foot", "wezterm", "mlterm", "rio", "contour", "xterm", "alacritty"]' >> $GITHUB_OUTPUT
 
   nix-flake-screenshots:
     name: Screenshot tests

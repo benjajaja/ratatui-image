@@ -250,6 +250,12 @@
           terminalCommand = "contour --working-directory /tmp/test-assets ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
           terminalPackage = pkgs.contour;
         };
+
+        screenshot-test-alacritty = makeScreenshotTest {
+          terminal = "alacritty";
+          terminalCommand = "alacritty -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalPackage = pkgs.alacritty;
+        };
       };
 
     in {
