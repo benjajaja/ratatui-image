@@ -263,3 +263,96 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           message: ${{ steps.create-comment.outputs.message }}
+
+  deploy-screenshots:
+    name: Deploy screenshots to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [nix-flake-screenshots, setup-terminals]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Download all screenshot artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: screenshot-*
+          path: screenshots-temp
+          merge-multiple: false
+      
+      - name: Organize screenshots for Pages
+        run: |
+          mkdir -p pages/screenshots
+          
+          # Copy actual screenshot files (not just URLs)
+          find screenshots-temp -name "*.png" -o -name "*.jpg" -o -name "*.gif" | while read file; do
+            # Extract terminal name from path and rename file
+            terminal=$(basename "$(dirname "$file")")
+            filename=$(basename "$file")
+            cp "$file" "pages/screenshots/${terminal}-${filename}"
+          done
+          
+          # Create an index page
+          cat > pages/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Screenshots</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 2rem; }
+              .terminal { margin: 2rem 0; }
+              img { max-width: 100%; border: 1px solid #ddd; border-radius: 8px; }
+            </style>
+          </head>
+          <body>
+            <h1>Terminal Screenshots</h1>
+          EOF
+          
+          # Add screenshots to index
+          terminals='${{ needs.setup-terminals.outputs.terminals }}'
+          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
+          for terminal in $terminal_list; do
+            echo "<div class='terminal'>" >> pages/index.html
+            echo "<h2>$terminal</h2>" >> pages/index.html
+            # Find screenshot file for this terminal
+            screenshot_file=$(find pages/screenshots -name "${terminal}-*" | head -1)
+            if [ -n "$screenshot_file" ]; then
+              filename=$(basename "$screenshot_file")
+              echo "<img src='screenshots/$filename' alt='$terminal screenshot'>" >> pages/index.html
+            else
+              echo "<p>No screenshot available</p>" >> pages/index.html
+            fi
+            echo "</div>" >> pages/index.html
+          done
+          
+          echo "</body></html>" >> pages/index.html
+          
+          # Create a JSON index for programmatic access
+          echo '{"screenshots": [' > pages/screenshots.json
+          first=true
+          for terminal in $terminal_list; do
+            screenshot_file=$(find pages/screenshots -name "${terminal}-*" | head -1)
+            if [ -n "$screenshot_file" ]; then
+              filename=$(basename "$screenshot_file")
+              if [ "$first" = false ]; then echo "," >> pages/screenshots.json; fi
+              echo "  {\"terminal\": \"$terminal\", \"url\": \"screenshots/$filename\"}" >> pages/screenshots.json
+              first=false
+            fi
+          done
+          echo ']}' >> pages/screenshots.json
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages/
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
