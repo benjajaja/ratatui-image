@@ -54,10 +54,6 @@ name = "demo"
 doc-scrape-examples = true
 
 [[example]]
-name = "screenshot"
-required-features = ["crossterm"]
-
-[[example]]
 name = "thread"
 required-features = ["crossterm"]
 

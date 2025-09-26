@@ -1,6 +1,6 @@
 ### Ensure that tests pass
 
-* `nix flake check`, or `cargo make ci`.
+* `nix flake check`, or `cargo make ci` (somewhat deprecated, but still there for non-nix users).
 * I must manually approve CI runs for new PRs to prevent github-action attacks.
 
 ### Manually test the demos
