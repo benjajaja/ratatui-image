@@ -152,6 +152,13 @@ let
       terminalCommand = "alacritty -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackage = pkgs.alacritty;
     };
+
+    screenshot-test-konsole = makeScreenshotTest {
+      terminal = "konsole";
+      terminalCommand = "konsole -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+      terminalPackage = pkgs.libsForQt5.konsole;
+      xwayland = true;
+    };
   };
 in
 screenshotTests
