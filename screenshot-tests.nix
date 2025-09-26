@@ -139,6 +139,7 @@ let
       terminal = "xfce4-terminal";
       terminalCommand = "xfce4-terminal -e \"${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
       terminalPackage = pkgs.xfce.xfce4-terminal;
+      sleep = 5;
     };
 
     screenshot-test-contour = makeScreenshotTest {
@@ -157,7 +158,14 @@ let
       terminal = "konsole";
       terminalCommand = "konsole -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackage = pkgs.libsForQt5.konsole;
-      xwayland = true;
+      xwayland = true; # Fails as wayland
+    };
+
+    screenshot-test-darktile = makeScreenshotTest {
+      terminal = "darktile";
+      terminalCommand = "darktile -c \"${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
+      terminalPackage = pkgs.darktile;
+      sleep = 5;
     };
   };
 in
