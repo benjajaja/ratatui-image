@@ -190,12 +190,14 @@
           terminal = "kitty";
           terminalCommand = "kitty ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
           terminalPackage = pkgs.kitty;
+          setup = "sleep 5";
         };
 
         screenshot-test-wezterm = makeScreenshotTest {
           terminal = "wezterm";
           terminalCommand = "wezterm start --always-new-process --cwd /tmp/test-assets -- ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
           terminalPackage = pkgs.wezterm;
+          setup = "sleep 5";
         };
 
         screenshot-test-ghostty = makeScreenshotTest {
