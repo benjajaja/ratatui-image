@@ -20,16 +20,6 @@ env:
   CLICOLOR_FORCE: 1
 
 jobs:
-  setup-terminals:
-    name: Setup terminals list
-    runs-on: ubuntu-latest
-    outputs:
-      terminals: ${{ steps.set-terminals.outputs.terminals }}
-    steps:
-      - id: set-terminals
-        run: |
-          echo 'terminals=["xterm", "xterm-vt340", "kitty", "ghostty", "foot", "wezterm", "mlterm", "rio", "contour"]' >> $GITHUB_OUTPUT
-
   ensure-readme-up-to-date:
     name: Ensure readme is up-to-date
     runs-on: ubuntu-latest
@@ -112,6 +102,16 @@ jobs:
       - name: Build package
         run: |
           nix build .#windows --print-build-logs
+
+  setup-terminals:
+    name: Setup terminals list
+    runs-on: ubuntu-latest
+    outputs:
+      terminals: ${{ steps.set-terminals.outputs.terminals }}
+    steps:
+      - id: set-terminals
+        run: |
+          echo 'terminals=["xterm-vt340", "kitty", "ghostty", "foot", "wezterm", "mlterm", "rio", "contour", "xterm"]' >> $GITHUB_OUTPUT
 
   nix-flake-screenshots:
     name: Screenshot tests
