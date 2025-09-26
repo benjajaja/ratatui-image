@@ -109,9 +109,16 @@ jobs:
     outputs:
       terminals: ${{ steps.set-terminals.outputs.terminals }}
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+
       - id: set-terminals
         run: |
-          echo 'terminals=["xterm-vt340", "kitty", "ghostty", "foot", "wezterm", "mlterm", "rio", "contour", "xterm", "alacritty"]' >> $GITHUB_OUTPUT
+          terminals=$(nix eval --raw --impure --expr 'let flake = builtins.getFlake (toString ./.); pkgs = flake.packages.x86_64-linux; terminals = builtins.filter (name: builtins.substring 0 15 name == "screenshot-test") (builtins.attrNames pkgs); in builtins.toJSON (map (t: builtins.substring 16 (-1) t) terminals)')
+          echo "terminals=$terminals" >> $GITHUB_OUTPUT
 
   nix-flake-screenshots:
     name: Screenshot tests
