@@ -219,9 +219,16 @@
           setup = "mkdir -p /home/test/.config/rio && touch /home/test/.config/rio/config.toml"; # Skip welcome screen
         };
 
+        screenshot-test-xterm-vt340 = makeScreenshotTest {
+          terminal = "xterm-vt340";
+          terminalCommand = "xterm -ti vt340 -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalPackage = pkgs.xterm;
+          xwayland = true;
+        };
+
         screenshot-test-xterm = makeScreenshotTest {
           terminal = "xterm";
-          terminalCommand = "xterm -ti vt340 -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalCommand = "xterm -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
           terminalPackage = pkgs.xterm;
           xwayland = true;
         };
