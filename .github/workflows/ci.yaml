@@ -34,7 +34,7 @@ jobs:
           override: true
       - uses: davidB/rust-cargo-make@v1
       - name: Make readme
-        run: cargo make readme
+        run: cargo make readme -o README.md
       - name: Ensure no changes
         run: git diff --exit-code .
 
