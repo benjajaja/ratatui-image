@@ -130,7 +130,7 @@ impl Picker {
                     Err(Errors::NoFontSize)
                 }
             }
-            Err(Errors::NoCap) => Ok(Self {
+            Err(Errors::NoCap | Errors::NoStdinResponse | Errors::NoFontSize) => Ok(Self {
                 // This is completely arbitrary. For halfblocks, it doesn't have to be precise
                 // since we're not rendering pixels. It should be roughly 1:2 ratio, and some
                 // reasonable size.
