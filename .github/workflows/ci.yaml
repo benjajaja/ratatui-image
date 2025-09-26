@@ -20,6 +20,16 @@ env:
   CLICOLOR_FORCE: 1
 
 jobs:
+  setup-terminals:
+    name: Setup terminals list
+    runs-on: ubuntu-latest
+    outputs:
+      terminals: ${{ steps.set-terminals.outputs.terminals }}
+    steps:
+      - id: set-terminals
+        run: |
+          echo 'terminals=["xterm", "xterm-vt340", "kitty", "ghostty", "foot", "wezterm", "mlterm", "rio", "contour"]' >> $GITHUB_OUTPUT
+
   ensure-readme-up-to-date:
     name: Ensure readme is up-to-date
     runs-on: ubuntu-latest
@@ -106,13 +116,13 @@ jobs:
   nix-flake-screenshots:
     name: Screenshot tests
     runs-on: ubuntu-latest
-    needs: nix-build
+    needs: [nix-build, setup-terminals]
     permissions:
       contents: read
       pull-requests: write  # This is needed for PR comments
     strategy:
       matrix:
-        terminal: [xterm, kitty, ghostty, foot, wezterm, mlterm, rio, contour]
+        terminal: ${{ fromJSON(needs.setup-terminals.outputs.terminals) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -193,7 +203,7 @@ jobs:
   comment-screenshots:
     name: Comment with all screenshots
     runs-on: ubuntu-latest
-    needs: nix-flake-screenshots
+    needs: [nix-flake-screenshots, setup-terminals]
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
@@ -218,7 +228,11 @@ jobs:
           echo "Screenshots from all terminal emulators:" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
 
-          for terminal in xterm kitty ghostty foot wezterm mlterm rio contour; do
+          terminals='${{ needs.setup-terminals.outputs.terminals }}'
+          # Convert JSON array to space-separated list
+          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
+
+          for terminal in $terminal_list; do
             echo "Processing terminal: $terminal"
             if [ -f "screenshot-info/${terminal}.txt" ]; then
               echo "Found info file for $terminal"
