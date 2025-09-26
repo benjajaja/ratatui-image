@@ -161,6 +161,7 @@
             systemd-run --uid=test --setenv=XDG_RUNTIME_DIR=/run/user/1000 \
               --setenv=WAYLAND_DISPLAY=wayland-1 \
               --setenv=LIBGL_ALWAYS_SOFTWARE=1 \
+              --setenv=RUST_BACKTRACE=1 \
               ${if xwayland then "--setenv=DISPLAY=:0" else ""} \
               --working-directory=/tmp/test-assets \
               -- ${terminalCommand}
