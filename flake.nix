@@ -107,7 +107,7 @@
         ];
       };
 
-      makeScreenshotTest = { terminal, terminalCommand, terminalPackage, setup ? null, xwayland ? false }: pkgs.nixosTest {
+      makeScreenshotTest = { terminal, terminalCommand, terminalPackage, setup ? null, sleep ? null, xwayland ? false }: pkgs.nixosTest {
         name = "ratatui-test-wayland-${terminal}";
 
         nodes.machine = { pkgs, ... }: {
@@ -175,6 +175,7 @@
             except Exception as e:
               print(f"/tmp/demo-ready not found within timeout: {e}")
             finally:
+              machine.succeed("${if sleep != null then "sleep ${toString sleep}" else "true"}")
               machine.screenshot("screenshot-${terminal}")
               print("Screenshot saved to test output directory as screenshot-${terminal}.png")
         '';
@@ -191,14 +192,14 @@
           terminal = "kitty";
           terminalCommand = "kitty ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
           terminalPackage = pkgs.kitty;
-          setup = "sleep 5";
+          sleep = 5;
         };
 
         screenshot-test-wezterm = makeScreenshotTest {
           terminal = "wezterm";
           terminalCommand = "wezterm start --always-new-process --cwd /tmp/test-assets -- ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
           terminalPackage = pkgs.wezterm;
-          setup = "sleep 5";
+          sleep = 5;
         };
 
         screenshot-test-ghostty = makeScreenshotTest {
