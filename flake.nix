@@ -249,7 +249,7 @@
 
         screenshot-test-contour = makeScreenshotTest {
           terminal = "contour";
-          terminalCommand = "contour --working-directory /tmp/test-assets ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+          terminalCommand = "contour --working-directory /tmp/test-assets /run/current-system/sw/bin/bash -c \"sleep 1; ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
           terminalPackage = pkgs.contour;
         };
 
