@@ -327,7 +327,7 @@ jobs:
           terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
           for terminal in $terminal_list; do
             echo "<div class='terminal'>" >> pages/index.html
-            echo "<h2>$terminal</h2>" >> pages/index.html
+            echo "<h2 id="$terminal">$terminal</h2>" >> pages/index.html
 
             # Read imgur URL from info file
             if [ -f "screenshot-info/${terminal}.txt" ]; then
