@@ -107,6 +107,17 @@ impl Picker {
         // Detect tmux, and only if positive then take some risky guess for iTerm2 support.
         let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();
 
+        static DEFAULT_PICKER: Picker = Picker {
+            // This is completely arbitrary. For halfblocks, it doesn't have to be precise
+            // since we're not rendering pixels. It should be roughly 1:2 ratio, and some
+            // reasonable size.
+            font_size: (10, 20),
+            background_color: DEFAULT_BACKGROUND,
+            protocol_type: ProtocolType::Halfblocks,
+            is_tmux: false,
+            capabilities: Vec::new(),
+        };
+
         // Write and read to stdin to query protocol capabilities and font-size.
         match query_with_timeout(is_tmux, Duration::from_secs(1), options) {
             Ok((capability_proto, font_size, caps)) => {
@@ -127,19 +138,16 @@ impl Picker {
                         capabilities: caps,
                     })
                 } else {
-                    Err(Errors::NoFontSize)
+                    let mut p = DEFAULT_PICKER.clone();
+                    p.is_tmux = is_tmux;
+                    Ok(p)
                 }
             }
-            Err(Errors::NoCap | Errors::NoStdinResponse | Errors::NoFontSize) => Ok(Self {
-                // This is completely arbitrary. For halfblocks, it doesn't have to be precise
-                // since we're not rendering pixels. It should be roughly 1:2 ratio, and some
-                // reasonable size.
-                font_size: (10, 20),
-                background_color: DEFAULT_BACKGROUND,
-                protocol_type: ProtocolType::Halfblocks,
-                is_tmux,
-                capabilities: Vec::new(),
-            }),
+            Err(Errors::NoCap | Errors::NoStdinResponse | Errors::NoFontSize) => {
+                let mut p = DEFAULT_PICKER.clone();
+                p.is_tmux = is_tmux;
+                Ok(p)
+            }
             Err(err) => Err(err),
         }
     }
