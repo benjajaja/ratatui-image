@@ -1,7 +1,7 @@
 { pkgs, src, self, system }:
 
 let
-  makeScreenshotTest = { terminal, terminalCommand, terminalPackages, setup ? null, sleep ? null, xwayland ? false }: pkgs.nixosTest {
+  makeScreenshotTest = { terminal, terminalCommand, terminalPackages, setup ? null, xwayland ? false }: pkgs.nixosTest {
     name = "ratatui-test-wayland-${terminal}";
 
     nodes.machine = { pkgs, ... }: {
@@ -69,7 +69,7 @@ let
         except Exception as e:
           print(f"/tmp/demo-ready not found within timeout: {e}")
         finally:
-          machine.succeed("${if sleep != null then "sleep ${toString sleep}" else "true"}")
+          machine.succeed("sleep 2")
           machine.screenshot("screenshot-${terminal}")
           print("Screenshot saved to test output directory as screenshot-${terminal}.png")
     '';
@@ -86,14 +86,12 @@ let
       terminal = "kitty";
       terminalCommand = "kitty ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackages = [ pkgs.kitty ];
-      sleep = 1;
     };
 
     screenshot-test-wezterm = makeScreenshotTest {
       terminal = "wezterm";
       terminalCommand = "wezterm start --always-new-process --cwd /tmp/test-assets -- ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackages = [ pkgs.wezterm ];
-      sleep = 1;
     };
 
     screenshot-test-ghostty = makeScreenshotTest {
@@ -139,7 +137,6 @@ let
       terminal = "xfce4-terminal";
       terminalCommand = "xfce4-terminal -e \"${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
       terminalPackages = [ pkgs.xfce.xfce4-terminal ];
-      sleep = 1;
     };
 
     screenshot-test-contour = makeScreenshotTest {
@@ -159,7 +156,6 @@ let
       terminal = "konsole";
       terminalCommand = "konsole -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackages = [ pkgs.libsForQt5.konsole pkgs.libsForQt5.qtwayland ];
-      sleep = 1;
     };
   };
 in
