@@ -154,18 +154,17 @@ let
       terminalPackage = pkgs.alacritty;
     };
 
+    screenshot-test-konsole-x11 = makeScreenshotTest {
+      terminal = "konsole-x11";
+      terminalCommand = "konsole -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+      terminalPackage = pkgs.libsForQt5.konsole;
+    };
+
     screenshot-test-konsole = makeScreenshotTest {
       terminal = "konsole";
       terminalCommand = "konsole -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackage = pkgs.libsForQt5.konsole;
-      xwayland = true; # Fails as wayland
-    };
-
-    screenshot-test-darktile = makeScreenshotTest {
-      terminal = "darktile";
-      terminalCommand = "darktile -c \"sleep 1; ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
-      terminalPackage = pkgs.darktile;
-      sleep = 1;
+      xwayland = true;
     };
   };
 in
