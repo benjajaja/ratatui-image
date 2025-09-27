@@ -86,14 +86,14 @@ let
       terminal = "kitty";
       terminalCommand = "kitty ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackage = pkgs.kitty;
-      sleep = 5;
+      sleep = 1;
     };
 
     screenshot-test-wezterm = makeScreenshotTest {
       terminal = "wezterm";
       terminalCommand = "wezterm start --always-new-process --cwd /tmp/test-assets -- ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackage = pkgs.wezterm;
-      sleep = 5;
+      sleep = 1;
     };
 
     screenshot-test-ghostty = makeScreenshotTest {
@@ -139,11 +139,12 @@ let
       terminal = "xfce4-terminal";
       terminalCommand = "xfce4-terminal -e \"${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
       terminalPackage = pkgs.xfce.xfce4-terminal;
-      sleep = 5;
+      sleep = 1;
     };
 
     screenshot-test-contour = makeScreenshotTest {
       terminal = "contour";
+      # This sleep is different: it's something about stdin not being ready immeadiately.
       terminalCommand = "contour --working-directory /tmp/test-assets /run/current-system/sw/bin/bash -c \"sleep 1; ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
       terminalPackage = pkgs.contour;
     };
@@ -158,13 +159,14 @@ let
       terminal = "konsole-x11";
       terminalCommand = "konsole -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackage = pkgs.libsForQt5.konsole;
+      xwayland = true;
     };
 
     screenshot-test-konsole = makeScreenshotTest {
       terminal = "konsole";
       terminalCommand = "konsole -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackage = pkgs.libsForQt5.konsole;
-      xwayland = true;
+      sleep = 1;
     };
   };
 in
