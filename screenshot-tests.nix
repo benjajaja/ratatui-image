@@ -163,9 +163,9 @@ let
 
     screenshot-test-darktile = makeScreenshotTest {
       terminal = "darktile";
-      terminalCommand = "darktile -c \"${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
+      terminalCommand = "darktile -c \"sleep 1; ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
       terminalPackage = pkgs.darktile;
-      sleep = 5;
+      sleep = 1;
     };
   };
 in
