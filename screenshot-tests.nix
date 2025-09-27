@@ -1,7 +1,7 @@
 { pkgs, src, self, system }:
 
 let
-  makeScreenshotTest = { terminal, terminalCommand, terminalPackage, setup ? null, sleep ? null, xwayland ? false }: pkgs.nixosTest {
+  makeScreenshotTest = { terminal, terminalCommand, terminalPackages, setup ? null, sleep ? null, xwayland ? false }: pkgs.nixosTest {
     name = "ratatui-test-wayland-${terminal}";
 
     nodes.machine = { pkgs, ... }: {
@@ -33,9 +33,8 @@ let
       };
 
       # Ensure required packages are available
-      environment.systemPackages = with pkgs; [
-        terminalPackage
-      ];
+      environment.systemPackages = with pkgs;
+        terminalPackages;
     };
 
     testScript = ''
@@ -55,6 +54,7 @@ let
         systemd-run --uid=test --setenv=XDG_RUNTIME_DIR=/run/user/1000 \
           --setenv=WAYLAND_DISPLAY=wayland-1 \
           --setenv=LIBGL_ALWAYS_SOFTWARE=1 \
+          --setenv=QT_QPA_PLATFORM="wayland" \
           --setenv=RUST_BACKTRACE=1 \
           ${if xwayland then "--setenv=DISPLAY=:0" else ""} \
           --working-directory=/tmp/test-assets \
@@ -79,66 +79,66 @@ let
     screenshot-test-foot = makeScreenshotTest {
       terminal = "foot";
       terminalCommand = "foot ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.foot;
+      terminalPackages = [ pkgs.foot ];
     };
 
     screenshot-test-kitty = makeScreenshotTest {
       terminal = "kitty";
       terminalCommand = "kitty ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.kitty;
+      terminalPackages = [ pkgs.kitty ];
       sleep = 1;
     };
 
     screenshot-test-wezterm = makeScreenshotTest {
       terminal = "wezterm";
       terminalCommand = "wezterm start --always-new-process --cwd /tmp/test-assets -- ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.wezterm;
+      terminalPackages = [ pkgs.wezterm ];
       sleep = 1;
     };
 
     screenshot-test-ghostty = makeScreenshotTest {
       terminal = "ghostty";
       terminalCommand = "ghostty -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.ghostty;
+      terminalPackages = [ pkgs.ghostty ];
     };
 
     screenshot-test-mlterm = makeScreenshotTest {
       terminal = "mlterm";
       terminalCommand = "mlterm -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.mlterm;
+      terminalPackages = [ pkgs.mlterm ];
     };
 
     screenshot-test-rio = makeScreenshotTest {
       terminal = "rio";
       terminalCommand = "rio -w /tmp/test-assets -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.rio;
+      terminalPackages = [ pkgs.rio ];
       setup = "mkdir -p /home/test/.config/rio && touch /home/test/.config/rio/config.toml"; # Skip welcome screen
     };
 
     screenshot-test-xterm-vt340 = makeScreenshotTest {
       terminal = "xterm-vt340";
       terminalCommand = "xterm -ti vt340 -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.xterm;
+      terminalPackages = [ pkgs.xterm ];
       xwayland = true;
     };
 
     screenshot-test-xterm = makeScreenshotTest {
       terminal = "xterm";
       terminalCommand = "xterm -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.xterm;
+      terminalPackages = [ pkgs.xterm ];
       xwayland = true;
     };
 
     screenshot-test-blackbox = makeScreenshotTest {
       terminal = "blackbox";
       terminalCommand = "blackbox -c \"${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
-      terminalPackage = pkgs.blackbox-terminal;
+      terminalPackages = [ pkgs.blackbox-terminal ];
     };
 
     screenshot-test-xfce4-terminal = makeScreenshotTest {
       terminal = "xfce4-terminal";
       terminalCommand = "xfce4-terminal -e \"${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
-      terminalPackage = pkgs.xfce.xfce4-terminal;
+      terminalPackages = [ pkgs.xfce.xfce4-terminal ];
       sleep = 1;
     };
 
@@ -146,26 +146,19 @@ let
       terminal = "contour";
       # This sleep is different: it's something about stdin not being ready immeadiately.
       terminalCommand = "contour --working-directory /tmp/test-assets /run/current-system/sw/bin/bash -c \"sleep 1; ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready\"";
-      terminalPackage = pkgs.contour;
+      terminalPackages = [ pkgs.contour ];
     };
 
     screenshot-test-alacritty = makeScreenshotTest {
       terminal = "alacritty";
       terminalCommand = "alacritty -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.alacritty;
-    };
-
-    screenshot-test-konsole-x11 = makeScreenshotTest {
-      terminal = "konsole-x11";
-      terminalCommand = "konsole -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.libsForQt5.konsole;
-      xwayland = true;
+      terminalPackages = [ pkgs.alacritty ];
     };
 
     screenshot-test-konsole = makeScreenshotTest {
       terminal = "konsole";
       terminalCommand = "konsole -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackage = pkgs.libsForQt5.konsole;
+      terminalPackages = [ pkgs.libsForQt5.konsole pkgs.libsForQt5.qtwayland ];
       sleep = 1;
     };
   };
