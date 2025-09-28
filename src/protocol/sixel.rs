@@ -36,7 +36,7 @@ impl Sixel {
 fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
     let img_rgba8 = img.to_rgba8();
 
-    let mut data = BitSixelEncoder::<dither::SierraLite>::encode(img_rgba8);
+    let mut data = BitSixelEncoder::<dither::NoDither>::encode(img_rgba8);
 
     if is_tmux {
         let (start, escape, end) = Parser::escape_tmux(is_tmux);
