@@ -215,8 +215,8 @@ jobs:
           # Convert JSON array to space-separated list
           terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
 
-          # Base URL for GitHub Pages
-          BASE_URL="https://benjajaja.github.io/ratatui-image-screenshots/pr-${{ github.event.pull_request.number }}"
+          # Base URL for raw GitHub content
+          BASE_URL="https://raw.githubusercontent.com/benjajaja/ratatui-image-screenshots/pr-${{ github.event.pull_request.number }}"
 
           for terminal in $terminal_list; do
             echo "### ${terminal}" >> $GITHUB_OUTPUT
