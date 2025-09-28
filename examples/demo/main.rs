@@ -152,8 +152,8 @@ impl App {
             }
             'o' => {
                 let path = match self.image_source_path.to_str() {
-                    Some("./assets/Ada.png") => "./assets/Jenkins.jpg",
-                    Some("./assets/Jenkins.jpg") => "./assets/NixOS.png",
+                    Some("./assets/Ada.png") => "./assets/Jenkins.png",
+                    Some("./assets/Jenkins.png") => "./assets/NixOS.png",
                     _ => "./assets/Ada.png",
                 };
                 self.image_source = image::ImageReader::open(path).unwrap().decode().unwrap();
