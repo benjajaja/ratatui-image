@@ -51,7 +51,6 @@ Summary | Link
 --------|---------
 Termwiz backend does not work at all | [#1](https://github.com/benjajaja/ratatui-image/issues/1)
 Sixel image rendered on the last line of terminal causes a scroll | [#57](https://github.com/benjajaja/ratatui-image/issues/57)
-Terminals may or may not take DPI scale into account | [#59 (closed)](https://github.com/benjajaja/ratatui-image/issues/59)
 
 ### Projects that use ratatui-image
 

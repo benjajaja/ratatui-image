@@ -103,20 +103,6 @@ a desired columns+rows bound, and so on.
   thread or async task (see `examples/async.rs`). It must be rendered with
   [`render_stateful_widget`] (i.e. with some mutable state).
 
-## Terminal image sizes and display scaling or DPI
-While ratatui-image goes to a great length to detect a rendered image's pixel size in terms of
-"character cells that will be covered", via font pixel size detection, ultimately it's up to
-the terminal emulator to decide what exactly a pixel is. Because a pixel might be scaled on
-modern desktop environments, some terminal emulators decide to also scale images, and others
-don't, **it is possible that images sizes vary across terminals**, however, functionally
-ratatui-image does still "work" in the sense of correctly detecting the "covered" area - as
-long as this scaling is applied to both the image and the reported font pixel size.
-
-Size    | Terminals
---------|----------
-Larger  | Kitty, foot, xterm
-Smaller | WezTerm, Ghostty
-
 ## Examples
 
 * `examples/demo.rs` is a fully fledged demo.
@@ -172,7 +158,6 @@ Summary | Link
 --------|---------
 Termwiz backend does not work at all | [#1](https://github.com/benjajaja/ratatui-image/issues/1)
 Sixel image rendered on the last line of terminal causes a scroll | [#57](https://github.com/benjajaja/ratatui-image/issues/57)
-Terminals may or may not take DPI scale into account | [#59 (closed)](https://github.com/benjajaja/ratatui-image/issues/59)
 
 ### Projects that use ratatui-image
 
