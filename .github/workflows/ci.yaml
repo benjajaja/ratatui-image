@@ -284,13 +284,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Download all screenshot artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: screenshot-*
-          path: screenshots-temp
-          merge-multiple: false
-
       - name: Download all screenshot info artifacts
         uses: actions/download-artifact@v4
         with:
