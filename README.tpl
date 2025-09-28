@@ -15,7 +15,7 @@
 
 ![Screen recording](./assets/showcase.gif)
 
-[Link to screenshot test suite with array of terminals](https://benjajaja.github.io/ratatui-image/) (xterm, foot, kitty, wezterm, ghostty, rio, mlterm...)
+[Link to screenshot test suite with array of terminals](https://benjajaja.github.io/ratatui-image-screenshots/) (xterm, foot, kitty, wezterm, ghostty, rio, mlterm...)
 
 {{readme}}
 
@@ -42,7 +42,7 @@ ctx       | `Sixel`  | ❌ | ❌ | Buggy.
 
 "QA" means that there is a flake VM test that runs the demo and takes a screenshot, posted as PR comment. A `-` means it's not possible or applicable to add a screenshot-test.
 
-[Link to latest screenshot of the test-suite on `master`](https://benjajaja.github.io/ratatui-image/)
+[Link to latest screenshot of the test-suite on `master`](https://benjajaja.github.io/ratatui-image-screenshots/)
 
 Halfblocks should work in all terminals, even if the font size could not be detected, with a 4:8 pixel ratio.
 
