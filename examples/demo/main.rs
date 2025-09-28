@@ -235,13 +235,10 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
 
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage(app.split_percent),
-                Constraint::Percentage(100 - app.split_percent),
-            ]
-            .as_ref(),
-        )
+        .constraints([
+            Constraint::Percentage(app.split_percent),
+            Constraint::Percentage(100 - app.split_percent),
+        ])
         .split(outer_block.inner(f.area()));
     f.render_widget(outer_block, f.area());
 
@@ -272,7 +269,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
 
     let chunks_left_bottom = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(left_chunks[1]);
 
     app.render_resized_image(f, Resize::Crop(None), chunks_left_bottom[0]);
@@ -305,7 +302,7 @@ fn paragraph<'a, T: Into<Text<'a>>>(str: T) -> Paragraph<'a> {
 fn vertical_layout() -> Layout {
     Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
 }
 
 fn block(name: &str) -> Block<'_> {
