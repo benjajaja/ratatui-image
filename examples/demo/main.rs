@@ -78,8 +78,12 @@ impl App {
             env::var("TERM").unwrap_or("unknown".to_string())
         );
 
-        let ada = "./assets/Ada.png";
-        let image_source = image::ImageReader::open(ada).unwrap().decode().unwrap();
+        let image = if env::args().any(|arg| arg == "--tmp-demo-ready") {
+            "./assets/NixOS.png"
+        } else {
+            "./assets/Ada.png"
+        };
+        let image_source = image::ImageReader::open(image).unwrap().decode().unwrap();
 
         let mut picker = Picker::from_query_stdio().unwrap();
         // Set completely transparent background (experimental, only works for iTerm2 and Kitty).
@@ -119,7 +123,7 @@ impl App {
             split_percent: 70,
             picker,
             image_source,
-            image_source_path: ada.into(),
+            image_source_path: image.into(),
 
             image_static,
             image_fit_state,

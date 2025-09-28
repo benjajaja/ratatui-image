@@ -43,7 +43,7 @@ let
       machine.wait_until_succeeds("pgrep -f sway")
 
       machine.succeed("mkdir -p /tmp/test-assets/assets")
-      machine.copy_from_host("${src}/assets/Ada.png", "/tmp/test-assets/assets/Ada.png")
+      machine.copy_from_host("${src}/assets/NixOS.png", "/tmp/test-assets/assets/NixOS.png")
 
       machine.wait_until_succeeds("systemd-run --uid=test --setenv=XDG_RUNTIME_DIR=/run/user/1000 --setenv=WAYLAND_DISPLAY=wayland-1 -- swaymsg -t get_version")
 
