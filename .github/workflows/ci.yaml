@@ -272,25 +272,23 @@ jobs:
           message: ${{ steps.create-comment.outputs.message }}
 
   deploy-screenshots:
-    name: Deploy screenshots to GitHub Pages
+    name: Deploy screenshots to external repo
     runs-on: ubuntu-latest
     needs: [nix-flake-screenshots, setup-terminals]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     permissions:
       contents: read
-      pages: write
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Download all screenshot info artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: screenshot-info-*
           path: screenshot-info
           merge-multiple: true
-      
+
       - name: Organize screenshots for Pages
         run: |
           mkdir -p pages
@@ -320,7 +318,7 @@ jobs:
           terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
           for terminal in $terminal_list; do
             echo "<div class='terminal'>" >> pages/index.html
-            echo "<h2 id="$terminal">$terminal</h2>" >> pages/index.html
+            echo "<h2 id=\"$terminal\">$terminal</h2>" >> pages/index.html
 
             # Read imgur URL from info file
             if [ -f "screenshot-info/${terminal}.txt" ]; then
@@ -337,15 +335,11 @@ jobs:
           done
 
           echo "</div></body></html>" >> pages/index.html
-      
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      
-      - name: Upload to GitHub Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: pages/
-      
+
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.PAT }}
+          external_repository: benjajaja/ratatui-images-screenshots
+          publish_dir: ./pages
+          publish_branch: gh-pages
