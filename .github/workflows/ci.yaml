@@ -167,45 +167,6 @@ jobs:
           pattern: screenshot-*
           path: screenshots
 
-      - name: Organize screenshots for deployment
-        run: |
-          mkdir -p pages
-
-          # Copy screenshots to pages directory
-          terminals='${{ needs.setup-terminals.outputs.terminals }}'
-          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
-
-          for terminal in $terminal_list; do
-            if [ -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ]; then
-              cp "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" "pages/screenshot-${terminal}.png"
-              echo "Copied screenshot for ${terminal}"
-            fi
-          done
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          personal_token: ${{ secrets.PAT }}
-          external_repository: benjajaja/ratatui-image-screenshots
-          publish_dir: ./pages
-          publish_branch: pr-${{ github.event.pull_request.number }}
-          force_orphan: true
-
-  comment-screenshots:
-    name: Comment with all screenshots
-    runs-on: ubuntu-latest
-    needs: [setup-terminals, deploy-screenshots-branch]
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Download all screenshot artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: screenshot-*
-          path: screenshots
-
       - name: Download dify binary
         run: |
           curl -L https://github.com/jihchi/dify/releases/download/v0.7.4/dify-x86_64-unknown-linux-gnu-v0.7.4.tar.gz -o dify.tar.gz
@@ -263,8 +224,48 @@ jobs:
             fi
           done
 
-      - name: Upload diff images as comment attachments
-        id: upload-diffs
+      - name: Organize screenshots for deployment
+        run: |
+          mkdir -p pages
+
+          # Copy screenshots to pages directory
+          terminals='${{ needs.setup-terminals.outputs.terminals }}'
+          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
+
+          for terminal in $terminal_list; do
+            if [ -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ]; then
+              cp "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" "pages/screenshot-${terminal}.png"
+              echo "Copied screenshot for ${terminal}"
+            fi
+          done
+
+          # Copy diff images to pages directory
+          for terminal in $terminal_list; do
+            if [ -f "diffs/diff-${terminal}.png" ]; then
+              cp "diffs/diff-${terminal}.png" "pages/diff-${terminal}.png"
+              echo "Copied diff for ${terminal}"
+            fi
+          done
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.PAT }}
+          external_repository: benjajaja/ratatui-image-screenshots
+          publish_dir: ./pages
+          publish_branch: pr-${{ github.event.pull_request.number }}
+          force_orphan: true
+
+  comment-screenshots:
+    name: Comment with all screenshots
+    runs-on: ubuntu-latest
+    needs: [setup-terminals, deploy-screenshots-branch]
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Create combined comment
         run: |
           terminals='${{ needs.setup-terminals.outputs.terminals }}'
           terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
@@ -283,35 +284,15 @@ jobs:
             echo "![${terminal} screenshot](${BASE_URL}/screenshot-${terminal}.png)" >> comment_body.txt
             echo "" >> comment_body.txt
 
-            # Check if diff image exists and upload it
-            if [ -f "diffs/diff-${terminal}.png" ]; then
-              echo "Uploading diff for ${terminal}..."
-
-              # Upload diff image to GitHub and capture full response
-              upload_response=$(curl -s -X POST \
-                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                -F "file=@diffs/diff-${terminal}.png" \
-                "https://uploads.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/assets")
-
-              echo "Upload response for ${terminal}: $upload_response"
-
-              # Try different fields to get the URL
-              diff_url=$(echo "$upload_response" | jq -r '.browser_download_url // .url // .download_url // empty')
-
-              if [ -n "$diff_url" ] && [ "$diff_url" != "null" ]; then
-                echo "**Image diff vs master:**" >> comment_body.txt
-                echo "![${terminal} diff]($diff_url)" >> comment_body.txt
-                echo "" >> comment_body.txt
-                echo "Added diff URL for ${terminal}: $diff_url"
-              else
-                echo "**Image diff vs master:** Upload failed" >> comment_body.txt
-                echo "" >> comment_body.txt
-                echo "Failed to get diff URL for ${terminal}"
-              fi
+            # Check if diff image exists by trying to fetch it
+            diff_url="${BASE_URL}/diff-${terminal}.png"
+            if curl -f -s -I "$diff_url" > /dev/null 2>&1; then
+              echo "**Image diff vs master:**" >> comment_body.txt
+              echo "![${terminal} diff]($diff_url)" >> comment_body.txt
+              echo "" >> comment_body.txt
             else
               echo "**No diff available** (no changes detected)" >> comment_body.txt
               echo "" >> comment_body.txt
-              echo "No diff file found for ${terminal}"
             fi
           done
 
