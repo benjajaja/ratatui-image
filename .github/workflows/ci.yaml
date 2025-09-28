@@ -344,21 +344,6 @@ jobs:
           done
 
           echo "</div></body></html>" >> pages/index.html
-
-          # Create a JSON index for programmatic access with Imgur URLs
-          echo '{"screenshots": [' > pages/screenshots.json
-          first=true
-          for terminal in $terminal_list; do
-            if [ -f "screenshot-info/${terminal}.txt" ]; then
-              imgur_url=$(cat "screenshot-info/${terminal}.txt" | tr -d '\n\r')
-              if [ -n "$imgur_url" ] && [ "$imgur_url" != "" ]; then
-                if [ "$first" = false ]; then echo "," >> pages/screenshots.json; fi
-                echo "  {\"terminal\": \"$terminal\", \"url\": \"$imgur_url\"}" >> pages/screenshots.json
-                first=false
-              fi
-            fi
-          done
-          echo ']}' >> pages/screenshots.json
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
