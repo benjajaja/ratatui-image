@@ -293,8 +293,9 @@ jobs:
         run: |
           mkdir -p pages
 
-          # Create an index page
-          cat > pages/index.html << 'EOF'
+          # Create an index page with timestamp
+          timestamp=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          cat > pages/index.html << EOF
           <!DOCTYPE html>
           <html>
           <head>
@@ -311,6 +312,7 @@ jobs:
             <div class="container">
               <h1>Ratatui-Image Terminal Screenshots</h1>
               <p style="text-align: center; color: #666;">Screenshots from various terminal emulators</p>
+              <p style="text-align: center; color: #999; font-size: 0.9em;">Last updated: ${timestamp}</p>
           EOF
 
           # Add screenshots to index using Imgur URLs
@@ -340,6 +342,6 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           personal_token: ${{ secrets.PAT }}
-          external_repository: benjajaja/ratatui-images-screenshots
+          external_repository: benjajaja/ratatui-image-screenshots
           publish_dir: ./pages
           publish_branch: gh-pages
