@@ -79,7 +79,7 @@ impl App {
         );
 
         let image = if env::args().any(|arg| arg == "--tmp-demo-ready") {
-            "./assets/NixOS.png"
+            "./assets/Jenkins.png"
         } else {
             "./assets/Ada.png"
         };
