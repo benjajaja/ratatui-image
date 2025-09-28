@@ -153,81 +153,57 @@ jobs:
           name: screenshot-${{ matrix.terminal }}
           path: result/screenshot-${{ matrix.terminal }}.png
 
-      - name: Upload to Imgur
-        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/master'
-        id: imgur
-        run: |
-          echo "Uploading screenshot for ${{ matrix.terminal }}..."
-          ls -la result/
-
-          if [ ! -f "result/screenshot-${{ matrix.terminal }}.png" ]; then
-            echo "Error: Screenshot file not found!"
-            exit 1
-          fi
-
-          response=$(curl -s -X POST \
-            -H "Authorization: Client-ID ${{ secrets.IMGUR_CLIENT_ID }}" \
-            -F "image=@result/screenshot-${{ matrix.terminal }}.png" \
-            https://api.imgur.com/3/image)
-
-          echo "Imgur response: $response"
-
-          # Check if upload was successful
-          success=$(echo "$response" | grep -o '"success":[^,]*' | cut -d':' -f2)
-          if [ "$success" != "true" ]; then
-            echo "Error: Imgur upload failed"
-            echo "$response"
-            exit 1
-          fi
-
-          # Extract URL using jq-like parsing (more reliable)
-          imgur_url=$(echo "$response" | sed -n 's/.*"link":"\([^"]*\)".*/\1/p')
-
-          if [ -z "$imgur_url" ]; then
-            echo "Error: Could not extract Imgur URL from response"
-            echo "$response"
-            exit 1
-          fi
-
-          echo "Successfully uploaded to: $imgur_url"
-          echo "imgur_url=$imgur_url" >> $GITHUB_OUTPUT
-          echo "terminal=${{ matrix.terminal }}" >> $GITHUB_OUTPUT
-
-      - name: Save terminal and URL for comment
-        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/master'
-        run: |
-          mkdir -p screenshots
-          echo "${{ steps.imgur.outputs.imgur_url }}" > screenshots/${{ matrix.terminal }}.txt
-          echo "Saved URL for ${{ matrix.terminal }}: ${{ steps.imgur.outputs.imgur_url }}"
-
-      - name: Upload screenshot info
-        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/master'
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshot-info-${{ matrix.terminal }}
-          path: screenshots/${{ matrix.terminal }}.txt
-
-  comment-screenshots:
-    name: Comment with all screenshots
+  deploy-screenshots-branch:
+    name: Deploy PR screenshots to external repo
     runs-on: ubuntu-latest
     needs: [nix-flake-screenshots, setup-terminals]
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
-      pull-requests: write
     steps:
-      - name: Download all screenshot info
+      - name: Download all screenshot artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: screenshot-info-*
-          path: screenshot-info
-          merge-multiple: true
+          pattern: screenshot-*
+          path: screenshots
 
+      - name: Organize screenshots for deployment
+        run: |
+          mkdir -p pages
+
+          # Copy screenshots to pages directory
+          terminals='${{ needs.setup-terminals.outputs.terminals }}'
+          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
+
+          for terminal in $terminal_list; do
+            if [ -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ]; then
+              cp "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" "pages/screenshot-${terminal}.png"
+              echo "Copied screenshot for ${terminal}"
+            fi
+          done
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.PAT }}
+          external_repository: benjajaja/ratatui-image-screenshots
+          publish_dir: ./pages
+          publish_branch: pr-${{ github.event.pull_request.number }}
+          force_orphan: true
+
+  comment-screenshots:
+    name: Comment with all screenshots
+    runs-on: ubuntu-latest
+    needs: [setup-terminals, deploy-screenshots-branch]
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
       - name: Create combined comment
         id: create-comment
         run: |
           echo "Creating comment with screenshots..."
-          ls -la screenshot-info/
 
           echo "message<<EOF" >> $GITHUB_OUTPUT
           echo "Merge of ${{ github.sha }} to \`master\`" >> $GITHUB_OUTPUT
@@ -239,30 +215,13 @@ jobs:
           # Convert JSON array to space-separated list
           terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
 
+          # Base URL for GitHub Pages
+          BASE_URL="https://benjajaja.github.io/ratatui-image-screenshots/pr-${{ github.event.pull_request.number }}"
+
           for terminal in $terminal_list; do
-            echo "Processing terminal: $terminal"
-            if [ -f "screenshot-info/${terminal}.txt" ]; then
-              echo "Found info file for $terminal"
-              cat "screenshot-info/${terminal}.txt"
-
-              url=$(cat "screenshot-info/${terminal}.txt" | tr -d '\n\r')
-              echo "Extracted URL: '$url'"
-
-              if [ -n "$url" ] && [ "$url" != "" ]; then
-                echo "### ${terminal}" >> $GITHUB_OUTPUT
-                echo "![${terminal} screenshot](${url})" >> $GITHUB_OUTPUT
-                echo "" >> $GITHUB_OUTPUT
-              else
-                echo "### ${terminal}" >> $GITHUB_OUTPUT
-                echo "❌ Screenshot upload failed for ${terminal}" >> $GITHUB_OUTPUT
-                echo "" >> $GITHUB_OUTPUT
-              fi
-            else
-              echo "No info file found for $terminal"
-              echo "### ${terminal}" >> $GITHUB_OUTPUT
-              echo "❌ No screenshot available for ${terminal}" >> $GITHUB_OUTPUT
-              echo "" >> $GITHUB_OUTPUT
-            fi
+            echo "### ${terminal}" >> $GITHUB_OUTPUT
+            echo "![${terminal} screenshot](${BASE_URL}/screenshot-${terminal}.png)" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
           done
           echo "EOF" >> $GITHUB_OUTPUT
 
