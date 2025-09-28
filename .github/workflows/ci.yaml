@@ -282,16 +282,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download all screenshot info artifacts
+      - name: Download all screenshot artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: screenshot-info-*
-          path: screenshot-info
-          merge-multiple: true
+          pattern: screenshot-*
+          path: screenshots
+          merge-multiple: false
 
       - name: Organize screenshots for Pages
         run: |
-          mkdir -p pages
+          mkdir -p pages/images
+
+          # Move screenshot images to pages/images directory
+          terminals='${{ needs.setup-terminals.outputs.terminals }}'
+          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
+
+          for terminal in $terminal_list; do
+            if [ -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ]; then
+              cp "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" "pages/images/screenshot-${terminal}.png"
+              echo "Copied screenshot for ${terminal}"
+            else
+              echo "Warning: Screenshot file not found for ${terminal}"
+            fi
+          done
 
           # Create an index page with timestamp
           timestamp=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
@@ -315,21 +328,14 @@ jobs:
               <p style="text-align: center; color: #999; font-size: 0.9em;">Last updated: ${timestamp}</p>
           EOF
 
-          # Add screenshots to index using Imgur URLs
-          terminals='${{ needs.setup-terminals.outputs.terminals }}'
-          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
+          # Add screenshots to index using local images
           for terminal in $terminal_list; do
             echo "<div class='terminal'>" >> pages/index.html
             echo "<h2 id=\"$terminal\">$terminal</h2>" >> pages/index.html
 
-            # Read imgur URL from info file
-            if [ -f "screenshot-info/${terminal}.txt" ]; then
-              imgur_url=$(cat "screenshot-info/${terminal}.txt" | tr -d '\n\r')
-              if [ -n "$imgur_url" ] && [ "$imgur_url" != "" ]; then
-                echo "<img src='$imgur_url' alt='$terminal screenshot'>" >> pages/index.html
-              else
-                echo "<p>No screenshot available</p>" >> pages/index.html
-              fi
+            # Check if image exists and add to HTML
+            if [ -f "pages/images/screenshot-${terminal}.png" ]; then
+              echo "<img src='images/screenshot-${terminal}.png' alt='$terminal screenshot'>" >> pages/index.html
             else
               echo "<p>No screenshot available</p>" >> pages/index.html
             fi
