@@ -237,14 +237,29 @@ jobs:
           for terminal in $terminal_list; do
             if [ -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ] && [ -f "reference-screenshots/screenshot-${terminal}.png" ]; then
               echo "Creating diff for ${terminal}..."
-              if ./dify "reference-screenshots/screenshot-${terminal}.png" "screenshots/screenshot-${terminal}/screenshot-${terminal}.png"; then
+
+              # Run dify and capture exit code (which indicates amount of difference)
+              set +e  # Disable exit on error temporarily
+              ./dify "reference-screenshots/screenshot-${terminal}.png" "screenshots/screenshot-${terminal}/screenshot-${terminal}.png"
+              diff_amount=$?
+              set -e  # Re-enable exit on error
+              echo "Difference amount for ${terminal}: ${diff_amount}"
+
+              # Check if diff.png was created and move it
+              if [ -f "diff.png" ]; then
                 mv diff.png "diffs/diff-${terminal}.png"
                 echo "Created diff for ${terminal}"
               else
-                echo "Failed to create diff for ${terminal}"
+                echo "No diff.png file created for ${terminal}"
               fi
             else
               echo "Missing screenshot files for ${terminal}, skipping diff"
+              if [ ! -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ]; then
+                echo "  Missing current screenshot"
+              fi
+              if [ ! -f "reference-screenshots/screenshot-${terminal}.png" ]; then
+                echo "  Missing reference screenshot"
+              fi
             fi
           done
 
@@ -270,19 +285,33 @@ jobs:
 
             # Check if diff image exists and upload it
             if [ -f "diffs/diff-${terminal}.png" ]; then
-              # Upload diff image to GitHub and get the URL
-              diff_url=$(curl -X POST \
-                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                -H "Content-Type: application/octet-stream" \
-                --data-binary "@diffs/diff-${terminal}.png" \
-                "https://uploads.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/assets?name=diff-${terminal}.png" \
-                | jq -r '.url')
+              echo "Uploading diff for ${terminal}..."
 
-              if [ "$diff_url" != "null" ] && [ -n "$diff_url" ]; then
+              # Upload diff image to GitHub and capture full response
+              upload_response=$(curl -s -X POST \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -F "file=@diffs/diff-${terminal}.png" \
+                "https://uploads.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/assets")
+
+              echo "Upload response for ${terminal}: $upload_response"
+
+              # Try different fields to get the URL
+              diff_url=$(echo "$upload_response" | jq -r '.browser_download_url // .url // .download_url // empty')
+
+              if [ -n "$diff_url" ] && [ "$diff_url" != "null" ]; then
                 echo "**Image diff vs master:**" >> comment_body.txt
                 echo "![${terminal} diff]($diff_url)" >> comment_body.txt
                 echo "" >> comment_body.txt
+                echo "Added diff URL for ${terminal}: $diff_url"
+              else
+                echo "**Image diff vs master:** Upload failed" >> comment_body.txt
+                echo "" >> comment_body.txt
+                echo "Failed to get diff URL for ${terminal}"
               fi
+            else
+              echo "**No diff available** (no changes detected)" >> comment_body.txt
+              echo "" >> comment_body.txt
+              echo "No diff file found for ${terminal}"
             fi
           done
 
