@@ -200,35 +200,96 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Create combined comment
-        id: create-comment
-        run: |
-          echo "Creating comment with screenshots..."
+      - name: Download all screenshot artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: screenshot-*
+          path: screenshots
 
-          echo "message<<EOF" >> $GITHUB_OUTPUT
-          echo "Merge of ${{ github.sha }} to \`master\`" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "Screenshots from all terminal emulators:" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
+      - name: Download dify binary
+        run: |
+          curl -L https://github.com/jihchi/dify/releases/download/v0.7.4/dify-x86_64-unknown-linux-gnu-v0.7.4.tar.gz -o dify.tar.gz
+          tar -xzf dify.tar.gz
+          chmod +x dify
+
+      - name: Download reference screenshots from master
+        run: |
+          mkdir -p reference-screenshots
+
+          # Base URL for master branch screenshots
+          BASE_URL="https://raw.githubusercontent.com/benjajaja/ratatui-image-screenshots/gh-pages/images"
 
           terminals='${{ needs.setup-terminals.outputs.terminals }}'
-          # Convert JSON array to space-separated list
+          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
+
+          for terminal in $terminal_list; do
+            echo "Downloading reference screenshot for ${terminal}..."
+            curl -f -L "${BASE_URL}/screenshot-${terminal}.png" -o "reference-screenshots/screenshot-${terminal}.png" || echo "No reference screenshot found for ${terminal}"
+          done
+
+      - name: Create image diffs
+        run: |
+          mkdir -p diffs
+
+          terminals='${{ needs.setup-terminals.outputs.terminals }}'
+          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
+
+          for terminal in $terminal_list; do
+            if [ -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ] && [ -f "reference-screenshots/screenshot-${terminal}.png" ]; then
+              echo "Creating diff for ${terminal}..."
+              if ./dify "reference-screenshots/screenshot-${terminal}.png" "screenshots/screenshot-${terminal}/screenshot-${terminal}.png"; then
+                mv diff.png "diffs/diff-${terminal}.png"
+                echo "Created diff for ${terminal}"
+              else
+                echo "Failed to create diff for ${terminal}"
+              fi
+            else
+              echo "Missing screenshot files for ${terminal}, skipping diff"
+            fi
+          done
+
+      - name: Upload diff images as comment attachments
+        id: upload-diffs
+        run: |
+          terminals='${{ needs.setup-terminals.outputs.terminals }}'
           terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
 
           # Base URL for raw GitHub content
           BASE_URL="https://raw.githubusercontent.com/benjajaja/ratatui-image-screenshots/pr-${{ github.event.pull_request.number }}"
 
+          # Initialize comment body
+          echo "Merge of ${{ github.sha }} to \`master\`" > comment_body.txt
+          echo "" >> comment_body.txt
+          echo "Screenshots from all terminal emulators:" >> comment_body.txt
+          echo "" >> comment_body.txt
+
           for terminal in $terminal_list; do
-            echo "### ${terminal}" >> $GITHUB_OUTPUT
-            echo "![${terminal} screenshot](${BASE_URL}/screenshot-${terminal}.png)" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
+            echo "### ${terminal}" >> comment_body.txt
+            echo "![${terminal} screenshot](${BASE_URL}/screenshot-${terminal}.png)" >> comment_body.txt
+            echo "" >> comment_body.txt
+
+            # Check if diff image exists and upload it
+            if [ -f "diffs/diff-${terminal}.png" ]; then
+              # Upload diff image to GitHub and get the URL
+              diff_url=$(curl -X POST \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary "@diffs/diff-${terminal}.png" \
+                "https://uploads.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/assets?name=diff-${terminal}.png" \
+                | jq -r '.url')
+
+              if [ "$diff_url" != "null" ] && [ -n "$diff_url" ]; then
+                echo "**Image diff vs master:**" >> comment_body.txt
+                echo "![${terminal} diff]($diff_url)" >> comment_body.txt
+                echo "" >> comment_body.txt
+              fi
+            fi
           done
-          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Comment PR with all screenshots
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          message: ${{ steps.create-comment.outputs.message }}
+          path: comment_body.txt
 
   deploy-screenshots:
     name: Deploy screenshots to external repo
