@@ -36,7 +36,9 @@ async fn main() -> Result<()> {
         running: true,
     }
     .run(ratatui::init())
-    .await
+    .await?;
+    ratatui::restore();
+    Ok(())
 }
 
 impl App {
