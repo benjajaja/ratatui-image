@@ -14,9 +14,9 @@
 //! **Query the terminal for the font-size in pixels.**
 //!
 //! If there is an actual graphics protocol available, it is necessary to know the font-size to
-//! be able to map the image pixels to character cell area. The image can be resized, fit, or
-//! cropped to an area. Query the terminal for the window and columns/rows sizes, and derive the
-//! font-size.
+//! be able to map the image pixels to character cell area.
+//! Query the terminal with some control sequences for either the font-size directly, or the
+//! window-size in pixels and derive the font-size together with row/column count.
 //!
 //! **Render the image by the means of the guessed protocol.**
 //!
@@ -24,8 +24,8 @@
 //! TUI from overwriting the image area, even with blank characters.
 //! Other protocols, like Kitty, are essentially stateful, but at least provide a way to re-render
 //! an image that has been loaded, at a different or same position.
-//! Since we have the font-size in pixels, we can precisely map the characters/cells/rows-columns that
-//! will be covered by the image and skip drawing over the image.
+//! Since we have the font-size in pixels, we can precisely map the characters/cells/rows-columns
+//! that will be covered by the image and skip drawing over the image.
 //!
 //! # Quick start
 //! ```rust
@@ -73,22 +73,27 @@
 //! a desired columns+rows bound, and so on.
 //!
 //! # Widget choice
-//! * The [Image] widget does not adapt to rendering area (except not drawing at all if space
-//!   is insufficient), may be a bit more bug prone (overdrawing or artifacts), and is not friendly
-//!   with some of the protocols (e.g. the Kitty graphics protocol, which is stateful). Its big
-//!   upside is that it is _stateless_ (in terms of ratatui, i.e. immediate-mode), and thus can never
-//!   block the rendering thread/task. A lot of ratatui apps only use stateless widgets.
-//! * The [StatefulImage] widget adapts to its render area, is more robust against overdraw bugs and
-//!   artifacts, and plays nicer with some of the graphics protocols.
-//!   The resizing and encoding is blocking by default, but it is possible to offload this to another
-//!   thread or async task (see `examples/async.rs`). It must be rendered with
-//!   [`render_stateful_widget`] (i.e. with some mutable state).
+//! * The [Image] widget has a fixed size in rows/columns. If the image pixel size exceeds the
+//!   pixel area of the rows/columns, the image is scaled down proportionally to "fit" once.
+//!   If the actual rendering area is smaller than the initial rows/columns, it is simply not
+//!   rendered at all.
+//!   The big upside is that this widget is _stateless_ (in terms of ratatui, i.e. immediate-mode),
+//!   and thus can never block the rendering thread/task. A lot of ratatui apps only use stateless
+//!   widgets, so this factor is also important when chosing.
+//! * The [StatefulImage] widget adapts to its render area at render-time. It can be set to fit,
+//!   crop, or scale to the available render area.
+//!   This means the widget must be stateful, i.e. use `render_stateful_widget` which takes a
+//!   mutable state parameter.
+//!   The resizing and encoding is blocking, and since it happens at render-time it is a good idea
+//!   to offload that to another thread or async task, if the UI must be responsive (see
+//!   `examples/thread.rs` and `examples/tokio.rs`).
 //!
 //! # Examples
 //!
 //! * `examples/demo.rs` is a fully fledged demo.
-//! * `examples/async.rs` shows how to offload resize and encoding to another thread, to avoid
+//! * `examples/thread.rs` shows how to offload resize and encoding to another thread, to avoid
 //!   blocking the UI thread.
+//! * `examples/tokio.rs` same as `thread.rs` but with tokio.
 //!
 //! The lib also includes a binary that renders an image file, but it is focused on testing.
 //!
@@ -132,7 +137,7 @@ pub type FontSize = (u16, u16);
 
 /// Fixed size image widget that uses [Protocol].
 ///
-/// The widget does **not** react to area resizes, and is not even guaranteed to **not** overdraw.
+/// The widget does **not** react to area resizes.
 /// Its advantage lies in that the [Protocol] needs only one initial resize.
 ///
 /// ```rust
