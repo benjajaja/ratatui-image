@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{Result, picker::cap_parser::Parser};
-use base64::{Engine, engine::general_purpose};
 use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
 
@@ -172,7 +171,7 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
     let chunks = bytes.chunks(4096 / 4 * 3);
     let chunk_count = chunks.len();
     for (i, chunk) in chunks.enumerate() {
-        let payload = general_purpose::STANDARD.encode(chunk);
+        let payload = base64_simd::STANDARD.encode_to_string(chunk);
         // tmux seems to only allow a limited amount of data in each passthrough sequence, since
         // we're already chunking the data for the kitty protocol that's a good enough chunk size to
         // use for the passthrough chunks too.

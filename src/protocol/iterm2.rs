@@ -1,5 +1,4 @@
 //! ITerm2 protocol implementation.
-use base64::{Engine, engine::general_purpose};
 use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::{cmp::min, format, io::Cursor};
@@ -30,7 +29,7 @@ fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String
     let mut png: Vec<u8> = vec![];
     img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)?;
 
-    let data = general_purpose::STANDARD.encode(&png);
+    let data = base64_simd::STANDARD.encode_to_string(&png);
 
     let (start, escape, end) = Parser::escape_tmux(is_tmux);
 
