@@ -288,7 +288,7 @@ jobs:
             fi
           done
 
-      - name: Comment on PR with all screenshots
+      - name: Comment on PR with all screenshots and diffs
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           path: comment_body.txt
