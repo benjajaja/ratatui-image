@@ -156,7 +156,7 @@ jobs:
           path: result/screenshot-${{ matrix.terminal }}.png
 
   deploy-screenshots-branch:
-    name: Deploy screenshots branch and comment
+    name: Deploy screenshots branch
     runs-on: ubuntu-latest
     needs: [nix-flake-screenshots, setup-terminals]
     if: github.event_name == 'pull_request_target' && contains(github.event.label.name, 'safe-to-deploy')
@@ -249,7 +249,7 @@ jobs:
             fi
           done
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to external repo
         uses: peaceiris/actions-gh-pages@v3
         with:
           personal_token: ${{ secrets.PAT }}
@@ -258,6 +258,14 @@ jobs:
           publish_branch: pr-${{ github.event.pull_request.number }}
           force_orphan: true
 
+  comment-screenshots-branch:
+    name: Comment on PR
+    runs-on: ubuntu-latest
+    needs: [deploy-screenshots-branch]
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
       - name: Create combined comment
         run: |
           terminals='${{ needs.setup-terminals.outputs.terminals }}'
@@ -289,7 +297,7 @@ jobs:
             fi
           done
 
-      - name: Comment PR with all screenshots
+      - name: Comment on PR with all screenshots
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           path: comment_body.txt
