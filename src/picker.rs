@@ -426,21 +426,14 @@ fn query_stdio_capabilities(
     let mut responses = vec![];
     'out: loop {
         let mut charbuf: [u8; 50] = [0; 50];
-        let result = io::stdin().read(&mut charbuf);
-        match result {
-            Ok(read) => {
-                for ch in charbuf.iter().take(read) {
-                    let mut more_caps = parser.push(char::from(*ch));
-                    match more_caps[..] {
-                        [Response::Status] => {
-                            break 'out;
-                        }
-                        _ => responses.append(&mut more_caps),
-                    }
+        let read = io::stdin().read(&mut charbuf)?;
+        for ch in charbuf.iter().take(read) {
+            let mut more_caps = parser.push(char::from(*ch));
+            match more_caps[..] {
+                [Response::Status] => {
+                    break 'out;
                 }
-            }
-            Err(err) => {
-                return Err(err.into());
+                _ => responses.append(&mut more_caps),
             }
         }
     }

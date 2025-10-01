@@ -133,23 +133,30 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&st
         symbol.push_str(&id_color);
         add_placeholder(&mut symbol, 0, y, id_extra);
 
-        for x in 1..(area.width.min(rect.width)) {
-            // Add entire row with positions
-            // Use inherited diacritic values
-            symbol.push('\u{10EEEE}');
+        let full_width = area.width.min(rect.width);
+        let width_usize = usize::from(full_width);
+        symbol.reserve(width_usize + 3);
+
+        // Add entire row with positions
+        // Use inherited diacritic values
+        symbol.extend(std::iter::repeat_n('\u{10EEEE}', width_usize - 1));
+
+        for x in 1..full_width {
             // Skip or something may overwrite it
-            buf.cell_mut((area.left() + x, area.top() + y))
-                .map(|cell| cell.set_skip(true));
+            if let Some(cell) = buf.cell_mut((area.left() + x, area.top() + y)) {
+                cell.set_skip(true);
+            }
         }
 
         // Restore saved cursor position including color, and now we have to move back to
         // the end of the area.
         let right = area.width - 1;
         let down = area.height - 1;
-        symbol.push_str(&format!("\x1b[u\x1b[{right}C\x1b[{down}B"));
+        write!(symbol, "\x1b[u\x1b[{right}C\x1b[{down}B").unwrap();
 
-        buf.cell_mut((area.left(), area.top() + y))
-            .map(|cell| cell.set_symbol(&symbol));
+        if let Some(cell) = buf.cell_mut((area.left(), area.top() + y)) {
+            cell.set_symbol(&symbol);
+        }
     }
 }
 
@@ -168,8 +175,16 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
     let mut data = String::from(start);
 
     // Max chunk size is 4096 bytes of base64 encoded data
-    let chunks = bytes.chunks(4096 / 4 * 3);
+    let chars_per_chunk = 4096;
+    let chunk_size = (chars_per_chunk / 4) * 3;
+    let chunks = bytes.chunks(chunk_size);
     let chunk_count = chunks.len();
+
+    // rough estimation for the worst-case size of what'll be written into `data` in the following
+    // loop
+    let reserve_size = (chunk_count * (11 + escape.len() + chars_per_chunk)) + 51;
+    data.reserve_exact(reserve_size);
+
     for (i, chunk) in chunks.enumerate() {
         let payload = base64_simd::STANDARD.encode_to_string(chunk);
         // tmux seems to only allow a limited amount of data in each passthrough sequence, since
@@ -180,24 +195,19 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
         match i {
             0 => {
                 // Transmit and virtual-place but keep sending chunks
-                let more = if chunk_count > 1 { 1 } else { 0 };
-                write!(
-                    data,
-                    "_Gq=2,i={id},a=T,U=1,f=32,t=d,s={w},v={h},m={more};{payload}"
-                )
-                .unwrap();
+                let more = u8::from(chunk_count > 1);
+                write!(data, "_Gq=2,i={id},a=T,U=1,f=32,t=d,s={w},v={h},m={more}").unwrap();
             }
             n if n + 1 == chunk_count => {
                 // m=0 means over
-                write!(data, "_Gq=2,m=0;{payload}").unwrap();
+                write!(data, "_Gq=2,m=0").unwrap();
             }
             _ => {
                 // Keep adding chunks
-                write!(data, "_Gq=2,m=1;{payload}").unwrap();
+                write!(data, "_Gq=2,m=1").unwrap();
             }
         }
-        data.push_str(escape);
-        write!(data, "\\").unwrap();
+        write!(data, ";{payload}{escape}\\").unwrap();
     }
     data.push_str(end);
 
@@ -208,7 +218,7 @@ fn add_placeholder(str: &mut String, x: u16, y: u16, id_extra: u8) {
     str.push('\u{10EEEE}');
     str.push(diacritic(y));
     str.push(diacritic(x));
-    str.push(diacritic(id_extra as u16));
+    str.push(diacritic(u16::from(id_extra)));
 }
 
 /// From https://sw.kovidgoyal.net/kitty/_downloads/1792bad15b12979994cd6ecc54c967a6/rowcolumn-diacritics.txt
@@ -512,11 +522,10 @@ static DIACRITICS: [char; 297] = [
     '\u{1D243}',
     '\u{1D244}',
 ];
+
 #[inline]
 fn diacritic(y: u16) -> char {
-    if y >= DIACRITICS.len() as u16 {
-        DIACRITICS[0]
-    } else {
-        DIACRITICS[y as usize]
-    }
+    *DIACRITICS
+        .get(usize::from(y))
+        .unwrap_or_else(|| &DIACRITICS[0])
 }
