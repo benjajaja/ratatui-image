@@ -142,8 +142,8 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&st
         write!(
             symbol,
             "\x1b[s{id_color}\u{10EEEE}{}{}{}",
-            diacritic(0),
             diacritic(y),
+            diacritic(0),
             diacritic(u16::from(id_extra))
         )
         .unwrap();
