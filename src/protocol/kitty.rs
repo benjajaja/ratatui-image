@@ -127,7 +127,7 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&st
         let mut symbol = seq.take().unwrap_or_default().to_owned();
 
         // the save-cursor-position string len that we write at the beginning
-        let save_cursor_and_placeholder_len: usize = 3 + id_color.len() + 3 + 2 + 3 + 3;
+        let save_cursor_and_placeholder_len: usize = 3 + id_color.len() + (4 * 4);
         // the worst-case width of the `write!` string at the bottom of this fn
         const RESTORE_CURSOR_POS_LEN: usize = 19;
 
@@ -135,7 +135,7 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&st
         let width_usize = usize::from(full_width);
 
         symbol
-            .reserve(save_cursor_and_placeholder_len + (width_usize * 3) + RESTORE_CURSOR_POS_LEN);
+            .reserve(save_cursor_and_placeholder_len + (width_usize * 4) + RESTORE_CURSOR_POS_LEN);
 
         // Save cursor postion, including fg color which is what we want, and start the unicode
         // placeholder sequence
