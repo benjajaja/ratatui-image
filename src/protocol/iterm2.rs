@@ -3,7 +3,7 @@ use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::{cmp::min, fmt::Write, io::Cursor};
 
-use crate::{Result, errors, picker::cap_parser::Parser};
+use crate::{Result, picker::cap_parser::Parser};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
 
@@ -85,7 +85,7 @@ fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) 
 
     for x in (render_area.left() + 1)..render_area.right() {
         if let Some(cell) = buf.cell_mut((x, render_area.top())) {
-            cell.skip = true;
+            cell.set_skip(true);
         }
     }
 

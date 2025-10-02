@@ -126,16 +126,27 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&st
         // first line for obvious reasons.
         let mut symbol = seq.take().unwrap_or_default().to_owned();
 
-        // Save cursor postion, including fg color which is what we want.
-        symbol.push_str("\x1b[s");
-
-        // Start unicode placeholder sequence
-        symbol.push_str(&id_color);
-        add_placeholder(&mut symbol, 0, y, id_extra);
+        // the save-cursor-position string len that we write at the beginning
+        let save_cursor_and_placeholder_len: usize = 3 + id_color.len() + 3 + 2 + 3 + 3;
+        // the worst-case width of the `write!` string at the bottom of this fn
+        const RESTORE_CURSOR_POS_LEN: usize = 19;
 
         let full_width = area.width.min(rect.width);
         let width_usize = usize::from(full_width);
-        symbol.reserve(width_usize + 3);
+
+        symbol
+            .reserve(save_cursor_and_placeholder_len + (width_usize * 3) + RESTORE_CURSOR_POS_LEN);
+
+        // Save cursor postion, including fg color which is what we want, and start the unicode
+        // placeholder sequence
+        write!(
+            symbol,
+            "\x1b[s{id_color}\u{10EEEE}{}{}{}",
+            diacritic(0),
+            diacritic(y),
+            diacritic(u16::from(id_extra))
+        )
+        .unwrap();
 
         // Add entire row with positions
         // Use inherited diacritic values
@@ -175,14 +186,18 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
     let mut data = String::from(start);
 
     // Max chunk size is 4096 bytes of base64 encoded data
-    let chars_per_chunk = 4096;
-    let chunk_size = (chars_per_chunk / 4) * 3;
-    let chunks = bytes.chunks(chunk_size);
+    const CHARS_PER_CHUNK: usize = 4096;
+    const CHUNK_SIZE: usize = (CHARS_PER_CHUNK / 4) * 3;
+    let chunks = bytes.chunks(CHUNK_SIZE);
     let chunk_count = chunks.len();
 
     // rough estimation for the worst-case size of what'll be written into `data` in the following
     // loop
-    let reserve_size = (chunk_count * (11 + escape.len() + chars_per_chunk)) + 51;
+    const WORST_CASE_ADDITIONAL_CHUNK_0_LEN: usize = 46;
+    let bytes_written_per_chunk = 11 + CHARS_PER_CHUNK + (escape.len() * 2);
+    let reserve_size =
+        (chunk_count * bytes_written_per_chunk) + WORST_CASE_ADDITIONAL_CHUNK_0_LEN + end.len();
+
     data.reserve_exact(reserve_size);
 
     for (i, chunk) in chunks.enumerate() {
@@ -190,35 +205,20 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
         // tmux seems to only allow a limited amount of data in each passthrough sequence, since
         // we're already chunking the data for the kitty protocol that's a good enough chunk size to
         // use for the passthrough chunks too.
-        data.push_str(escape);
+        write!(data, "{escape}_Gq=2,").unwrap();
 
-        match i {
-            0 => {
-                // Transmit and virtual-place but keep sending chunks
-                let more = u8::from(chunk_count > 1);
-                write!(data, "_Gq=2,i={id},a=T,U=1,f=32,t=d,s={w},v={h},m={more}").unwrap();
-            }
-            n if n + 1 == chunk_count => {
-                // m=0 means over
-                write!(data, "_Gq=2,m=0").unwrap();
-            }
-            _ => {
-                // Keep adding chunks
-                write!(data, "_Gq=2,m=1").unwrap();
-            }
+        if i == 0 {
+            write!(data, "i={id},a=T,U=1,f=32,t=d,s={w},v={h},").unwrap();
         }
-        write!(data, ";{payload}{escape}\\").unwrap();
+
+        let more = u8::from(chunk_count > (i + 1));
+
+        // m=0 means over
+        write!(data, "m={more};{payload}{escape}\\").unwrap();
     }
     data.push_str(end);
 
     data
-}
-
-fn add_placeholder(str: &mut String, x: u16, y: u16, id_extra: u8) {
-    str.push('\u{10EEEE}');
-    str.push(diacritic(y));
-    str.push(diacritic(x));
-    str.push(diacritic(u16::from(id_extra)));
 }
 
 /// From https://sw.kovidgoyal.net/kitty/_downloads/1792bad15b12979994cd6ecc54c967a6/rowcolumn-diacritics.txt
