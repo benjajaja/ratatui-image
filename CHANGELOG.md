@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+# [8.0.2] - 2025-09-03
+
+* Performance improvements in kitty and iterm2 protocols
+* Use base64-simd
+* Picker::from_query_stdio returns a halfblocks picker when: no capabilities, stdio query 
+  timeout, or no font-size received.
+* Add screenshot test suite to CI
+* Add tokio support to ThreadProtocol
+* Updated to rust 2024
+* Add support for terminals: BobCat, warp
+
 # [8.0.1] - 2025-05-30
 
 Fix halfblocks not having the same size as other protocols.
