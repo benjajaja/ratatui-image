@@ -2,7 +2,7 @@ use std::{
     fs,
     sync::mpsc::{self},
     thread,
-    time::{self, Duration},
+    time::Duration,
 };
 
 use ratatui::{
@@ -10,8 +10,7 @@ use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     layout::{Position, Rect},
     style::{Color, Stylize},
-    text::Line,
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph},
 };
 use ratatui_image::{
     Resize, StatefulImage,
@@ -22,7 +21,9 @@ use ratatui_image::{
 
 struct App {
     async_state: ThreadProtocol,
+    last_known_size: Rect,
     logo_pos: Position,
+    logo_size: f64,
     source_code_lines: Vec<String>,
 }
 
@@ -75,7 +76,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut app = App {
         async_state: ThreadProtocol::new(tx_worker, Some(picker.new_resize_protocol(dyn_img))),
+        last_known_size: Rect::default(),
         logo_pos: Position { x: 1, y: 1 },
+        logo_size: 0.1,
         source_code_lines: Vec::new(),
     };
 
@@ -102,6 +105,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         app.source_code_lines =
                             source_code.split("\n").map(|s| s.to_string()).collect();
                     }
+                    if rand::random::<f64>() > 0.9 {
+                        if app.logo_size < 1.0 {
+                            app.logo_size += 0.1;
+                        } else {
+                            app.logo_size = 0.1;
+                        }
+                    }
                 }
             }
         }
@@ -121,30 +131,41 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     let inner_area = block.inner(area);
     f.render_widget(block, area);
 
-    let mut i = 0;
-    for y in inner_area.y..inner_area.height {
+    for (i, y) in (inner_area.y..inner_area.height).enumerate() {
         if i >= app.source_code_lines.len() {
             break;
         }
         let p = Paragraph::new(app.source_code_lines[i].clone());
         f.render_widget(p, Rect::new(inner_area.x, y, inner_area.width, 1));
-        i += 1;
     }
+
+    let size_for = app.async_state.size_for(Resize::Fit(None), inner_area);
+
+    let mut size = size_for.unwrap_or(app.last_known_size);
+    app.last_known_size = size;
+
+    size.width = (f64::from(size.width) * app.logo_size).ceil() as u16;
+    size.height = (f64::from(size.height) * app.logo_size).ceil() as u16;
+
+    let mut image_block_area = size;
+    image_block_area.width += 2;
+    image_block_area.height += 2;
+
+    image_block_area.x = app.logo_pos.x;
+    image_block_area.y = app.logo_pos.y;
 
     let image_block = Block::default()
         .borders(Borders::ALL)
         .title("Nix")
-        .bg(Color::Reset);
-    let size = app
-        .async_state
-        .size_for(Resize::default(), inner_area)
-        .unwrap_or_default();
-    let mut area = size;
-    area.x = app.logo_pos.x;
-    area.y = app.logo_pos.y;
+        .bg(Color::White);
+    let block_inner_area = image_block.inner(image_block_area);
+    if image_block_area.width <= inner_area.width && image_block_area.height <= inner_area.height {
+        f.render_widget(image_block, image_block_area);
 
-    let inner_area = image_block.inner(area);
-    f.render_widget(image_block, area);
-
-    f.render_stateful_widget(StatefulImage::new(), inner_area, &mut app.async_state);
+        f.render_widget(Clear, block_inner_area);
+        f.render_widget(Block::new().bg(Color::White), block_inner_area);
+        if size_for.is_some() {
+            f.render_stateful_widget(StatefulImage::new(), block_inner_area, &mut app.async_state);
+        }
+    }
 }
