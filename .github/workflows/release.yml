@@ -12,7 +12,7 @@ jobs:
 
   post-build:
     name: Release
-    needs: build
+    needs: nix-build
     runs-on: ubuntu-latest
 
     steps:
