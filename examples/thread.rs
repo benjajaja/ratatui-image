@@ -1,4 +1,5 @@
 use std::{
+    fs,
     sync::mpsc::{self},
     thread,
     time::Duration,
@@ -7,10 +8,12 @@ use std::{
 use ratatui::{
     Frame,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-    widgets::{Block, Borders, Paragraph},
+    layout::{Position, Rect},
+    style::{Color, Stylize},
+    widgets::{Block, Borders, Clear, Paragraph},
 };
 use ratatui_image::{
-    StatefulImage,
+    Resize, StatefulImage,
     errors::Errors,
     picker::Picker,
     thread::{ResizeRequest, ResizeResponse, ThreadProtocol},
@@ -18,18 +21,23 @@ use ratatui_image::{
 
 struct App {
     async_state: ThreadProtocol,
+    last_known_size: Rect,
+    logo_pos: Position,
+    logo_size: f64,
+    source_code_lines: Vec<String>,
 }
 
 enum AppEvent {
     KeyEvent(KeyEvent),
     Redraw(Result<ResizeResponse, Errors>),
+    Tick,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = ratatui::init();
 
     let picker = Picker::from_query_stdio()?;
-    let dyn_img = image::ImageReader::open("./assets/Ada.png")?.decode()?;
+    let dyn_img = image::ImageReader::open("./assets/NixOS.png")?.decode()?;
 
     // Send a [ResizeProtocol] to resize and encode it in a separate thread.
     let (tx_worker, rec_worker) = mpsc::channel::<ResizeRequest>();
@@ -56,17 +64,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tx_main_events = tx_main.clone();
     thread::spawn(move || -> Result<(), std::io::Error> {
         loop {
-            if ratatui::crossterm::event::poll(Duration::from_millis(1000))? {
+            if ratatui::crossterm::event::poll(Duration::from_millis(100))? {
                 if let Event::Key(key) = event::read()? {
                     tx_main_events.send(AppEvent::KeyEvent(key)).unwrap();
                 }
+            } else {
+                tx_main_events.send(AppEvent::Tick).unwrap();
             }
         }
     });
 
     let mut app = App {
         async_state: ThreadProtocol::new(tx_worker, Some(picker.new_resize_protocol(dyn_img))),
+        last_known_size: Rect::default(),
+        logo_pos: Position { x: 1, y: 1 },
+        logo_size: 0.1,
+        source_code_lines: Vec::new(),
     };
+
+    let source_code = fs::read_to_string("./examples/thread.rs")?;
+    app.source_code_lines = source_code.split("\n").map(|s| s.to_string()).collect();
 
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
@@ -81,6 +98,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 AppEvent::Redraw(completed) => {
                     let _ = app.async_state.update_resized_protocol(completed?);
                 }
+                AppEvent::Tick => {
+                    if app.source_code_lines.len() > 1 {
+                        app.source_code_lines.remove(0);
+                    } else {
+                        app.source_code_lines =
+                            source_code.split("\n").map(|s| s.to_string()).collect();
+                    }
+                    if rand::random::<f64>() > 0.9 {
+                        if app.logo_size < 1.0 {
+                            app.logo_size += 0.1;
+                        } else {
+                            app.logo_size = 0.1;
+                        }
+                    }
+                }
             }
         }
     }
@@ -92,16 +124,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn ui(f: &mut Frame<'_>, app: &mut App) {
     let area = f.area();
-    let block = Block::default().borders(Borders::ALL).title("Thread test");
-
-    f.render_widget(
-        Paragraph::new("PartiallyHiddenScreenshotParagraphBackground\n".repeat(10)),
-        block.inner(area),
-    );
-    f.render_stateful_widget(
-        StatefulImage::new(),
-        block.inner(area),
-        &mut app.async_state,
-    );
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Thread test")
+        .bg(Color::Blue);
+    let inner_area = block.inner(area);
     f.render_widget(block, area);
+
+    for (i, y) in (inner_area.y..inner_area.height).enumerate() {
+        if i >= app.source_code_lines.len() {
+            break;
+        }
+        let p = Paragraph::new(app.source_code_lines[i].clone());
+        f.render_widget(p, Rect::new(inner_area.x, y, inner_area.width, 1));
+    }
+
+    let size_for = app.async_state.size_for(Resize::Fit(None), inner_area);
+
+    let mut size = size_for.unwrap_or(app.last_known_size);
+    app.last_known_size = size;
+
+    size.width = (f64::from(size.width) * app.logo_size).ceil() as u16;
+    size.height = (f64::from(size.height) * app.logo_size).ceil() as u16;
+
+    let mut image_block_area = size;
+    image_block_area.width += 2;
+    image_block_area.height += 2;
+
+    image_block_area.x = app.logo_pos.x;
+    image_block_area.y = app.logo_pos.y;
+
+    let image_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Nix")
+        .bg(Color::White);
+    let block_inner_area = image_block.inner(image_block_area);
+    if image_block_area.width <= inner_area.width && image_block_area.height <= inner_area.height {
+        f.render_widget(image_block, image_block_area);
+
+        f.render_widget(Clear, block_inner_area);
+        f.render_widget(Block::new().bg(Color::White), block_inner_area);
+        if size_for.is_some() {
+            f.render_stateful_widget(StatefulImage::new(), block_inner_area, &mut app.async_state);
+        }
+    }
 }
