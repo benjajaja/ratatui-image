@@ -115,7 +115,7 @@ let
 
     screenshot-test-xterm-vt340 = makeScreenshotTest {
       terminal = "xterm-vt340";
-      terminalCommand = "xterm -ti vt340 -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+      terminalCommand = "xterm -ti vt340 -fa \"DejaVu Sans Mono\" -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackages = [ pkgs.xterm ];
       xwayland = true;
     };
