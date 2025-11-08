@@ -55,7 +55,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
     let mut last_tick = Instant::now();
     loop {
-        terminal.draw(|f| ui(f, &mut app))?;
+        terminal
+            .draw(|f| ui(f, &mut app))
+            .map_err(|berr| io::Error::other(format!("{berr}")))?;
 
         let timeout = app
             .tick_rate

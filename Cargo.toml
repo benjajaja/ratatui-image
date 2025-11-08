@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-image"
-version = "8.1.1"
+version = "9.0.0-beta.2"
 edition = "2024"
 autoexamples = true
 authors = ["Benjamin Große <ste3ls@gmail.com>"]
@@ -36,7 +36,7 @@ libloading = { version = "0.8", optional = true }
 serde = { version = "^1.0", optional = true, features = ["derive"] }
 base64-simd = { version = "0.8" }
 rand = { version = "^0.8.5" }
-ratatui = { version = "^0.29.0", default-features = false, features = [] }
+ratatui = { version = "^0.30.0-beta.0", default-features = false, features = [] }
 thiserror = { version = "1.0.59" }
 tokio = { version = "1.45.1", default-features = false, optional = true, features = ["sync"]}
 
