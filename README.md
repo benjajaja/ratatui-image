@@ -151,6 +151,7 @@ Alacritty | `Sixel`  | ❌ | -  | [There is a sixel fork](https://github.com/mic
 Konsole   | `Sixel`  | ❌ | -  | [Not really fixed in 24.12](https://bugs.kde.org/show_bug.cgi?id=456354)
 Contour   | `Sixel`  | ❌ | ❌ | Does not clear graphics.
 ctx       | `Sixel`  | ❌ | ❌ | Buggy.
+Warp      | `iTerm2` | ❌ | -  | iTerm2 does not clear, Kitty unicode-placeholders part not implemented.
 
 "QA" means that there is a flake VM test that runs the demo and takes a screenshot, posted as PR comment. A `-` means it's not possible or applicable to add a screenshot-test.
 
