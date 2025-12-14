@@ -3,14 +3,18 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     crane.url = "github:ipetkov/crane";
     flake-utils.url = "github:numtide/flake-utils";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
     self,
     nixpkgs,
     crane,
-    fenix,
     flake-utils,
+    rust-overlay,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (system: let
@@ -51,15 +55,6 @@
         # MY_CUSTOM_VAR = "some value";
       };
 
-      craneLibLLvmTools =
-        craneLib.overrideToolchain
-        (fenix.packages.${system}.complete.withComponents [
-          "cargo"
-          "llvm-tools"
-          "rustc"
-          "clippy"
-        ]);
-
       # Build *just* the cargo dependencies, so we can reuse
       # all of that work (e.g. via cachix) when running in CI
       cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -91,36 +86,27 @@
           ''; # for the binary itself
         });
 
-      toolchain = with fenix.packages.${system};
-        combine [
-          minimal.rustc
-          minimal.cargo
-          targets.x86_64-pc-windows-gnu.latest.rust-std
-        ];
-      craneLibWindows = (crane.mkLib pkgs).overrideToolchain toolchain;
-      ratatui-image-windows = craneLibWindows.buildPackage {
-        inherit src;
+      screenshotTests = import ./screenshot-tests.nix { inherit pkgs src self system; };
 
+      # Cross-compile to Windows
+      pkgsWindows = import nixpkgs {
+        overlays = [ (import rust-overlay) ];
+        localSystem = system;
+        crossSystem = {
+          config = "x86_64-w64-mingw32";
+          libc = "msvcrt";
+        };
+      };
+      craneLibWindows = (crane.mkLib pkgsWindows).overrideToolchain (p:
+        p.rust-bin.stable.latest.default.override {
+          targets = [ "x86_64-pc-windows-gnu" ];
+        }
+      );
+      ratatui-image-windows = craneLibWindows.buildPackage {
+        src = craneLibWindows.cleanCargoSource ./.;
         strictDeps = true;
         doCheck = false;
-
-        CARGO_BUILD_TARGET = "x86_64-pc-windows-gnu";
-
-        # fixes issues related to libring
-        TARGET_CC = "${pkgs.pkgsCross.mingwW64.stdenv.cc}/bin/${pkgs.pkgsCross.mingwW64.stdenv.cc.targetPrefix}cc";
-
-        #fixes issues related to openssl
-        OPENSSL_DIR = "${pkgs.openssl.dev}";
-        OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
-        OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include/";
-
-        depsBuildBuild = with pkgs; [
-          pkgsCross.mingwW64.stdenv.cc
-          pkgsCross.mingwW64.windows.pthreads
-        ];
       };
-
-      screenshotTests = import ./screenshot-tests.nix { inherit pkgs src self system; };
 
     in {
       checks = {
@@ -162,16 +148,10 @@
       packages =
         {
           default = ratatui-image;
-          windows = ratatui-image-windows;
           demo = ratatui-demo;
+          windows = ratatui-image-windows;
         }
-        // screenshotTests
-        // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-          ratatui-image-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (commonArgs
-            // {
-              inherit cargoArtifacts;
-            });
-        };
+        // screenshotTests;
 
       apps.default = flake-utils.lib.mkApp {
         drv = ratatui-image;

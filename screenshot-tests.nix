@@ -1,7 +1,7 @@
 { pkgs, src, self, system }:
 
 let
-  makeScreenshotTest = { terminal, terminalCommand, terminalPackages, setup ? null, xwayland ? false }: pkgs.nixosTest {
+  makeScreenshotTest = { terminal, terminalCommand, terminalPackages, setup ? null, xwayland ? false }: pkgs.testers.nixosTest {
     name = "ratatui-test-wayland-${terminal}";
 
     nodes.machine = { pkgs, ... }: {
@@ -38,8 +38,7 @@ let
         noto-fonts       # Google's "no tofu" - comprehensive Unicode
         noto-fonts-lgc-plus
         noto-fonts-cjk-sans
-        noto-fonts-emoji
-        noto-fonts-extra # Additional Noto variants
+        noto-fonts-color-emoji
         dejavu_fonts     # Good fallback with extended coverage
         freefont_ttf     # GNU FreeFont - wide Unicode range
         fira-code
@@ -169,7 +168,7 @@ let
     screenshot-test-konsole = makeScreenshotTest {
       terminal = "konsole";
       terminalCommand = "konsole -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
-      terminalPackages = [ pkgs.libsForQt5.konsole pkgs.libsForQt5.qtwayland ];
+      terminalPackages = [ pkgs.kdePackages.konsole pkgs.kdePackages.qtwayland ];
     };
   };
 in
