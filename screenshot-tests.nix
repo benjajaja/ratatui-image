@@ -68,7 +68,7 @@ let
           --setenv=WAYLAND_DISPLAY=wayland-1 \
           --setenv=LIBGL_ALWAYS_SOFTWARE=1 \
           --setenv=QT_QPA_PLATFORM="wayland" \
-          --setenv=RUST_BACKTRACE=1 \
+          --setenv=RUST_BACKTRACE=full \
           ${if xwayland then "--setenv=DISPLAY=:0" else ""} \
           --working-directory=/tmp/test-assets \
           -- ${terminalCommand}
