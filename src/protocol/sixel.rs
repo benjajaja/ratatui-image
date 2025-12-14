@@ -5,9 +5,7 @@
 //! [`sixel-bytes`]: https://github.com/benjajaja/sixel-bytes
 //! [supports]: https://arewesixelyet.com
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel
-use icy_sixel::{
-    DiffusionMethod, MethodForLargest, MethodForRep, PixelFormat, Quality, sixel_string,
-};
+use icy_sixel::{EncodeOptions, sixel_encode};
 use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::cmp::min;
@@ -37,20 +35,11 @@ impl Sixel {
 // TODO: change E to sixel_rs::status::Error and map when calling
 fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
     let (w, h) = (img.width(), img.height());
-    let img_rgb8 = img.to_rgb8();
-    let bytes = img_rgb8.as_raw();
+    let img_rgba8 = img.to_rgba8();
+    let bytes = img_rgba8.as_raw();
 
-    let mut data = sixel_string(
-        bytes,
-        w as i32,
-        h as i32,
-        PixelFormat::RGB888,
-        DiffusionMethod::Stucki,
-        MethodForLargest::Auto,
-        MethodForRep::Auto,
-        Quality::HIGH,
-    )
-    .map_err(|err| Errors::Sixel(err.to_string()))?;
+    let mut data = sixel_encode(bytes, w as usize, h as usize, &EncodeOptions::default())
+        .map_err(|err| Errors::Sixel(format!("sixel encoding error: {err}")))?;
 
     if is_tmux {
         let (start, escape, end) = Parser::escape_tmux(is_tmux);

@@ -91,7 +91,7 @@ impl App {
 
         let image_static = picker
             .new_protocol(image_source.clone(), size(), Resize::Fit(None))
-            .unwrap();
+            .expect("demo gets a protocol from image");
         let image_fit_state = picker.new_resize_protocol(image_source.clone());
         let image_crop_state = picker.new_resize_protocol(image_source.clone());
         let image_scale_state = picker.new_resize_protocol(image_source.clone());
