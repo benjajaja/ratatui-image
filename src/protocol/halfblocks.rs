@@ -27,6 +27,7 @@ struct HalfBlock {
 
 const HALF_UPPER: char = '▀';
 const HALF_LOWER: char = '▄';
+const SPACE: char = ' ';
 
 impl HalfBlock {
     fn set_cell(&self, cell: &mut Cell) {
@@ -36,6 +37,10 @@ impl HalfBlock {
     }
 
     fn pick_side(&mut self) {
+        if self.upper == self.lower {
+            self.char = SPACE;
+            return;
+        }
         if HalfBlock::luminance(HalfBlock::rgb(self.lower))
             > HalfBlock::luminance(HalfBlock::rgb(self.upper))
         {
@@ -187,16 +192,16 @@ impl StatefulProtocolTrait for Halfblocks {
 #[cfg(test)]
 mod tests {
     use image::{DynamicImage, Rgb, RgbImage};
-    use ratatui::{
-        buffer::{Buffer, Cell},
-        layout::Rect,
-        style::Color,
+    use insta::assert_snapshot;
+    use ratatui::{Terminal, backend::TestBackend, layout::Rect};
+
+    use crate::{
+        Image,
+        protocol::{Protocol, halfblocks::Halfblocks},
     };
 
-    use crate::protocol::{ProtocolTrait, halfblocks::Halfblocks};
-
     #[test]
-    fn render() {
+    fn render_checker() {
         let mut img = RgbImage::new(2, 2);
         img.put_pixel(0, 0, Rgb([255, 0, 0])); // red
         img.put_pixel(1, 0, Rgb([0, 255, 0])); // green
@@ -206,17 +211,36 @@ mod tests {
         let image = DynamicImage::ImageRgb8(img);
         let area = Rect::new(0, 0, 2, 1);
         let hbs = Halfblocks::new(image, area).unwrap();
-        let mut buf = Buffer::empty(area);
-        hbs.render(area, &mut buf);
 
-        let mut c = Cell::new("▀");
-        c.set_fg(Color::Rgb(255, 0, 0));
-        c.set_bg(Color::Rgb(0, 0, 255));
-        assert_eq!(c, buf.content[0]);
+        let mut terminal = Terminal::new(TestBackend::new(2, 1)).unwrap();
+        terminal
+            .draw(|frame| frame.render_widget(Image::new(&Protocol::Halfblocks(hbs)), frame.area()))
+            .unwrap();
 
-        let mut c = Cell::new("▄");
-        c.set_fg(Color::Rgb(255, 255, 0));
-        c.set_bg(Color::Rgb(0, 255, 0));
-        assert_eq!(c, buf.content[1]);
+        assert_snapshot!(terminal.backend());
+    }
+
+    #[test]
+    fn render_image() {
+        let mut img = RgbImage::new(2, 2);
+        img.put_pixel(0, 0, Rgb([255, 0, 0])); // red
+        img.put_pixel(1, 0, Rgb([0, 255, 0])); // green
+        img.put_pixel(0, 1, Rgb([0, 0, 255])); // blue
+        img.put_pixel(1, 1, Rgb([255, 255, 0])); // yellow
+
+        let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
+        terminal
+            .draw(|frame| {
+                let image = image::ImageReader::open("./assets/NixOS.png")
+                    .unwrap()
+                    .decode()
+                    .unwrap();
+                let area = Rect::new(0, 0, 40, 20);
+                let hbs = Halfblocks::new(image, area).unwrap();
+                frame.render_widget(Image::new(&Protocol::Halfblocks(hbs)), frame.area());
+            })
+            .unwrap();
+
+        assert_snapshot!(terminal.backend());
     }
 }
