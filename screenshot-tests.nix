@@ -32,6 +32,19 @@ let
         packages = [ ];
       };
 
+      # Fonts for proper Unicode rendering (chafa, braille, block elements, etc.)
+      fonts.packages = with pkgs; [
+        unifont          # ~77,000 glyphs, covers entire BMP
+        noto-fonts       # Google's "no tofu" - comprehensive Unicode
+        noto-fonts-cjk-sans
+        noto-fonts-emoji
+        noto-fonts-extra # Additional Noto variants
+        dejavu_fonts     # Good fallback with extended coverage
+        freefont_ttf     # GNU FreeFont - wide Unicode range
+        fira-code
+        fira-mono
+      ];
+
       # Ensure required packages are available
       environment.systemPackages = with pkgs;
         terminalPackages;

@@ -14,7 +14,7 @@ on:
   workflow_call:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 env:
@@ -145,7 +145,7 @@ jobs:
 
       - name: Run screenshot test for ${{ matrix.terminal }}
         run: |
-          nix build .#packages.x86_64-linux.screenshot-test-${{ matrix.terminal }} --print-build-logs
+          nix build .#screenshot-test-${{ matrix.terminal }} --print-build-logs
 
       - name: Upload screenshot artifact
         uses: actions/upload-artifact@v4

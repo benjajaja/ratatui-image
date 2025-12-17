@@ -26,7 +26,7 @@
           # Default files from crane (Rust and cargo files)
           (craneLib.fileset.commonCargoSources unfilteredRoot)
           (lib.fileset.maybeMissing ./assets)
-          (lib.fileset.maybeMissing ./src/snapshots)
+          (lib.fileset.fileFilter (file: file.hasExt "snap") ./src)
         ];
       };
 
@@ -36,13 +36,12 @@
 
         buildInputs = with pkgs;
           [
-            pkg-config
             cargo-watch
             cargo-semver-checks
             cargo-release
             cargo-make
             rust-analyzer
-            # Add additional build inputs here
+            chafa
           ]
           ++ lib.optionals pkgs.stdenv.isDarwin [
             # Additional darwin specific inputs can be set here
@@ -69,13 +68,22 @@
       ratatui-image = craneLib.buildPackage (commonArgs
         // {
           inherit cargoArtifacts;
+          cargoExtraArgs = "--features chafa";
+          nativeBuildInputs = [ pkgs.pkg-config pkgs.llvmPackages.libclang ];
+          buildInputs = [ pkgs.chafa.dev pkgs.glib.dev ];
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+          BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${lib.versions.major pkgs.llvmPackages.libclang.version}/include -isystem ${pkgs.glibc.dev}/include";
         });
 
       ratatui-demo = craneLib.buildPackage (commonArgs
         // {
           inherit cargoArtifacts;
           pname = "demo";
-          cargoExtraArgs = "--example demo --features crossterm";
+          cargoExtraArgs = "--example demo --features crossterm,chafa";
+          nativeBuildInputs = [ pkgs.pkg-config pkgs.llvmPackages.libclang ];
+          buildInputs = [ pkgs.chafa.dev pkgs.glib.dev ];
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+          BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${lib.versions.major pkgs.llvmPackages.libclang.version}/include -isystem ${pkgs.glibc.dev}/include";
         });
 
       toolchain = with fenix.packages.${system};
@@ -174,7 +182,17 @@
         # Extra inputs can be added here; cargo and rustc are provided by default.
         packages = with pkgs; [
           cargo-release
+          cargo-insta
+          chafa
+          pkg-config
+          llvmPackages.libclang
         ];
+
+        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+        BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${lib.versions.major pkgs.llvmPackages.libclang.version}/include -isystem ${pkgs.glibc.dev}/include";
+
+        # For chafa-sys to build via pkg-config
+        PKG_CONFIG_PATH = "${pkgs.chafa.dev}/lib/pkgconfig:${pkgs.glib.dev}/lib/pkgconfig";
       };
     });
 }

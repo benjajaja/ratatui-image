@@ -126,6 +126,8 @@ false`). To only support a selection of image formats and cut down dependencies,
   feature, add `image` to your crate, and enable its features/formats as desired. See
   <https://doc.rust-lang.org/cargo/reference/features.html#feature-unification/>.
 * `tokio` whether to use tokio's `UnboundedSender` in `ThreadProtocol`
+* `chafa` to use the amazing [chafa](https://hpjansson.org/chafa/) library for rendering without
+  image protocols. *Needs the chafa C library installed at runtime!*.
 
 [ratatui]: https://github.com/ratatui-org/ratatui
 [sixel]: https://en.wikipedia.org/wiki/Sixel

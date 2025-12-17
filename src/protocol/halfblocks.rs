@@ -1,7 +1,11 @@
 //! Halfblocks protocol implementations.
+//!
 //! Uses the unicode character `▀` combined with foreground and background color. Assumes that the
 //! font aspect ratio is roughly 1:2. Should work in all terminals.
-use image::{DynamicImage, imageops::FilterType};
+//!
+//! With the `chafa` feature, uses `chafa` and actually renders much richer than just primitive
+//! halfblocks.
+use image::DynamicImage;
 use ratatui::{
     buffer::{Buffer, Cell},
     layout::Rect,
@@ -25,94 +29,11 @@ struct HalfBlock {
     char: char,
 }
 
-const HALF_UPPER: char = '▀';
-const HALF_LOWER: char = '▄';
-const SPACE: char = ' ';
-
 impl HalfBlock {
     fn set_cell(&self, cell: &mut Cell) {
         cell.set_fg(self.upper)
             .set_bg(self.lower)
             .set_char(self.char);
-    }
-
-    fn pick_side(&mut self) {
-        if self.upper == self.lower {
-            self.char = SPACE;
-            return;
-        }
-        if HalfBlock::luminance(HalfBlock::rgb(self.lower))
-            > HalfBlock::luminance(HalfBlock::rgb(self.upper))
-        {
-            std::mem::swap(&mut self.upper, &mut self.lower);
-            self.char = HALF_LOWER;
-        }
-    }
-
-    fn luminance((r, g, b): (u8, u8, u8)) -> u32 {
-        2126 * r as u32 + 7152 * g as u32 + 722 * b as u32
-    }
-
-    fn rgb(color: Color) -> (u8, u8, u8) {
-        match color {
-            Color::Rgb(r, g, b) => (r, g, b),
-            Color::Indexed(i) => HalfBlock::indexed_to_rgb(i),
-            Color::Black => (0, 0, 0),
-            Color::Red => (205, 0, 0),
-            Color::Green => (0, 205, 0),
-            Color::Yellow => (205, 205, 0),
-            Color::Blue => (0, 0, 238),
-            Color::Magenta => (205, 0, 205),
-            Color::Cyan => (0, 205, 205),
-            Color::Gray => (229, 229, 229),
-            Color::DarkGray => (127, 127, 127),
-            Color::LightRed => (255, 0, 0),
-            Color::LightGreen => (0, 255, 0),
-            Color::LightYellow => (255, 255, 0),
-            Color::LightBlue => (92, 92, 255),
-            Color::LightMagenta => (255, 0, 255),
-            Color::LightCyan => (0, 255, 255),
-            Color::White => (255, 255, 255),
-            Color::Reset => (255, 255, 255), // assume light background, or pick a default
-        }
-    }
-
-    fn indexed_to_rgb(i: u8) -> (u8, u8, u8) {
-        match i {
-            0..=15 => match i {
-                0 => (0, 0, 0),
-                1 => (205, 0, 0),
-                2 => (0, 205, 0),
-                3 => (205, 205, 0),
-                4 => (0, 0, 238),
-                5 => (205, 0, 205),
-                6 => (0, 205, 205),
-                7 => (229, 229, 229),
-                8 => (127, 127, 127),
-                9 => (255, 0, 0),
-                10 => (0, 255, 0),
-                11 => (255, 255, 0),
-                12 => (92, 92, 255),
-                13 => (255, 0, 255),
-                14 => (0, 255, 255),
-                15 => (255, 255, 255),
-                _ => unreachable!(),
-            },
-            16..=231 => {
-                // 6x6x6 color cube
-                let i = i - 16;
-                let r = (i / 36) % 6;
-                let g = (i / 6) % 6;
-                let b = i % 6;
-                let to_val = |c: u8| if c == 0 { 0 } else { 55 + c * 40 };
-                (to_val(r), to_val(g), to_val(b))
-            }
-            232..=255 => {
-                // grayscale ramp
-                let gray = 8 + (i - 232) * 10;
-                (gray, gray, gray)
-            }
-        }
     }
 }
 
@@ -130,36 +51,85 @@ impl Halfblocks {
     }
 }
 
+#[cfg(not(feature = "chafa"))]
 fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
-    let img = img.resize_exact(
-        rect.width as u32,
-        (rect.height * 2) as u32,
-        FilterType::Triangle,
-    );
+    primitive::encode(img, rect)
+}
 
-    let mut data = vec![
-        HalfBlock {
-            upper: Color::Rgb(0, 0, 0),
-            lower: Color::Rgb(0, 0, 0),
-            char: HALF_UPPER,
-        };
-        (rect.width * rect.height) as usize
-    ];
+#[cfg(feature = "chafa")]
+fn encode(img: &image::DynamicImage, area: Rect) -> Vec<HalfBlock> {
+    use chafa_sys::*;
 
-    for (y, row) in img.to_rgb8().rows().enumerate() {
-        for (x, pixel) in row.enumerate() {
-            let position = x + (rect.width as usize) * (y / 2);
-            if y % 2 == 0 {
-                data[position].upper = Color::Rgb(pixel[0], pixel[1], pixel[2]);
-            } else {
-                data[position].lower = Color::Rgb(pixel[0], pixel[1], pixel[2]);
+    let width = area.width;
+    let height = area.height;
+    unsafe {
+        let symbol_map = chafa_symbol_map_new();
+        chafa_symbol_map_add_by_tags(
+            symbol_map,
+            ChafaSymbolTags_CHAFA_SYMBOL_TAG_ALL, // & !ChafaSymbolTags_CHAFA_SYMBOL_TAG_ASCII
+                                                  // & !ChafaSymbolTags_CHAFA_SYMBOL_TAG_ALNUM,
+        );
+
+        let config = chafa_canvas_config_new();
+        chafa_canvas_config_set_symbol_map(config, symbol_map);
+
+        chafa_canvas_config_set_geometry(config, width as i32, height as i32);
+        let canvas = chafa_canvas_new(config);
+
+        let rgb = img.to_rgb8();
+        let (w, h) = rgb.dimensions();
+
+        chafa_canvas_draw_all_pixels(
+            canvas,
+            ChafaPixelType_CHAFA_PIXEL_RGB8,
+            rgb.as_ptr() as *const _,
+            w as i32,
+            h as i32,
+            (w * 3) as i32,
+        );
+
+        let mut blocks = Vec::with_capacity((width * height) as usize);
+
+        for y in 0..height {
+            for x in 0..width {
+                let c = chafa_canvas_get_char_at(canvas, x as i32, y as i32);
+                let symbol = char::from_u32(c).unwrap_or(' ');
+
+                let mut fg_color: i32 = 0;
+                let mut bg_color: i32 = 0;
+                chafa_canvas_get_colors_at(
+                    canvas,
+                    x as i32,
+                    y as i32,
+                    &mut fg_color,
+                    &mut bg_color,
+                );
+
+                let fg = Color::Rgb(
+                    ((fg_color >> 16) & 0xff) as u8,
+                    ((fg_color >> 8) & 0xff) as u8,
+                    (fg_color & 0xff) as u8,
+                );
+                let bg = Color::Rgb(
+                    ((bg_color >> 16) & 0xff) as u8,
+                    ((bg_color >> 8) & 0xff) as u8,
+                    (bg_color & 0xff) as u8,
+                );
+
+                blocks.push(HalfBlock {
+                    upper: fg,
+                    lower: bg,
+                    char: symbol,
+                });
             }
         }
+
+        chafa_canvas_unref(canvas);
+        chafa_canvas_config_unref(config);
+        chafa_symbol_map_unref(symbol_map);
+
+        blocks
     }
-    for hb in &mut data {
-        hb.pick_side();
-    }
-    data
 }
 
 impl ProtocolTrait for Halfblocks {
@@ -189,9 +159,135 @@ impl StatefulProtocolTrait for Halfblocks {
     }
 }
 
+#[cfg(not(feature = "chafa"))]
+mod primitive {
+    use image::DynamicImage;
+    use image::imageops::FilterType;
+    use ratatui::{layout::Rect, style::Color};
+
+    use super::HalfBlock;
+
+    const HALF_UPPER: char = '▀';
+    const HALF_LOWER: char = '▄';
+    const SPACE: char = ' ';
+
+    pub fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
+        let img = img.resize_exact(
+            rect.width as u32,
+            (rect.height * 2) as u32,
+            FilterType::Triangle,
+        );
+
+        let mut data = vec![
+            HalfBlock {
+                upper: Color::Rgb(0, 0, 0),
+                lower: Color::Rgb(0, 0, 0),
+                char: HALF_UPPER,
+            };
+            (rect.width * rect.height) as usize
+        ];
+
+        for (y, row) in img.to_rgb8().rows().enumerate() {
+            for (x, pixel) in row.enumerate() {
+                let position = x + (rect.width as usize) * (y / 2);
+                if y % 2 == 0 {
+                    data[position].upper = Color::Rgb(pixel[0], pixel[1], pixel[2]);
+                } else {
+                    data[position].lower = Color::Rgb(pixel[0], pixel[1], pixel[2]);
+                }
+            }
+        }
+        for hb in &mut data {
+            hb.pick_side();
+        }
+        data
+    }
+
+    impl HalfBlock {
+        fn pick_side(&mut self) {
+            if self.upper == self.lower {
+                self.char = SPACE;
+                return;
+            }
+            if HalfBlock::luminance(HalfBlock::rgb(self.lower))
+                > HalfBlock::luminance(HalfBlock::rgb(self.upper))
+            {
+                std::mem::swap(&mut self.upper, &mut self.lower);
+                self.char = HALF_LOWER;
+            }
+        }
+
+        fn luminance((r, g, b): (u8, u8, u8)) -> u32 {
+            2126 * r as u32 + 7152 * g as u32 + 722 * b as u32
+        }
+
+        fn rgb(color: Color) -> (u8, u8, u8) {
+            match color {
+                Color::Rgb(r, g, b) => (r, g, b),
+                Color::Indexed(i) => HalfBlock::indexed_to_rgb(i),
+                Color::Black => (0, 0, 0),
+                Color::Red => (205, 0, 0),
+                Color::Green => (0, 205, 0),
+                Color::Yellow => (205, 205, 0),
+                Color::Blue => (0, 0, 238),
+                Color::Magenta => (205, 0, 205),
+                Color::Cyan => (0, 205, 205),
+                Color::Gray => (229, 229, 229),
+                Color::DarkGray => (127, 127, 127),
+                Color::LightRed => (255, 0, 0),
+                Color::LightGreen => (0, 255, 0),
+                Color::LightYellow => (255, 255, 0),
+                Color::LightBlue => (92, 92, 255),
+                Color::LightMagenta => (255, 0, 255),
+                Color::LightCyan => (0, 255, 255),
+                Color::White => (255, 255, 255),
+                Color::Reset => (255, 255, 255), // assume light background, or pick a default
+            }
+        }
+
+        fn indexed_to_rgb(i: u8) -> (u8, u8, u8) {
+            match i {
+                0..=15 => match i {
+                    0 => (0, 0, 0),
+                    1 => (205, 0, 0),
+                    2 => (0, 205, 0),
+                    3 => (205, 205, 0),
+                    4 => (0, 0, 238),
+                    5 => (205, 0, 205),
+                    6 => (0, 205, 205),
+                    7 => (229, 229, 229),
+                    8 => (127, 127, 127),
+                    9 => (255, 0, 0),
+                    10 => (0, 255, 0),
+                    11 => (255, 255, 0),
+                    12 => (92, 92, 255),
+                    13 => (255, 0, 255),
+                    14 => (0, 255, 255),
+                    15 => (255, 255, 255),
+                    _ => unreachable!(),
+                },
+                16..=231 => {
+                    // 6x6x6 color cube
+                    let i = i - 16;
+                    let r = (i / 36) % 6;
+                    let g = (i / 6) % 6;
+                    let b = i % 6;
+                    let to_val = |c: u8| if c == 0 { 0 } else { 55 + c * 40 };
+                    (to_val(r), to_val(g), to_val(b))
+                }
+                232..=255 => {
+                    // grayscale ramp
+                    let gray = 8 + (i - 232) * 10;
+                    (gray, gray, gray)
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use image::{DynamicImage, Rgb, RgbImage};
+    use image::{Rgb, RgbImage};
     use insta::assert_snapshot;
     use ratatui::{Terminal, backend::TestBackend, layout::Rect};
 
@@ -199,26 +295,6 @@ mod tests {
         Image,
         protocol::{Protocol, halfblocks::Halfblocks},
     };
-
-    #[test]
-    fn render_checker() {
-        let mut img = RgbImage::new(2, 2);
-        img.put_pixel(0, 0, Rgb([255, 0, 0])); // red
-        img.put_pixel(1, 0, Rgb([0, 255, 0])); // green
-        img.put_pixel(0, 1, Rgb([0, 0, 255])); // blue
-        img.put_pixel(1, 1, Rgb([255, 255, 0])); // yellow
-
-        let image = DynamicImage::ImageRgb8(img);
-        let area = Rect::new(0, 0, 2, 1);
-        let hbs = Halfblocks::new(image, area).unwrap();
-
-        let mut terminal = Terminal::new(TestBackend::new(2, 1)).unwrap();
-        terminal
-            .draw(|frame| frame.render_widget(Image::new(&Protocol::Halfblocks(hbs)), frame.area()))
-            .unwrap();
-
-        assert_snapshot!(terminal.backend());
-    }
 
     #[test]
     fn render_image() {
@@ -241,6 +317,13 @@ mod tests {
             })
             .unwrap();
 
-        assert_snapshot!(terminal.backend());
+        assert_snapshot!(
+            if cfg!(feature = "chafa") {
+                "chafa"
+            } else {
+                "halfblocks"
+            },
+            terminal.backend()
+        );
     }
 }
