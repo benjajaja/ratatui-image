@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [8.1.1] - 2025-12-18
+
 * [Chafa](https://hpjansson.org/chafa/) support
   The Halfblocks protocol now supports chafa, if the feature is enabled.
   This "ASCII Art"-like renderer is a million times better than the basic Halfblocks implementation.
