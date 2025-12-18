@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+* [Chafa](https://hpjansson.org/chafa/) support
+  The Halfblocks protocol now supports chafa, if the feature is enabled.
+  This "ASCII Art"-like renderer is a million times better than the basic Halfblocks implementation.
+  The library is loaded dynamically, if the feature is enabled, at runtime.
+  That means no linking acrobacies are required, it should "just work" if the user has libchafa installed on their system.
+  It could still be "wrapped", see how the flake.nix handles `LD_LIBRARY_PATH` to magically include this in the `ratatui-image` binary.
+  This is still gated behind a feature, because calling chafa uses `unsafe`.
+* Improved Halfblocks renderer
+  Picks upper block, lower block, or space, depending on pixel colors.
+  This gives some vague feedback when the output is rendered without colors, e.g. in insta testing snapshots.
+
 # [8.0.2] - 2025-09-03
 
 * Performance improvements in kitty and iterm2 protocols
