@@ -1,5 +1,5 @@
 ---
-source: src/protocol/halfblocks.rs
+source: src/protocol/halfblocks/mod.rs
 expression: terminal.backend()
 ---
 "                                                                                "

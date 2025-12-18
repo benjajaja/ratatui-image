@@ -41,7 +41,6 @@
             cargo-release
             cargo-make
             rust-analyzer
-            chafa
           ]
           ++ lib.optionals pkgs.stdenv.isDarwin [
             # Additional darwin specific inputs can be set here
@@ -68,22 +67,28 @@
       ratatui-image = craneLib.buildPackage (commonArgs
         // {
           inherit cargoArtifacts;
+          nativeBuildInputs = [ pkgs.makeWrapper ];
+          buildInputs = [ pkgs.chafa ];
           cargoExtraArgs = "--features chafa";
-          nativeBuildInputs = [ pkgs.pkg-config pkgs.llvmPackages.libclang ];
-          buildInputs = [ pkgs.chafa.dev pkgs.glib.dev ];
-          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-          BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${lib.versions.major pkgs.llvmPackages.libclang.version}/include -isystem ${pkgs.glibc.dev}/include";
+          LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.chafa ]; # for tests
+          postFixup = ''
+            wrapProgram $out/bin/ratatui-image \
+              --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ pkgs.chafa ]}
+          ''; # for the binary itself
         });
 
       ratatui-demo = craneLib.buildPackage (commonArgs
         // {
           inherit cargoArtifacts;
           pname = "demo";
+          nativeBuildInputs = [ pkgs.makeWrapper ];
+          buildInputs = [ pkgs.chafa ];
           cargoExtraArgs = "--example demo --features crossterm,chafa";
-          nativeBuildInputs = [ pkgs.pkg-config pkgs.llvmPackages.libclang ];
-          buildInputs = [ pkgs.chafa.dev pkgs.glib.dev ];
-          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-          BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${lib.versions.major pkgs.llvmPackages.libclang.version}/include -isystem ${pkgs.glibc.dev}/include";
+          LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.chafa ]; # for tests
+          postFixup = ''
+            wrapProgram $out/bin/demo \
+              --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ pkgs.chafa ]}
+          ''; # for the binary itself
         });
 
       toolchain = with fenix.packages.${system};
@@ -187,12 +192,7 @@
           pkg-config
           llvmPackages.libclang
         ];
-
-        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-        BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${lib.versions.major pkgs.llvmPackages.libclang.version}/include -isystem ${pkgs.glibc.dev}/include";
-
-        # For chafa-sys to build via pkg-config
-        PKG_CONFIG_PATH = "${pkgs.chafa.dev}/lib/pkgconfig:${pkgs.glib.dev}/lib/pkgconfig";
+        LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.chafa ];
       };
     });
 }
