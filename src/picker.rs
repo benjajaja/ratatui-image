@@ -41,7 +41,7 @@ pub enum Capability {
 }
 
 const DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 0]);
-const STDIN_READ_TIMEOUT_MILLIS: u64 = 1000;
+const STDIN_READ_TIMEOUT_MILLIS: u64 = 2000;
 
 #[derive(Clone, Debug)]
 pub struct Picker {

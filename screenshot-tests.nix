@@ -82,7 +82,7 @@ let
         except Exception as e:
           print(f"/tmp/demo-ready not found within timeout: {e}")
         finally:
-          machine.succeed("sleep 2")
+          machine.succeed("sleep 5")
           machine.screenshot("screenshot-${terminal}")
           print("Screenshot saved to test output directory as screenshot-${terminal}.png")
     '';
