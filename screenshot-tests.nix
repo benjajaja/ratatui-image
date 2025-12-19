@@ -135,7 +135,7 @@ let
 
     screenshot-test-xterm = makeScreenshotTest {
       terminal = "xterm";
-      terminalCommand = "xterm -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+      terminalCommand = "xterm -fa \"DejaVu Sans Mono\" -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackages = [ pkgs.xterm ];
       xwayland = true;
     };
