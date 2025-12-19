@@ -3,7 +3,7 @@
 use std::{
     env,
     io::{self, Read, Write},
-    time::Duration,
+    sync::mpsc::Sender,
 };
 
 use crate::{
@@ -41,6 +41,7 @@ pub enum Capability {
 }
 
 const DEFAULT_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 0]);
+const STDIN_READ_TIMEOUT_MILLIS: u64 = 1000;
 
 #[derive(Clone, Debug)]
 pub struct Picker {
@@ -90,9 +91,7 @@ impl Picker {
     /// ```
     ///
     pub fn from_query_stdio() -> Result<Self> {
-        Picker::from_query_stdio_with_options(QueryStdioOptions {
-            text_sizing_protocol: false,
-        })
+        Picker::from_query_stdio_with_options(QueryStdioOptions::default())
     }
 
     /// This should ONLY be used if [Capability::TextSizingProtocol] is needed for some external
@@ -119,7 +118,7 @@ impl Picker {
         };
 
         // Write and read to stdin to query protocol capabilities and font-size.
-        match query_with_timeout(is_tmux, Duration::from_secs(1), options) {
+        match query_with_timeout(is_tmux, options) {
             Ok((capability_proto, font_size, caps)) => {
                 // If some env var says that we should try iTerm2, then disregard protocol-from-capabilities.
                 let iterm2_proto = iterm2_from_env();
@@ -410,7 +409,8 @@ fn font_size_fallback() -> Option<FontSize> {
 fn query_stdio_capabilities(
     is_tmux: bool,
     options: QueryStdioOptions,
-) -> Result<(Option<ProtocolType>, Option<FontSize>, Vec<Capability>)> {
+    tx: &Sender<QueryResult>,
+) -> Result<()> {
     // Send several control sequences at once:
     // `_Gi=...`: Kitty graphics support.
     // `[c`: Capabilities including sixels.
@@ -426,7 +426,12 @@ fn query_stdio_capabilities(
     let mut responses = vec![];
     'out: loop {
         let mut charbuf: [u8; 50] = [0; 50];
+
         let read = io::stdin().read(&mut charbuf)?;
+        // A read blocks a bit, keep receiver busy now.
+        tx.send(QueryResult::Busy)
+            .map_err(|_senderr| Errors::NoStdinResponse)?;
+
         for ch in charbuf.iter().take(read) {
             let mut more_caps = parser.push(char::from(*ch));
             match more_caps[..] {
@@ -438,7 +443,10 @@ fn query_stdio_capabilities(
         }
     }
 
-    interpret_parser_responses(responses)
+    let result = interpret_parser_responses(responses)?;
+    tx.send(QueryResult::Done(result))
+        .map_err(|_senderr| Errors::NoStdinResponse)?;
+    Ok(())
 }
 
 fn interpret_parser_responses(
@@ -511,26 +519,48 @@ fn interpret_parser_responses(
     Ok((proto, font_size, capabilities))
 }
 
+enum QueryResult {
+    Done((Option<ProtocolType>, Option<FontSize>, Vec<Capability>)),
+    Err(Errors),
+    Busy,
+}
 fn query_with_timeout(
     is_tmux: bool,
-    timeout: Duration,
     options: QueryStdioOptions,
 ) -> Result<(Option<ProtocolType>, Option<FontSize>, Vec<Capability>)> {
     use std::{sync::mpsc, thread};
     let (tx, rx) = mpsc::channel();
 
+    let timeout = options.timeout;
     thread::spawn(move || {
-        let _ = tx.send(enable_raw_mode().and_then(|disable_raw_mode| {
-            let result = query_stdio_capabilities(is_tmux, options);
-            // Always try to return to raw_mode.
-            disable_raw_mode()?;
-            result
-        }));
+        if let Err(err) = tx
+            .send(QueryResult::Busy)
+            .map_err(|_senderr| Errors::NoStdinResponse)
+            .and_then(|_| enable_raw_mode())
+            .and_then(|disable_raw_mode| {
+                tx.send(QueryResult::Busy)
+                    .map_err(|_senderr| Errors::NoStdinResponse)?;
+                query_stdio_capabilities(is_tmux, options, &tx)?;
+                disable_raw_mode()?;
+                Ok(())
+            })
+        {
+            // Last chance, fire and forget now.
+            let _ = tx.send(QueryResult::Err(err));
+        }
     });
 
-    match rx.recv_timeout(timeout) {
-        Ok(result) => Ok(result?),
-        Err(_recvtimeout) => Err(Errors::NoStdinResponse),
+    loop {
+        match rx.recv_timeout(timeout) {
+            Ok(qresult) => match qresult {
+                QueryResult::Done(result) => return Ok(result),
+                QueryResult::Err(err) => return Err(err),
+                QueryResult::Busy => continue, // restarts the timeout
+            },
+            Err(_recverr) => {
+                return Err(Errors::NoStdinResponse);
+            }
+        }
     }
 }
 

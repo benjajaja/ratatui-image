@@ -1,5 +1,7 @@
 //! Terminal stdio query parser module.
-use std::fmt::Write;
+use std::{fmt::Write, time::Duration};
+
+use crate::picker::STDIN_READ_TIMEOUT_MILLIS;
 
 pub struct Parser {
     data: String,
@@ -25,11 +27,22 @@ pub enum Response {
 
 /// Extra query options
 pub struct QueryStdioOptions {
+    // Timeout for the stdio query.
+    pub timeout: Duration,
     /// Query for [Text Sizing Protocol]. The result can be checked by searching for
     /// [crate::picker::Capability::TextSizingProtocol] in [crate::picker::Picker::capabilities].
     ///
     /// [Text Sizing Protocol] <https://sw.kovidgoyal.net/kitty/text-sizing-protocol//>
     pub text_sizing_protocol: bool,
+}
+
+impl Default for QueryStdioOptions {
+    fn default() -> Self {
+        Self {
+            timeout: Duration::from_millis(STDIN_READ_TIMEOUT_MILLIS),
+            text_sizing_protocol: false,
+        }
+    }
 }
 
 impl Default for Parser {
