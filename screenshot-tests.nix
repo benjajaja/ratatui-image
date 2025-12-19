@@ -128,14 +128,14 @@ let
 
     screenshot-test-xterm-vt340 = makeScreenshotTest {
       terminal = "xterm-vt340";
-      terminalCommand = "xterm -ti vt340 -fa \"DejaVu Sans Mono\" -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+      terminalCommand = "xterm -ti vt340 -fa \"Noto Sans Mono\" -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackages = [ pkgs.xterm ];
       xwayland = true;
     };
 
     screenshot-test-xterm = makeScreenshotTest {
       terminal = "xterm";
-      terminalCommand = "xterm -fa \"DejaVu Sans Mono\" -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+      terminalCommand = "xterm -fa \"Noto Sans Mono\" -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackages = [ pkgs.xterm ];
       xwayland = true;
     };
