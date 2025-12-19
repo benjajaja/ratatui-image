@@ -1,6 +1,5 @@
-name: CI
+name: ci
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   push:
     branches:
@@ -9,7 +8,6 @@ on:
   pull_request:
     branches:
       - master
-  pull_request_target:
   merge_group:
   workflow_call:
 
@@ -22,11 +20,11 @@ env:
 
 jobs:
   ensure-readme-up-to-date:
-    name: Ensure readme is up-to-date
+    name: Ensure readme has been generated
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
@@ -39,8 +37,8 @@ jobs:
       - name: Ensure no changes
         run: git diff --exit-code .
 
-  nix-flake-test:
-    name: Flake check
+  nix-flake-check:
+    name: Nix flake check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -105,7 +103,7 @@ jobs:
           nix build .#windows --print-build-logs
 
   setup-terminals:
-    name: Setup terminals list
+    name: Find terminal tests
     runs-on: ubuntu-latest
     outputs:
       terminals: ${{ steps.set-terminals.outputs.terminals }}
@@ -122,7 +120,7 @@ jobs:
           echo "terminals=$terminals" >> $GITHUB_OUTPUT
 
   nix-flake-screenshots:
-    name: Screenshot tests
+    name: Nix screenshot tests
     runs-on: ubuntu-latest
     needs: [nix-build, setup-terminals]
     permissions:
@@ -152,226 +150,3 @@ jobs:
         with:
           name: screenshot-${{ matrix.terminal }}
           path: result/screenshot-${{ matrix.terminal }}.png
-
-  deploy-screenshots-branch:
-    name: Deploy screenshots branch
-    runs-on: ubuntu-latest
-    needs: [nix-flake-screenshots, setup-terminals]
-    if: github.event_name == 'pull_request_target' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-    permissions:
-      contents: read
-      pull-requests: write  # This is needed for PR comments
-    steps:
-      - name: Download all screenshot artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: screenshot-*
-          path: screenshots
-
-      - name: Download dify binary
-        run: |
-          curl -L https://github.com/jihchi/dify/releases/download/v0.7.4/dify-x86_64-unknown-linux-gnu-v0.7.4.tar.gz -o dify.tar.gz
-          tar -xzf dify.tar.gz
-          chmod +x dify
-
-      - name: Download reference screenshots from master
-        run: |
-          mkdir -p reference-screenshots
-
-          # Base URL for master branch screenshots
-          BASE_URL="https://raw.githubusercontent.com/benjajaja/ratatui-image-screenshots/gh-pages/images"
-
-          terminals='${{ needs.setup-terminals.outputs.terminals }}'
-          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
-
-          for terminal in $terminal_list; do
-            echo "Downloading reference screenshot for ${terminal}..."
-            curl -f -L "${BASE_URL}/screenshot-${terminal}.png" -o "reference-screenshots/screenshot-${terminal}.png" || echo "No reference screenshot found for ${terminal}"
-          done
-
-      - name: Create image diffs
-        run: |
-          mkdir -p diffs
-
-          terminals='${{ needs.setup-terminals.outputs.terminals }}'
-          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
-
-          for terminal in $terminal_list; do
-            if [ -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ] && [ -f "reference-screenshots/screenshot-${terminal}.png" ]; then
-              echo "Creating diff for ${terminal}..."
-
-              # Run dify and capture exit code (which indicates amount of difference)
-              set +e  # Disable exit on error temporarily
-              ./dify "reference-screenshots/screenshot-${terminal}.png" "screenshots/screenshot-${terminal}/screenshot-${terminal}.png"
-              diff_amount=$?
-              set -e  # Re-enable exit on error
-              echo "Difference amount for ${terminal}: ${diff_amount}"
-
-              # Check if diff.png was created and move it
-              if [ -f "diff.png" ]; then
-                mv diff.png "diffs/diff-${terminal}.png"
-                echo "Created diff for ${terminal}"
-              else
-                echo "No diff.png file created for ${terminal}"
-              fi
-            else
-              echo "Missing screenshot files for ${terminal}, skipping diff"
-              if [ ! -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ]; then
-                echo "  Missing current screenshot"
-              fi
-              if [ ! -f "reference-screenshots/screenshot-${terminal}.png" ]; then
-                echo "  Missing reference screenshot"
-              fi
-            fi
-          done
-
-      - name: Organize screenshots for deployment
-        run: |
-          mkdir -p pages
-
-          # Copy screenshots to pages directory
-          terminals='${{ needs.setup-terminals.outputs.terminals }}'
-          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
-
-          for terminal in $terminal_list; do
-            if [ -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ]; then
-              cp "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" "pages/screenshot-${terminal}.png"
-              echo "Copied screenshot for ${terminal}"
-            fi
-          done
-
-          # Copy diff images to pages directory
-          for terminal in $terminal_list; do
-            if [ -f "diffs/diff-${terminal}.png" ]; then
-              cp "diffs/diff-${terminal}.png" "pages/diff-${terminal}.png"
-              echo "Copied diff for ${terminal}"
-            fi
-          done
-
-      - name: Deploy to external repo
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          personal_token: ${{ secrets.PAT }}
-          external_repository: benjajaja/ratatui-image-screenshots
-          publish_dir: ./pages
-          publish_branch: pr-${{ github.event.pull_request.number }}
-          force_orphan: true
-
-      - name: Create combined comment
-        run: |
-          terminals='${{ needs.setup-terminals.outputs.terminals }}'
-          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
-
-          # Base URL for raw GitHub content
-          BASE_URL="https://raw.githubusercontent.com/benjajaja/ratatui-image-screenshots/pr-${{ github.event.pull_request.number }}"
-
-          # Initialize comment body
-          echo "Merge of ${{ github.sha }} to \`master\`" > comment_body.txt
-          echo "" >> comment_body.txt
-          echo "Screenshots from all terminal emulators:" >> comment_body.txt
-          echo "" >> comment_body.txt
-
-          for terminal in $terminal_list; do
-            echo "### ${terminal}" >> comment_body.txt
-            echo "![${terminal} screenshot](${BASE_URL}/screenshot-${terminal}.png)" >> comment_body.txt
-            echo "" >> comment_body.txt
-
-            # Check if diff image exists by trying to fetch it
-            diff_url="${BASE_URL}/diff-${terminal}.png"
-            if curl -f -s -I "$diff_url" > /dev/null 2>&1; then
-              echo "**Image diff vs master:**" >> comment_body.txt
-              echo "![${terminal} diff]($diff_url)" >> comment_body.txt
-              echo "" >> comment_body.txt
-            else
-              echo "**No diff available** (no changes detected)" >> comment_body.txt
-              echo "" >> comment_body.txt
-            fi
-          done
-
-      - name: Comment on PR with all screenshots
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          path: comment_body.txt
-
-  deploy-screenshots-master:
-    name: Deploy master screenshots to external repo
-    runs-on: ubuntu-latest
-    needs: [nix-flake-screenshots, setup-terminals]
-    if: |
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
-      github.event_name != 'pull_request_target'
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download all screenshot artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: screenshot-*
-          path: screenshots
-          merge-multiple: false
-
-      - name: Organize screenshots for Pages
-        run: |
-          mkdir -p pages/images
-
-          # Move screenshot images to pages/images directory
-          terminals='${{ needs.setup-terminals.outputs.terminals }}'
-          terminal_list=$(echo "$terminals" | jq -r '.[]' | tr '\n' ' ')
-
-          for terminal in $terminal_list; do
-            if [ -f "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" ]; then
-              cp "screenshots/screenshot-${terminal}/screenshot-${terminal}.png" "pages/images/screenshot-${terminal}.png"
-              echo "Copied screenshot for ${terminal}"
-            else
-              echo "Warning: Screenshot file not found for ${terminal}"
-            fi
-          done
-
-          # Create an index page with timestamp
-          timestamp=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          cat > pages/index.html << EOF
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Screenshots</title>
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 2rem; }
-              .terminal { margin: 2rem 0; }
-              img { max-width: 100%; border: 1px solid #ddd; border-radius: 8px; }
-              h1 { text-align: center; }
-              .container { max-width: 1200px; margin: 0 auto; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>Ratatui-Image Terminal Screenshots</h1>
-              <p style="text-align: center; color: #666;">Screenshots from various terminal emulators</p>
-              <p style="text-align: center; color: #999; font-size: 0.9em;">Last updated: ${timestamp}</p>
-          EOF
-
-          # Add screenshots to index using local images
-          for terminal in $terminal_list; do
-            echo "<div class='terminal'>" >> pages/index.html
-            echo "<h2 id=\"$terminal\">$terminal</h2>" >> pages/index.html
-
-            # Check if image exists and add to HTML
-            if [ -f "pages/images/screenshot-${terminal}.png" ]; then
-              echo "<img src='images/screenshot-${terminal}.png' alt='$terminal screenshot'>" >> pages/index.html
-            else
-              echo "<p>No screenshot available</p>" >> pages/index.html
-            fi
-            echo "</div>" >> pages/index.html
-          done
-
-          echo "</div></body></html>" >> pages/index.html
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          personal_token: ${{ secrets.PAT }}
-          external_repository: benjajaja/ratatui-image-screenshots
-          publish_dir: ./pages
-          publish_branch: gh-pages
