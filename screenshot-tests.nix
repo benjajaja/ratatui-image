@@ -36,6 +36,7 @@ let
       fonts.packages = with pkgs; [
         unifont          # ~77,000 glyphs, covers entire BMP
         noto-fonts       # Google's "no tofu" - comprehensive Unicode
+        noto-fonts-lgc-plus
         noto-fonts-cjk-sans
         noto-fonts-emoji
         noto-fonts-extra # Additional Noto variants
@@ -128,14 +129,14 @@ let
 
     screenshot-test-xterm-vt340 = makeScreenshotTest {
       terminal = "xterm-vt340";
-      terminalCommand = "xterm -ti vt340 -fa \"Noto Sans Mono\" -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+      terminalCommand = "xterm -ti vt340 -fa \"Noto Sans Mono\" -fs 16 -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackages = [ pkgs.xterm ];
       xwayland = true;
     };
 
     screenshot-test-xterm = makeScreenshotTest {
       terminal = "xterm";
-      terminalCommand = "xterm -fa \"Noto Sans Mono\" -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
+      terminalCommand = "xterm -fa \"Noto Sans Mono\" -fs 16 -e ${self.packages.${system}.demo}/bin/demo --tmp-demo-ready";
       terminalPackages = [ pkgs.xterm ];
       xwayland = true;
     };
