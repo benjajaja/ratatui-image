@@ -540,9 +540,9 @@ fn query_with_timeout(
             .and_then(|disable_raw_mode| {
                 tx.send(QueryResult::Busy)
                     .map_err(|_senderr| Errors::NoStdinResponse)?;
-                query_stdio_capabilities(is_tmux, options, &tx)?;
+                let result = query_stdio_capabilities(is_tmux, options, &tx);
                 disable_raw_mode()?;
-                Ok(())
+                result
             })
         {
             // Last chance, fire and forget now.

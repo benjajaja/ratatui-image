@@ -26,9 +26,12 @@ struct App {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let filename = env::args()
-        .nth(1)
-        .expect("Usage: <program> <path/to/image>");
+    let Some(filename) = env::args().nth(1) else {
+        let Some(progname) = env::args().next() else {
+            return Err("Usage: <program> <path/to/image>".into());
+        };
+        return Err(format!("Usage: {progname} <path/to/image>").into());
+    };
 
     let picker = Picker::from_query_stdio().unwrap_or_else(|_| {
         let font_width = env::args()
