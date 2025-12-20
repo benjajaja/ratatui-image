@@ -107,8 +107,10 @@
 //!   feature, add `image` to your crate, and enable its features/formats as desired. See
 //!   <https://doc.rust-lang.org/cargo/reference/features.html#feature-unification/>.
 //! * `tokio` whether to use tokio's `UnboundedSender` in `ThreadProtocol`
-//! * `chafa` to use the amazing [chafa](https://hpjansson.org/chafa/) library for rendering without
-//!   image protocols. *Needs the chafa C library installed at runtime!*.
+//! * `chafa-dyn` to use the amazing [chafa](https://hpjansson.org/chafa/) library for rendering without
+//!   image protocols. *Tries to load the chafa C library at runtime with libloading, without any linkage*.
+//! * `chafa-static` to link to a static libchafa.a if present, or falls back regular dynamic linking
+//!   (not libloading).
 //!
 //! [ratatui]: https://github.com/ratatui-org/ratatui
 //! [sixel]: https://en.wikipedia.org/wiki/Sixel

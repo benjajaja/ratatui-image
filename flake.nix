@@ -21,6 +21,21 @@
       pkgs = nixpkgs.legacyPackages.${system};
       inherit (pkgs) lib;
 
+      # Build chafa with static library support (uses autotools)
+      chafaStatic = pkgs.chafa.overrideAttrs (old: {
+        configureFlags = (old.configureFlags or []) ++ [
+          "--enable-static"
+          "--enable-shared"
+        ];
+      });
+
+      # We also need static glib for full static linking (uses meson)
+      glibStatic = pkgs.glib.overrideAttrs (old: {
+        mesonFlags = (old.mesonFlags or []) ++ [
+          "-Ddefault_library=both"
+        ];
+      });
+
       craneLib = crane.mkLib pkgs;
 
       unfilteredRoot = ./.;
@@ -62,10 +77,25 @@
       ratatui-image = craneLib.buildPackage (commonArgs
         // {
           inherit cargoArtifacts;
-          nativeBuildInputs = [ pkgs.makeWrapper ];
-          buildInputs = [ pkgs.chafa ];
-          cargoExtraArgs = "--features chafa";
-          LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.chafa ]; # for tests
+          nativeBuildInputs = with pkgs; [
+            makeWrapper
+            pkg-config
+            llvmPackages.libclang
+          ];
+          buildInputs = with pkgs; [
+            chafaStatic
+            chafaStatic.dev
+            glibStatic.dev
+            libsysprof-capture
+            pcre2.dev
+            libffi.dev
+            zlib.dev
+          ];
+          cargoExtraArgs = "--features chafa-static";
+          # Environment for pkg-config and bindgen
+          PKG_CONFIG_PATH = "${chafaStatic.dev}/lib/pkgconfig:${glibStatic.dev}/lib/pkgconfig:${pkgs.libsysprof-capture}/lib/pkgconfig:${pkgs.pcre2.dev}/lib/pkgconfig:${pkgs.libffi.dev}/lib/pkgconfig:${pkgs.zlib.dev}/lib/pkgconfig";
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+          BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.glibc.dev}/include";
         });
 
       ratatui-demo = craneLib.buildPackage (commonArgs
@@ -74,7 +104,7 @@
           pname = "demo";
           nativeBuildInputs = [ pkgs.makeWrapper ];
           buildInputs = [ pkgs.chafa ];
-          cargoExtraArgs = "--example demo --features crossterm,chafa";
+          cargoExtraArgs = "--example demo --features crossterm,chafa-dyn";
           LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.chafa ]; # for tests
         });
 
@@ -161,10 +191,23 @@
           cargo-release
           cargo-insta
           chafa
+          chafaStatic       # for chafa-static feature (has libchafa.a)
+          chafaStatic.dev
+          glibStatic.dev    # required by chafa.pc (has libglib-2.0.a)
+          # Dependencies needed for static linking
+          libsysprof-capture
+          pcre2.dev
+          libffi.dev
+          zlib.dev
           pkg-config
           llvmPackages.libclang
         ];
         LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.chafa ];
+        # For chafa-static feature, bindgen needs LIBCLANG_PATH and C headers
+        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+        BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.glibc.dev}/include";
+        # Ensure chafaStatic is found first for static linking
+        PKG_CONFIG_PATH = "${chafaStatic.dev}/lib/pkgconfig:${glibStatic.dev}/lib/pkgconfig";
       };
     });
 }

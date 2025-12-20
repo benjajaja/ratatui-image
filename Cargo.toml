@@ -26,7 +26,8 @@ termion = ["ratatui/termion"]
 termwiz = ["ratatui/termwiz"]
 serde = ["dep:serde"]
 tokio = ["dep:tokio"]
-chafa = ["dep:libloading"]
+chafa-dyn = ["dep:libloading"]
+chafa-static = ["dep:pkg-config"]
 
 [dependencies]
 image = { version = "^0.25.6", default-features = false, features = ["jpeg"] }
@@ -67,6 +68,9 @@ required-features = ["crossterm"]
 [[example]]
 name = "tokio"
 required-features = ["crossterm", "tokio"]
+
+[build-dependencies]
+pkg-config = { version = "0.3", optional = true }
 
 [dev-dependencies]
 color-eyre = "0.6.5"

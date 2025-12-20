@@ -3,8 +3,9 @@
 //! Uses the unicode character `▀` combined with foreground and background color. Assumes that the
 //! font aspect ratio is roughly 1:2. Should work in all terminals.
 //!
-//! If libchafa is available at runtime, uses `chafa` for much richer rendering than primitive
-//! halfblocks. Falls back to primitive halfblocks if libchafa is not installed.
+//! If chafa is available (either statically linked via `chafa-static` feature, or dynamically
+//! loaded at runtime via `chafa-dyn` feature), uses chafa for much richer rendering than primitive
+//! halfblocks. Falls back to primitive halfblocks if libchafa is not installed (dynamic only).
 
 use image::DynamicImage;
 use ratatui::{
@@ -16,8 +17,15 @@ use ratatui::{
 use super::{ProtocolTrait, StatefulProtocolTrait};
 use crate::Result;
 
-#[cfg(feature = "chafa")]
+// Static linking takes precedence over dynamic loading
+#[cfg(feature = "chafa-static")]
+#[path = "halfblocks/chafa_static.rs"]
 mod chafa;
+
+#[cfg(all(feature = "chafa-dyn", not(feature = "chafa-static")))]
+#[path = "halfblocks/chafa_dynamic.rs"]
+mod chafa;
+
 mod primitive;
 
 /// Fixed Halfblocks protocol
@@ -56,13 +64,13 @@ impl Halfblocks {
     }
 }
 
-#[cfg(feature = "chafa")]
+#[cfg(any(feature = "chafa-dyn", feature = "chafa-static"))]
 fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
     // Try chafa first, fall back to primitive
     chafa::encode(img, rect).unwrap_or_else(|| primitive::encode(img, rect))
 }
 
-#[cfg(not(feature = "chafa"))]
+#[cfg(not(any(feature = "chafa-dyn", feature = "chafa-static")))]
 fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
     primitive::encode(img, rect)
 }
@@ -126,11 +134,11 @@ mod tests {
             })
             .unwrap();
 
-        #[cfg(feature = "chafa")]
+        #[cfg(any(feature = "chafa-dyn", feature = "chafa-static"))]
         let name = "chafa";
-        #[cfg(feature = "chafa")]
+        #[cfg(any(feature = "chafa-dyn", feature = "chafa-static"))]
         assert!(super::chafa::is_available());
-        #[cfg(not(feature = "chafa"))]
+        #[cfg(not(any(feature = "chafa-dyn", feature = "chafa-static")))]
         let name = "halfblocks";
         assert_snapshot!(name, terminal.backend());
     }
