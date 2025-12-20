@@ -66,10 +66,6 @@
           buildInputs = [ pkgs.chafa ];
           cargoExtraArgs = "--features chafa";
           LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.chafa ]; # for tests
-          postFixup = ''
-            wrapProgram $out/bin/ratatui-image \
-              --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ pkgs.chafa ]}
-          ''; # for the binary itself
         });
 
       ratatui-demo = craneLib.buildPackage (commonArgs
@@ -80,10 +76,6 @@
           buildInputs = [ pkgs.chafa ];
           cargoExtraArgs = "--example demo --features crossterm,chafa";
           LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.chafa ]; # for tests
-          postFixup = ''
-            wrapProgram $out/bin/demo \
-              --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ pkgs.chafa ]}
-          ''; # for the binary itself
         });
 
       screenshotTests = import ./screenshot-tests.nix { inherit pkgs src self system; };
