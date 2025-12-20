@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+* Split `chafa` feature into `chafa-dyn` and `chafa-static`
+  * `chafa-dyn` uses the existing libloading, no need to deal with linking, the user just needs to
+    have libchafa.so on their system. This cannot fail, it falls back to the primitive halfblocks.
+  * `chafa-static` links, and attempt to link against a static `libchafa.a` if available (see
+    flake.nix for an example on how to get that). If the static library is not available at
+    compile-time, then it will dynamically link against `libchafa.so`, and fail if not present at 
+    runtime. This means `chafa-static` can be used for a static binary, or a binary that links
+    dynamically.
+* Minor stdin-read-timeout adjustments
+
 ## [8.1.1] - 2025-12-18
 
 * [Chafa](https://hpjansson.org/chafa/) support
