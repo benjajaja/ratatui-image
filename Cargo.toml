@@ -27,7 +27,7 @@ termwiz = ["ratatui/termwiz"]
 serde = ["dep:serde"]
 tokio = ["dep:tokio"]
 chafa-libload = ["dep:libloading"]
-chafa-dyn = []
+chafa-dyn = ["dep:pkg-config"]
 chafa-static = ["dep:pkg-config"]
 
 [dependencies]

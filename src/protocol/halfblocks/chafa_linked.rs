@@ -1,7 +1,7 @@
-//! Chafa-based halfblocks implementation using compile-time linking.
+//! Chafa-based halfblocks implementation using compile-time static linking.
 //!
-//! This module uses compile-time linking to libchafa (either dynamic or static).
-//! Used by both chafa-dyn and chafa-static features.
+//! This module uses compile-time static linking to libchafa.a.
+//! Used by the chafa-static feature only.
 
 use std::ffi::c_void;
 use std::sync::OnceLock;
@@ -20,7 +20,7 @@ type ChafaCanvas = *mut c_void;
 const CHAFA_SYMBOL_TAG_ALL: u32 = 0xBFE7FFFF;
 const CHAFA_PIXEL_RGB8: u32 = 8;
 
-// FFI declarations - linked dynamically via #[link] or statically via build.rs
+// FFI declarations - linked via build.rs (static or dynamic based on feature)
 #[cfg_attr(feature = "chafa-dyn", link(name = "chafa"))]
 unsafe extern "C" {
     fn chafa_symbol_map_new() -> ChafaSymbolMap;

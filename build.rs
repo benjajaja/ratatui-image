@@ -1,5 +1,13 @@
 fn main() {
-    // chafa-dyn: No build.rs handling needed - uses #[link(name = "chafa")] attribute
+    // chafa-dyn: Use pkg-config to find chafa and emit link flags
+    #[cfg(feature = "chafa-dyn")]
+    {
+        pkg_config::Config::new()
+            .probe("chafa")
+            .expect(
+                "Failed to find chafa via pkg-config. Install libchafa-dev or set PKG_CONFIG_PATH.",
+            );
+    }
 
     // chafa-static: Static linking only (no fallback)
     #[cfg(feature = "chafa-static")]

@@ -4,8 +4,8 @@
 //! font aspect ratio is roughly 1:2. Should work in all terminals.
 //!
 //! If chafa is available, uses chafa for much richer rendering than primitive halfblocks:
-//! - `chafa-static`: statically linked at compile time
-//! - `chafa-dyn`: dynamically linked at compile time
+//! - `chafa-static`: statically linked at compile time (requires static libchafa.a)
+//! - `chafa-dyn`: dynamically linked at compile time via pkg-config
 //! - `chafa-libload`: loaded at runtime via libloading, falls back to primitive if not found
 
 // Ensure only one chafa feature is enabled at a time
