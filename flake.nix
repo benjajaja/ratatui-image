@@ -102,10 +102,25 @@
         // {
           inherit cargoArtifacts;
           pname = "demo";
-          nativeBuildInputs = [ pkgs.makeWrapper ];
-          buildInputs = [ pkgs.chafa ];
-          cargoExtraArgs = "--example demo --features crossterm,chafa-libload";
-          LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.chafa ]; # for tests
+          nativeBuildInputs = with pkgs; [
+            makeWrapper
+            pkg-config
+            llvmPackages.libclang
+          ];
+          buildInputs = with pkgs; [
+            chafaStatic
+            chafaStatic.dev
+            glibStatic.dev
+            libsysprof-capture
+            pcre2.dev
+            libffi.dev
+            zlib.dev
+          ];
+          cargoExtraArgs = "--example demo --features chafa-static";
+          # Environment for pkg-config and bindgen
+          PKG_CONFIG_PATH = "${chafaStatic.dev}/lib/pkgconfig:${glibStatic.dev}/lib/pkgconfig:${pkgs.libsysprof-capture}/lib/pkgconfig:${pkgs.pcre2.dev}/lib/pkgconfig:${pkgs.libffi.dev}/lib/pkgconfig:${pkgs.zlib.dev}/lib/pkgconfig";
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+          BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.glibc.dev}/include";
         });
 
       screenshotTests = import ./screenshot-tests.nix { inherit pkgs src self system; };
@@ -143,7 +158,7 @@
         ratatui-image-clippy = craneLib.cargoClippy (commonArgs
           // {
             inherit cargoArtifacts;
-            cargoClippyExtraArgs = "--all-targets --features crossterm -- --deny warnings";
+            cargoClippyExtraArgs = "--all-targets -- --deny warnings";
           });
 
         ratatui-image-doc = craneLib.cargoDoc (commonArgs
