@@ -1,7 +1,9 @@
 fn main() {
+    // chafa-dyn: No build.rs handling needed - uses #[link(name = "chafa")] attribute
+
+    // chafa-static: Static linking only (no fallback)
     #[cfg(feature = "chafa-static")]
     {
-        // For static linking, we handle linking ourselves
         let lib = pkg_config::Config::new()
             .statik(true)
             .probe("chafa")
@@ -9,7 +11,7 @@ fn main() {
                 "Failed to find chafa via pkg-config. Install libchafa-dev or set PKG_CONFIG_PATH.",
             );
 
-        // Find the static library and emit proper linking
+        // Find the static library
         for path in &lib.link_paths {
             let static_lib = path.join("libchafa.a");
             if static_lib.exists() {
@@ -34,11 +36,11 @@ fn main() {
             }
         }
 
-        // If no static lib found, fall back to dynamic linking via pkg-config
-        println!(
-            "cargo:warning=libchafa.a not found in {:?}, using dynamic linking",
+        // No static lib found - this is an error for chafa-static
+        panic!(
+            "chafa-static feature requires libchafa.a but it was not found in {:?}. \
+             Either build chafa with --enable-static or use chafa-dyn for dynamic linking.",
             lib.link_paths
         );
-        // pkg_config already handled the linking when probe() succeeded
     }
 }

@@ -3,9 +3,18 @@
 //! Uses the unicode character `▀` combined with foreground and background color. Assumes that the
 //! font aspect ratio is roughly 1:2. Should work in all terminals.
 //!
-//! If chafa is available (either statically linked via `chafa-static` feature, or dynamically
-//! loaded at runtime via `chafa-dyn` feature), uses chafa for much richer rendering than primitive
-//! halfblocks. Falls back to primitive halfblocks if libchafa is not installed (dynamic only).
+//! If chafa is available, uses chafa for much richer rendering than primitive halfblocks:
+//! - `chafa-static`: statically linked at compile time
+//! - `chafa-dyn`: dynamically linked at compile time
+//! - `chafa-libload`: loaded at runtime via libloading, falls back to primitive if not found
+
+// Ensure only one chafa feature is enabled at a time
+#[cfg(all(feature = "chafa-static", feature = "chafa-dyn"))]
+compile_error!("features `chafa-static` and `chafa-dyn` are mutually exclusive");
+#[cfg(all(feature = "chafa-static", feature = "chafa-libload"))]
+compile_error!("features `chafa-static` and `chafa-libload` are mutually exclusive");
+#[cfg(all(feature = "chafa-dyn", feature = "chafa-libload"))]
+compile_error!("features `chafa-dyn` and `chafa-libload` are mutually exclusive");
 
 use image::DynamicImage;
 use ratatui::{
@@ -17,13 +26,16 @@ use ratatui::{
 use super::{ProtocolTrait, StatefulProtocolTrait};
 use crate::Result;
 
-// Static linking takes precedence over dynamic loading
 #[cfg(feature = "chafa-static")]
-#[path = "halfblocks/chafa_static.rs"]
+#[path = "halfblocks/chafa_linked.rs"]
 mod chafa;
 
-#[cfg(all(feature = "chafa-dyn", not(feature = "chafa-static")))]
-#[path = "halfblocks/chafa_dynamic.rs"]
+#[cfg(feature = "chafa-dyn")]
+#[path = "halfblocks/chafa_linked.rs"]
+mod chafa;
+
+#[cfg(feature = "chafa-libload")]
+#[path = "halfblocks/chafa_libload.rs"]
 mod chafa;
 
 mod primitive;
@@ -64,13 +76,24 @@ impl Halfblocks {
     }
 }
 
-#[cfg(any(feature = "chafa-dyn", feature = "chafa-static"))]
+// chafa-static and chafa-dyn: always use chafa (no fallback needed/possible)
+#[cfg(any(feature = "chafa-static", feature = "chafa-dyn"))]
 fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
-    // Try chafa first, fall back to primitive
+    chafa::encode(img, rect).expect("chafa is always available with compile-time linking")
+}
+
+// chafa-libload: try chafa, fallback to primitive if not available at runtime
+#[cfg(feature = "chafa-libload")]
+fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
     chafa::encode(img, rect).unwrap_or_else(|| primitive::encode(img, rect))
 }
 
-#[cfg(not(any(feature = "chafa-dyn", feature = "chafa-static")))]
+// no chafa feature: use primitive only
+#[cfg(not(any(
+    feature = "chafa-libload",
+    feature = "chafa-dyn",
+    feature = "chafa-static"
+)))]
 fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
     primitive::encode(img, rect)
 }
@@ -134,12 +157,20 @@ mod tests {
             })
             .unwrap();
 
-        #[cfg(any(feature = "chafa-dyn", feature = "chafa-static"))]
-        let name = "chafa";
-        #[cfg(any(feature = "chafa-dyn", feature = "chafa-static"))]
-        assert!(super::chafa::is_available());
-        #[cfg(not(any(feature = "chafa-dyn", feature = "chafa-static")))]
-        let name = "halfblocks";
-        assert_snapshot!(name, terminal.backend());
+        #[cfg(any(
+            feature = "chafa-static",
+            feature = "chafa-dyn",
+            feature = "chafa-libload"
+        ))]
+        {
+            assert!(super::chafa::is_available());
+            assert_snapshot!("chafa", terminal.backend());
+        }
+        #[cfg(not(any(
+            feature = "chafa-static",
+            feature = "chafa-dyn",
+            feature = "chafa-libload"
+        )))]
+        assert_snapshot!("halfblocks", terminal.backend());
     }
 }

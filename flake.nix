@@ -104,7 +104,7 @@
           pname = "demo";
           nativeBuildInputs = [ pkgs.makeWrapper ];
           buildInputs = [ pkgs.chafa ];
-          cargoExtraArgs = "--example demo --features crossterm,chafa-dyn";
+          cargoExtraArgs = "--example demo --features crossterm,chafa-libload";
           LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.chafa ]; # for tests
         });
 

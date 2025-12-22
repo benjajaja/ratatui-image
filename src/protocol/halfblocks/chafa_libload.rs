@@ -1,6 +1,6 @@
-//! Chafa-based halfblocks implementation using runtime library loading.
+//! Chafa-based halfblocks implementation using runtime library loading (libloading).
 //!
-//! Falls back to primitive halfblocks if libchafa is not available.
+//! Falls back to primitive halfblocks if libchafa is not available at runtime.
 
 use std::ffi::c_void;
 use std::sync::OnceLock;
