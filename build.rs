@@ -34,14 +34,11 @@ fn main() {
             }
         }
 
-        // If no static lib found, fall back to dynamic
+        // If no static lib found, fall back to dynamic linking via pkg-config
         println!(
-            "cargo:warning=libchafa.a not found in {:?}, will use dynamic linking",
+            "cargo:warning=libchafa.a not found in {:?}, using dynamic linking",
             lib.link_paths
         );
-        for path in &lib.link_paths {
-            println!("cargo:rustc-link-search=native={}", path.display());
-        }
-        println!("cargo:rustc-link-lib=chafa");
+        // pkg_config already handled the linking when probe() succeeded
     }
 }
