@@ -3,9 +3,12 @@ fn main() {
     #[cfg(feature = "chafa-dyn")]
     {
         pkg_config::Config::new()
+            // https://github.com/hpjansson/chafa/commit/b1ddce829798a81db54572261e6864ebab171631
+            // 1.18.0 added chafa_canvas_get_char_at()
+            .atleast_version("1.18.0")
             .probe("chafa")
             .expect(
-                "Failed to find chafa via pkg-config. Install libchafa-dev or set PKG_CONFIG_PATH.",
+                "Failed to find chafa via pkg-config. Install libchafa-dev or set PKG_CONFIG_PATH. Needs version >= 1.18.0.",
             );
     }
 
