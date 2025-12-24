@@ -26,11 +26,7 @@ use ratatui::{
 use super::{ProtocolTrait, StatefulProtocolTrait};
 use crate::Result;
 
-#[cfg(feature = "chafa-static")]
-#[path = "halfblocks/chafa_linked.rs"]
-mod chafa;
-
-#[cfg(feature = "chafa-dyn")]
+#[cfg(any(feature = "chafa-dyn", feature = "chafa-static",))]
 #[path = "halfblocks/chafa_linked.rs"]
 mod chafa;
 
@@ -38,6 +34,7 @@ mod chafa;
 #[path = "halfblocks/chafa_libload.rs"]
 mod chafa;
 
+#[cfg(not(any(feature = "chafa-dyn", feature = "chafa-static",)))]
 mod primitive;
 
 /// Fixed Halfblocks protocol
@@ -157,14 +154,18 @@ mod tests {
             })
             .unwrap();
 
-        #[cfg(any(
-            feature = "chafa-static",
-            feature = "chafa-dyn",
-            feature = "chafa-libload"
-        ))]
+        #[cfg(any(feature = "chafa-static", feature = "chafa-dyn",))]
         {
-            assert!(super::chafa::is_available());
             assert_snapshot!("chafa", terminal.backend());
+        }
+        #[cfg(feature = "chafa-libload")]
+        {
+            // chafa-libload depends on wether the test env has libchafa or not.
+            if super::chafa::is_available() {
+                assert_snapshot!("chafa", terminal.backend());
+            } else {
+                assert_snapshot!("halfblocks", terminal.backend());
+            }
         }
         #[cfg(not(any(
             feature = "chafa-static",

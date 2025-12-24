@@ -72,12 +72,6 @@ fn init_chafa() -> ChafaState {
     }
 }
 
-#[cfg(test)]
-/// Returns true (chafa is always available with compile-time linking).
-pub fn is_available() -> bool {
-    true
-}
-
 /// Encode using chafa.
 pub fn encode(img: &DynamicImage, area: Rect) -> Option<Vec<HalfBlock>> {
     let chafa = CHAFA.get_or_init(init_chafa);

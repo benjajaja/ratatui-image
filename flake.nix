@@ -113,10 +113,11 @@
 
       # Feature matrix for checks
       featureMatrix = {
-        default       = { args = "";                                 extraArgs = {}; };
-        chafa-libload = { args = "--features chafa-libload";         extraArgs = {}; };
-        chafa-static  = { args = "--features chafa-static";          extraArgs = chafaBuildArgs; };
-        full          = { args = "--features serde,tokio,chafa-dyn"; extraArgs = chafaBuildArgs; };
+        default        = { args = "";                                 extraArgs = {}; };
+        chafa-libload  = { args = "--features chafa-libload";         extraArgs = chafaBuildArgs; };
+        chafa-static   = { args = "--features chafa-static";          extraArgs = chafaBuildArgs; };
+        full           = { args = "--features serde,tokio,chafa-dyn"; extraArgs = chafaBuildArgs; };
+        thread-example = { args = "--features thread-example"; extraArgs = chafaBuildArgs; };
       };
 
       mkClippy = name: { args, extraArgs }:
