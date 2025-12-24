@@ -36,6 +36,26 @@
         ];
       });
 
+      # Chafa build dependencies for chafa-dyn and chafa-static features
+      chafaBuildArgs = {
+        nativeBuildInputs = with pkgs; [
+          pkg-config
+          llvmPackages.libclang
+        ];
+        buildInputs = with pkgs; [
+          chafaStatic
+          chafaStatic.dev
+          glibStatic.dev
+          libsysprof-capture
+          pcre2.dev
+          libffi.dev
+          zlib.dev
+        ];
+        PKG_CONFIG_PATH = "${chafaStatic.dev}/lib/pkgconfig:${glibStatic.dev}/lib/pkgconfig:${pkgs.libsysprof-capture}/lib/pkgconfig:${pkgs.pcre2.dev}/lib/pkgconfig:${pkgs.libffi.dev}/lib/pkgconfig:${pkgs.zlib.dev}/lib/pkgconfig";
+        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+        BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.glibc.dev}/include";
+      };
+
       craneLib = crane.mkLib pkgs;
 
       unfilteredRoot = ./.;
@@ -75,55 +95,55 @@
       cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
       ratatui-image = craneLib.buildPackage (commonArgs
+        // chafaBuildArgs
         // {
           inherit cargoArtifacts;
-          nativeBuildInputs = with pkgs; [
-            makeWrapper
-            pkg-config
-            llvmPackages.libclang
-          ];
-          buildInputs = with pkgs; [
-            chafaStatic
-            chafaStatic.dev
-            glibStatic.dev
-            libsysprof-capture
-            pcre2.dev
-            libffi.dev
-            zlib.dev
-          ];
           cargoExtraArgs = "--features chafa-static";
-          # Environment for pkg-config and bindgen
-          PKG_CONFIG_PATH = "${chafaStatic.dev}/lib/pkgconfig:${glibStatic.dev}/lib/pkgconfig:${pkgs.libsysprof-capture}/lib/pkgconfig:${pkgs.pcre2.dev}/lib/pkgconfig:${pkgs.libffi.dev}/lib/pkgconfig:${pkgs.zlib.dev}/lib/pkgconfig";
-          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-          BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.glibc.dev}/include";
         });
 
       ratatui-demo = craneLib.buildPackage (commonArgs
+        // chafaBuildArgs
         // {
           inherit cargoArtifacts;
           pname = "demo";
-          nativeBuildInputs = with pkgs; [
-            makeWrapper
-            pkg-config
-            llvmPackages.libclang
-          ];
-          buildInputs = with pkgs; [
-            chafaStatic
-            chafaStatic.dev
-            glibStatic.dev
-            libsysprof-capture
-            pcre2.dev
-            libffi.dev
-            zlib.dev
-          ];
           cargoExtraArgs = "--example demo --features chafa-static";
-          # Environment for pkg-config and bindgen
-          PKG_CONFIG_PATH = "${chafaStatic.dev}/lib/pkgconfig:${glibStatic.dev}/lib/pkgconfig:${pkgs.libsysprof-capture}/lib/pkgconfig:${pkgs.pcre2.dev}/lib/pkgconfig:${pkgs.libffi.dev}/lib/pkgconfig:${pkgs.zlib.dev}/lib/pkgconfig";
-          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-          BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.glibc.dev}/include";
         });
 
       screenshotTests = import ./screenshot-tests.nix { inherit pkgs src self system; };
+
+      # Feature matrix for checks
+      featureMatrix = {
+        default       = { args = "";                                 extraArgs = {}; };
+        chafa-libload = { args = "--features chafa-libload";         extraArgs = {}; };
+        chafa-static  = { args = "--features chafa-static";          extraArgs = chafaBuildArgs; };
+        full          = { args = "--features serde,tokio,chafa-dyn"; extraArgs = chafaBuildArgs; };
+      };
+
+      mkClippy = name: { args, extraArgs }:
+        craneLib.cargoClippy (commonArgs // {
+          inherit cargoArtifacts;
+          cargoClippyExtraArgs = "${args} --all-targets -- --deny warnings";
+        } // extraArgs);
+
+      mkNextest = name: { args, extraArgs }:
+        craneLib.cargoNextest (commonArgs // {
+          inherit cargoArtifacts;
+          cargoExtraArgs = args;
+          partitions = 1;
+          partitionType = "count";
+        } // extraArgs);
+
+      mkDoc = name: { args, extraArgs }:
+        craneLib.cargoDoc (commonArgs // {
+          inherit cargoArtifacts;
+          cargoExtraArgs = args;
+        } // extraArgs);
+
+      matrixChecks = lib.foldl' (acc: name: acc // {
+        "clippy-${name}"  = mkClippy name featureMatrix.${name};
+        "nextest-${name}" = mkNextest name featureMatrix.${name};
+        "doc-${name}"     = mkDoc name featureMatrix.${name};
+      }) {} (lib.attrNames featureMatrix);
 
       # Cross-compile to Windows
       pkgsWindows = import nixpkgs {
@@ -148,39 +168,8 @@
     in {
       checks = {
         inherit ratatui-image;
-
-        # Run clippy (and deny all warnings) on the crate source,
-        # again, reusing the dependency artifacts from above.
-        #
-        # Note that this is done as a separate derivation so that
-        # we can block the CI if there are issues here, but not
-        # prevent downstream consumers from building our crate by itself.
-        ratatui-image-clippy = craneLib.cargoClippy (commonArgs
-          // {
-            inherit cargoArtifacts;
-            cargoClippyExtraArgs = "--all-targets -- --deny warnings";
-          });
-
-        ratatui-image-doc = craneLib.cargoDoc (commonArgs
-          // {
-            inherit cargoArtifacts;
-          });
-
-        # Check formatting
-        ratatui-image-fmt = craneLib.cargoFmt {
-          inherit src;
-        };
-
-        # Run tests with cargo-nextest
-        # Consider setting `doCheck = false` on `ratatui-image` if you do not want
-        # the tests to run twice
-        ratatui-image-nextest = craneLib.cargoNextest (commonArgs
-          // {
-            inherit cargoArtifacts;
-            partitions = 1;
-            partitionType = "count";
-          });
-      };
+        ratatui-image-fmt = craneLib.cargoFmt { inherit src; };
+      } // matrixChecks;
 
       packages =
         {
