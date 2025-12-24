@@ -1,6 +1,6 @@
 //! Widget that separates resize+encode from rendering.
 //! This allows for rendering to be non-blocking, offloading resize+encode into another thread.
-//! See examples/async.rs for how to setup the threads and channels.
+//! See examples/thread.rs and examples/tokio.rs for how to setup the threads and channels.
 //! At least one worker thread for resize+encode is required, the example shows how to combine
 //! the needs-resize-polling with other terminal events into one event loop.
 

@@ -26,6 +26,7 @@ termion = ["ratatui/termion"]
 termwiz = ["ratatui/termwiz"]
 serde = ["dep:serde"]
 tokio = ["dep:tokio"]
+thread-example = []
 chafa-libload = ["dep:libloading"]
 chafa-dyn = ["dep:pkg-config"]
 chafa-static = ["dep:pkg-config"]
@@ -64,7 +65,7 @@ doc-scrape-examples = true
 
 [[example]]
 name = "thread"
-required-features = ["crossterm"]
+required-features = ["crossterm", "thread-example"] # clashes with "tokio".
 
 [[example]]
 name = "tokio"
