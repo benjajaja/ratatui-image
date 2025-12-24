@@ -41,7 +41,8 @@ Contour   | `Sixel`  | ❌ | ❌ | Does not clear graphics.
 ctx       | `Sixel`  | ❌ | ❌ | Buggy.
 Warp      | `iTerm2` | ❌ | -  | iTerm2 does not clear, Kitty unicode-placeholders part not implemented.
 
-"QA" means that there is a flake VM test that runs the demo and takes a screenshot, posted as PR comment. A `-` means it's not possible or applicable to add a screenshot-test.
+"QA" means that there is a flake VM test that runs the demo and takes a screenshot, posted as PR comment.
+`-` means it's not possible or applicable to add a screenshot-test.
 
 [Link to latest screenshot of the test-suite on `master`](https://benjajaja.github.io/ratatui-image-screenshots/)
 
@@ -63,6 +64,8 @@ Sixel image rendered on the last line of terminal causes a scroll | [#57](https:
   A terminal file manager that can preview images.
 * [Aerostream](https://github.com/shigepon7/aerostream)
   A Bluesky client using EventStream.
+* [Eilmeldung](https://github.com/christo-auer/eilmeldung)
+  RSS reader
 
 Many more, see ![crate dependants](https://crates.io/crates/ratatui-image/reverse_dependencies)
 and ![github dependency graph](https://github.com/benjajaja/ratatui-image/network/dependencies)

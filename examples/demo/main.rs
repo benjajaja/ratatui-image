@@ -20,7 +20,7 @@ use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Stylize},
-    text::{Line, Text},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 use ratatui_image::{
@@ -146,6 +146,12 @@ impl App {
                 }
             }
             'i' => {
+                // Normally, we *never* would want to switch the detected protocol.
+                // This is for some debug session, where you want to test some other protocol than
+                // the detected.
+                // Changing "live" is also quite hazardous, as this will render some artifacts in
+                // between, or even trigger error messages, or crashes.
+                // If you need to "downgrade" e.g. to Halfblocks, then do it before any renders.
                 let next = self.picker.protocol_type().next();
                 self.picker.set_protocol_type(next);
                 self.reset_images();
@@ -281,14 +287,19 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     f.render_widget(
         paragraph(vec![
             Line::from("Key bindings:"),
-            Line::from("H/L: resize"),
-            Line::from(format!(
-                "i: cycle image protocols (current: {:?})",
-                app.picker.protocol_type()
-            )),
-            Line::from("o: cycle image"),
-            Line::from(format!("t: toggle ({:?})", app.show_images)),
+            Line::from(vec![
+                Span::from("H").green(),
+                Span::from("/"),
+                Span::from("L").green(),
+                Span::from(": resize"),
+            ]),
+            Line::from(vec![Span::from("o").green(), Span::from(": cycle image")]),
+            Line::from(vec![
+                Span::from("t").green(),
+                Span::from(format!(": toggle ({:?})", app.show_images)),
+            ]),
             Line::from(format!("Font size: {:?}", app.picker.font_size())),
+            Line::from(format!("Protocol: {:?}", app.picker.protocol_type())),
         ]),
         area,
     );
