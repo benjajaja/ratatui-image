@@ -124,6 +124,7 @@ impl StatefulProtocol {
         }
     }
 
+    // Calculate the area that this image will ultimately render to, inside the given area.
     pub fn size_for(&self, resize: Resize, area: Rect) -> Rect {
         resize.render_area(&self.source, self.font_size, area)
     }
