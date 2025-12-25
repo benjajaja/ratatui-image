@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
   * Removed libloading, because if it would be available at runtime, it should also be available
     at compile time.
 * Minor stdin-read-timeout adjustments
+* Deprecate `Picker::from_fontsize`, add `Picker::halfblocks`
+* Added timeout option to `Picker::from_query_stdio_with_options`.
 
 ## [8.1.1] - 2025-12-18
 
