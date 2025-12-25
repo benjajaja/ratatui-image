@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [9.0.0] - 2025-12-25
+
 * Split `chafa` feature into two mutually exclusive features:
   * `chafa-dyn` (default): Dynamically links against `libchafa.so` at compile time.
     Requires libchafa to be available at runtime the same way it was at compile time.
