@@ -33,19 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err(format!("Usage: {progname} <path/to/image>").into());
     };
 
-    let picker = Picker::from_query_stdio().unwrap_or_else(|_| {
-        let font_width = env::args()
-            .nth(2)
-            .expect("Usage: <program> <path/to/image> <font-width> <font-height>");
-        let font_height = env::args()
-            .nth(3)
-            .expect("Usage: <program> <path/to/image> <font-width> <font-height>");
-        let font_size = (
-            font_height.parse::<u16>().expect("could not parse size"),
-            font_width.parse::<u16>().expect("could not parse size"),
-        );
-        Picker::from_fontsize(font_size)
-    });
+    let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();

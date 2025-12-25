@@ -67,10 +67,6 @@ Sixel image rendered on the last line of terminal causes a scroll | [#57](https:
 * [Eilmeldung](https://github.com/christo-auer/eilmeldung)
   RSS reader
 
-Many more, see ![crate dependants](https://crates.io/crates/ratatui-image/reverse_dependencies)
-and ![github dependency graph](https://github.com/benjajaja/ratatui-image/network/dependencies)
-(note that github includes a huge number of unrelated dotfile repos).
-
 ### Comparison
 
 * [viuer](https://crates.io/crates/viuer)

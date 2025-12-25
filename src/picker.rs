@@ -151,17 +151,32 @@ impl Picker {
         }
     }
 
-    /// Create a picker from a given terminal [FontSize].
-    /// This is the only way to create a picker on windows, for now.
+    /// Create a picker that is guaranteed to only work with Halfblocks.
     ///
     /// # Example
     /// ```rust
     /// use ratatui_image::picker::Picker;
     ///
-    /// let user_fontsize = (7, 14);
-    ///
-    /// let mut picker = Picker::from_fontsize(user_fontsize);
+    /// let mut picker = Picker::halfblocks();
     /// ```
+    pub fn halfblocks() -> Self {
+        // Detect tmux, ignore iTerm2 as we don't have font-size.
+        let (is_tmux, _tmux_proto) = detect_tmux_and_outer_protocol_from_env();
+
+        Self {
+            font_size: (10, 20),
+            background_color: DEFAULT_BACKGROUND,
+            protocol_type: ProtocolType::Halfblocks,
+            is_tmux,
+            capabilities: Vec::new(),
+        }
+    }
+
+    /// Create a picker from a given terminal [FontSize].
+    #[deprecated(
+        since = "9.0.0",
+        note = "use `from_query_stdio` or `halfblocks` instead"
+    )]
     pub fn from_fontsize(font_size: FontSize) -> Self {
         // Detect tmux, and if positive then take some risky guess for iTerm2 support.
         let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();

@@ -19,6 +19,8 @@
 
 ## Image widgets with multiple graphics protocol backends for [ratatui]
 
+**Unify terminal image rendering across Sixels, Kitty, and iTerm2 protocols.**
+
 [ratatui] is an immediate-mode TUI library.
 ratatui-image tackles 3 general problems when rendering images with an immediate-mode TUI:
 
@@ -62,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Should use Picker::from_query_stdio() to get the font size and protocol,
     // but we can't put that here because that would break doctests!
-    let mut picker = Picker::from_fontsize((8, 12));
+    let mut picker = Picker::halfblocks();
 
     // Load an image with the image crate.
     let dyn_img = image::ImageReader::open("./assets/Ada.png")?.decode()?;
@@ -116,7 +118,7 @@ a desired columns+rows bound, and so on.
 
 The lib also includes a binary that renders an image file, but it is focused on testing.
 
-### Features
+## Features
 
 #### Backend
 
@@ -131,6 +133,8 @@ The lib also includes a binary that renders an image file, but it is focused on 
   Requires libchafa to be available at runtime in the same way.
 * `chafa-static` to statically link against libchafa.a at compile time. The library is embedded
   in the binary.
+* If you absolutely don't want to deal with libchafa, then you should use
+  `--no-default-features --features image-defaults,crossterm` or a variation thereof.
 
 Note: The chafa features are mutually exclusive - only enable one at a time.
 
@@ -196,10 +200,6 @@ Sixel image rendered on the last line of terminal causes a scroll | [#57](https:
   A Bluesky client using EventStream.
 * [Eilmeldung](https://github.com/christo-auer/eilmeldung)
   RSS reader
-
-Many more, see ![crate dependants](https://crates.io/crates/ratatui-image/reverse_dependencies)
-and ![github dependency graph](https://github.com/benjajaja/ratatui-image/network/dependencies)
-(note that github includes a huge number of unrelated dotfile repos).
 
 ### Comparison
 
