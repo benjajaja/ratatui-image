@@ -1,7 +1,6 @@
-//! Chafa-based halfblocks implementation using compile-time static linking.
+//! Chafa-based halfblocks implementation using compile-time linking.
 //!
-//! This module uses compile-time static linking to libchafa.a.
-//! Used by the chafa-static feature only.
+//! This module uses compile-time linking to libchafa.so (dyn) or libchafa.a (static).
 
 use std::ffi::c_void;
 use std::sync::OnceLock;

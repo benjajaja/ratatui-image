@@ -47,7 +47,7 @@ let
 
       # Ensure required packages are available
       environment.systemPackages = with pkgs;
-        terminalPackages;
+        terminalPackages ++ [ chafa ];
     };
 
     testScript = ''

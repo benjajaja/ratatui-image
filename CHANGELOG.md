@@ -4,13 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-* Split `chafa` feature into three mutually exclusive features:
-  * `chafa-libload`: Uses libloading to load libchafa at runtime. No compile-time linking required.
-    Falls back to primitive halfblocks if libchafa is not found at runtime.
-  * `chafa-dyn`: Dynamically links against `libchafa.so` at compile time.
+* Split `chafa` feature into two mutually exclusive features:
+  * `chafa-dyn` (default): Dynamically links against `libchafa.so` at compile time.
     Requires libchafa to be available at runtime the same way it was at compile time.
   * `chafa-static`: Statically links against `libchafa.a` at compile time.
-    The library is embedded in the binary (see flake.nix for an example on how to build with static chafa).
+    The library is embedded in the binary (see flake.nix for an example on how to build with a
+    static chafa).
+  * Removed libloading, because if it would be available at runtime, it should also be available
+    at compile time.
 * Minor stdin-read-timeout adjustments
 
 ## [8.1.1] - 2025-12-18

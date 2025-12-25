@@ -98,7 +98,7 @@
         // chafaBuildArgs
         // {
           inherit cargoArtifacts;
-          cargoExtraArgs = "--features chafa-static";
+          cargoExtraArgs = "--no-default-features --features chafa-static,image-defaults,crossterm";
         });
 
       ratatui-demo = craneLib.buildPackage (commonArgs
@@ -106,16 +106,20 @@
         // {
           inherit cargoArtifacts;
           pname = "demo";
-          cargoExtraArgs = "--example demo --features chafa-static";
+          cargoExtraArgs = "--example demo --no-default-features --features chafa-static,image-defaults,crossterm";
+          installPhaseCommand = ''
+            mkdir -p $out/bin
+            cp target/release/examples/demo $out/bin/
+          '';
         });
 
       screenshotTests = import ./screenshot-tests.nix { inherit pkgs src self system; };
 
       # Feature matrix for checks
       featureMatrix = {
-        default        = { args = "";                                 extraArgs = {}; };
-        chafa-libload  = { args = "--features chafa-libload";         extraArgs = chafaBuildArgs; };
-        chafa-static   = { args = "--features chafa-static";          extraArgs = chafaBuildArgs; };
+        default        = { args = ""; extraArgs = chafaBuildArgs; };
+        no-chafa       = { args = "--no-default-features --features image-defaults,crossterm"; extraArgs = {}; };
+        chafa-static   = { args = "--no-default-features --features chafa-static,image-defaults,crossterm"; extraArgs = chafaBuildArgs; };
         full           = { args = "--features serde,tokio,chafa-dyn"; extraArgs = chafaBuildArgs; };
         thread-example = { args = "--features thread-example"; extraArgs = chafaBuildArgs; };
       };
@@ -164,6 +168,7 @@
         src = craneLibWindows.cleanCargoSource ./.;
         strictDeps = true;
         doCheck = false;
+        cargoExtraArgs = "--no-default-features --features image-defaults,crossterm";
       };
 
     in {

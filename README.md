@@ -116,25 +116,34 @@ a desired columns+rows bound, and so on.
 
 The lib also includes a binary that renders an image file, but it is focused on testing.
 
-## Features
-* `crossterm` or `termion` should match your ratatui backend. `termwiz` is available, but not
-  working correctly with ratatui-image.
-* `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
-  useful to save it in some user configuration.
-* `image-defaults` (default) just enables `image/defaults` (`image` has `default-features =
-false`). To only support a selection of image formats and cut down dependencies, disable this
-  feature, add `image` to your crate, and enable its features/formats as desired. See
-  <https://doc.rust-lang.org/cargo/reference/features.html#feature-unification/>.
-* `tokio` whether to use tokio's `UnboundedSender` in `ThreadProtocol`
-* `chafa-libload` to use the amazing [chafa](https://hpjansson.org/chafa/) library for rendering
-  without image protocols. Loads the chafa C library at runtime with libloading, without any
-  compile-time linkage. Falls back to primitive halfblocks if libchafa is not available.
-* `chafa-dyn` to dynamically link against libchafa.so at compile time. Requires libchafa to be
-  available at runtime.
+### Features
+
+#### Backend
+
+* `crossterm` (default) if this matches your ratatui backend (most likely).
+* `termion` if this matches your ratatui backend.
+* `termwiz` is available, but not working correctly with ratatui-image.
+
+#### Chafa library
+
+* `chafa-dyn` (default) to use the amazing [chafa](https://hpjansson.org/chafa/) library for
+  rendering without image protocols. Dynamically link against libchafa.so at compile time.
+  Requires libchafa to be available at runtime in the same way.
 * `chafa-static` to statically link against libchafa.a at compile time. The library is embedded
   in the binary.
 
 Note: The chafa features are mutually exclusive - only enable one at a time.
+
+#### Others
+
+* `image-defaults` (default) just enables `image/defaults` (`image` has `default-features =
+  false`). To only support a selection of image formats and cut down dependencies, disable this
+  feature, add `image` to your crate, and enable its features/formats as desired. See
+  <https://doc.rust-lang.org/cargo/reference/features.html#feature-unification/>.
+* `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
+  useful to save it in some user configuration.
+* `tokio` whether to use tokio's `UnboundedSender` in `ThreadProtocol`.
+
 
 [ratatui]: https://github.com/ratatui-org/ratatui
 [sixel]: https://en.wikipedia.org/wiki/Sixel
