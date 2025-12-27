@@ -52,7 +52,10 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), Box<dyn Error>>
+where
+    <B as ratatui::backend::Backend>::Error: 'static,
+{
     let mut last_tick = Instant::now();
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
