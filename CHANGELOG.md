@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [10.0.0] - 2025-12-27
+
 ## [9.0.0] - 2025-12-25
 
 * Split `chafa` feature into two mutually exclusive features:
