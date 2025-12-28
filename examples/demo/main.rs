@@ -85,9 +85,7 @@ impl App {
         };
         let image_source = image::ImageReader::open(image).unwrap().decode().unwrap();
 
-        let mut picker = Picker::from_query_stdio().unwrap();
-        // Set completely transparent background (experimental, only works for iTerm2 and Kitty).
-        picker.set_background_color([0, 0, 0, 0]);
+        let picker = Picker::from_query_stdio().unwrap();
 
         let image_static = picker
             .new_protocol(image_source.clone(), size(), Resize::Fit(None))
