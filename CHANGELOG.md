@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [10.0.2] - 2025-12-28
+
 * Updated to latest [icy_sixel](https://github.com/mkrueger/icy_sixel/pull/14) v0.5.0 with 
   transparency support. If you have been overriding the Picker's background color because there
   were black bars with Sixels at the bottom or right of an image, you don't need to do that anymore.
