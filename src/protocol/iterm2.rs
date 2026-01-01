@@ -37,6 +37,7 @@ fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String
     // image due to skipping of the following characters _in the buffer_.
     // DECERA does not work in WezTerm, however ECH and and cursor CUD and CUU do.
     // For each line, erase `width` characters, then move back and place image.
+    // TODO: unify this with sixel
     let width = render_area.width;
     let height = render_area.height;
     let mut seq = String::from(start);

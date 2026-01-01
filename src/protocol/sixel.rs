@@ -8,7 +8,7 @@
 use icy_sixel::{EncodeOptions, sixel_encode};
 use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
-use std::cmp::min;
+use std::{cmp::min, fmt::Write};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
 use crate::{Result, errors::Errors, picker::cap_parser::Parser};
@@ -23,7 +23,7 @@ pub struct Sixel {
 
 impl Sixel {
     pub fn new(image: DynamicImage, area: Rect, is_tmux: bool) -> Result<Self> {
-        let data = encode(&image, is_tmux)?;
+        let data = encode(&image, area, is_tmux)?;
         Ok(Self {
             data,
             area,
@@ -33,7 +33,7 @@ impl Sixel {
 }
 
 // TODO: change E to sixel_rs::status::Error and map when calling
-fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
+fn encode(img: &DynamicImage, area: Rect, is_tmux: bool) -> Result<String> {
     let (w, h) = (img.width(), img.height());
     let img_rgba8 = img.to_rgba8();
     let bytes = img_rgba8.as_raw();
@@ -41,8 +41,21 @@ fn encode(img: &DynamicImage, is_tmux: bool) -> Result<String> {
     let mut data = sixel_encode(bytes, w as usize, h as usize, &EncodeOptions::default())
         .map_err(|err| Errors::Sixel(format!("sixel encoding error: {err}")))?;
 
+    let (start, escape, end) = Parser::escape_tmux(is_tmux);
+    // Transparency needs explicit erasing of stale characters, or they stay behind the rendered
+    // image due to skipping of the following characters _in the buffer_.
+    // See comment in iterm2::encode about why we use ECH and movements instead of DECERA.
+    // TODO: unify this with iterm2
+    let mut clear_seq = String::new();
+    let width = area.width;
+    let height = area.height;
+    for _ in 0..height {
+        write!(clear_seq, "{escape}[{width}X{escape}[1B").unwrap();
+    }
+    write!(clear_seq, "{escape}[{height}A").unwrap();
+    data.insert_str(0, &clear_seq);
+
     if is_tmux {
-        let (start, escape, end) = Parser::escape_tmux(is_tmux);
         if data.strip_prefix('\x1b').is_none() {
             return Err(Errors::Tmux("sixel string did not start with escape"));
         }
@@ -122,7 +135,7 @@ fn render_area(rect: Rect, area: Rect, overdraw: bool) -> Option<Rect> {
 
 impl StatefulProtocolTrait for Sixel {
     fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()> {
-        let data = encode(&img, self.is_tmux)?;
+        let data = encode(&img, area, self.is_tmux)?;
         *self = Sixel {
             data,
             area,
