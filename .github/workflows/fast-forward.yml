@@ -23,3 +23,5 @@ jobs:
           # never post a comment.  (In all cases the information is
           # still available in the step's summary.)
           comment: never
+          # Use PAT to allow the push to trigger CI workflow
+          github_token: ${{ secrets.PAT }}
