@@ -339,13 +339,12 @@ impl Resize {
         // Resize/Crop/etc., fitting a multiple of font-size, but not necessarily the area.
         let mut image = self.resize_image(source, width, height);
 
-        // Always pad to area size with background color, Sixel doesn't have transparency
-        // and would get a white background by the sixel library.
-        // Once Sixel gets transparency support, only pad
-        // `if image.width() != width || image.height() != height`.
-        let mut bg: DynamicImage = ImageBuffer::from_pixel(width, height, background_color).into();
-        imageops::overlay(&mut bg, &image, 0, 0);
-        image = bg;
+        if image.width() != width || image.height() != height {
+            let mut bg: DynamicImage =
+                ImageBuffer::from_pixel(width, height, background_color).into();
+            imageops::overlay(&mut bg, &image, 0, 0);
+            image = bg;
+        }
         image
     }
 
