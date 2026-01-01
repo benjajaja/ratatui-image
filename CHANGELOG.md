@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+* Fix transparent sixel images not having background cleared (same as iterm2).
+
 ## [10.0.2] - 2025-12-28
 
 * Updated to latest [icy_sixel](https://github.com/mkrueger/icy_sixel/pull/14) v0.5.0 with 
