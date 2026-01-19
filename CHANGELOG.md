@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 * Fix transparent sixel images not having background cleared (same as iterm2).
+* Sixels don't need to always be overlayed / padded, since we now have transparency.
 
 ## [10.0.2] - 2025-12-28
 
