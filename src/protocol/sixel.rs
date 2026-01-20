@@ -1,8 +1,8 @@
 //! Sixel protocol implementations.
-//! Uses [`sixel-bytes`] to draw image pixels, if the terminal [supports] the [Sixel] protocol.
+//! Uses [`icy_sixel`] to draw image pixels, if the terminal [supports] the [Sixel] protocol.
 //! Needs the `sixel` feature.
 //!
-//! [`sixel-bytes`]: https://github.com/benjajaja/sixel-bytes
+//! [`icy_sixel`]: https://github.com/mkrueger/icy_sixel
 //! [supports]: https://arewesixelyet.com
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel
 use icy_sixel::{EncodeOptions, sixel_encode};
