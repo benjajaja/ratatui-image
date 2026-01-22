@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [10.0.4] - 2026-01-22
+
 ## [10.0.3] - 2026-01-19
 
 * Fix transparent sixel images not having background cleared (same as iterm2).
