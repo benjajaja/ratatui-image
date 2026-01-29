@@ -19,9 +19,8 @@ struct KittyProtoState {
 impl KittyProtoState {
     fn new(img: &DynamicImage, id: u32, is_tmux: bool) -> Self {
         let transmit_str = transmit_virtual(img, id, is_tmux);
-        let (_, escape, _) = Parser::escape_tmux(is_tmux);
         let [id_extra, id_r, id_g, id_b] = id.to_be_bytes();
-        let id_color = format!("{escape}[38;2;{id_r};{id_g};{id_b}m");
+        let id_color = format!("\x1b[38;2;{id_r};{id_g};{id_b}m");
         let id_extra = u16::from(id_extra);
         Self {
             transmitted: Arc::new(AtomicBool::new(false)),
@@ -47,7 +46,6 @@ impl KittyProtoState {
 pub struct Kitty {
     proto_state: KittyProtoState,
     area: Rect,
-    is_tmux: bool,
 }
 
 impl Kitty {
@@ -57,7 +55,6 @@ impl Kitty {
         Ok(Self {
             proto_state,
             area,
-            is_tmux,
         })
     }
 }
@@ -67,14 +64,7 @@ impl ProtocolTrait for Kitty {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
 
-        render(
-            area,
-            self.area,
-            buf,
-            self.is_tmux,
-            &self.proto_state.id,
-            seq,
-        );
+        render(area, self.area, buf, &self.proto_state.id, seq);
     }
 
     fn area(&self) -> Rect {
@@ -92,9 +82,8 @@ pub struct StatefulKitty {
 
 impl StatefulKitty {
     pub fn new(id: u32, is_tmux: bool) -> StatefulKitty {
-        let (_, escape, _) = Parser::escape_tmux(is_tmux);
         let [id_extra, id_r, id_g, id_b] = id.to_be_bytes();
-        let id_color = format!("{escape}[38;2;{id_r};{id_g};{id_b}m");
+        let id_color = format!("\x1b[38;2;{id_r};{id_g};{id_b}m");
         let id_extra = u16::from(id_extra);
         StatefulKitty {
             id: (id, id_color, id_extra),
@@ -110,7 +99,7 @@ impl ProtocolTrait for StatefulKitty {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
 
-        render(area, self.rect, buf, self.is_tmux, &self.id, seq);
+        render(area, self.rect, buf, &self.id, seq);
     }
 
     fn area(&self) -> Rect {
@@ -131,21 +120,17 @@ fn render(
     area: Rect,
     rect: Rect,
     buf: &mut Buffer,
-    is_tmux: bool,
     (_, id_color, id_extra): &(u32, String, u16),
     mut seq: Option<&str>,
 ) {
-    let (start, escape, end) = Parser::escape_tmux(is_tmux);
-
     let full_width = area.width.min(rect.width);
     let width_usize = usize::from(full_width);
 
-    let estimated_placeholder_row_size = start.len() +
+    let estimated_placeholder_row_size =
         id_color.len() +
         30 +  // diacritics
         (width_usize * 4) +
-        30 + // restore cursor dance
-        end.len();
+        30; // restore cursor dance
     let estimated_transmit_row_size =
         estimated_placeholder_row_size + if let Some(seq) = seq { seq.len() } else { 0 };
     let mut symbol = String::with_capacity(estimated_transmit_row_size);
@@ -156,7 +141,7 @@ fn render(
     // the end of the area.
     let right = area.width - 1;
     let down = area.height - 1;
-    let restore_cursor = format!("{escape}[u{escape}[{right}C{escape}[{down}B{end}");
+    let restore_cursor = format!("\x1b[u\x1b[{right}C\x1b[{down}B");
 
     // Clamp to effectively 297, the number of placeholders in the Kitty protocol.
     // Anything beyond would just render the something that's wrong, so skip.
@@ -172,7 +157,6 @@ fn render(
         if y == 1 {
             symbol.shrink_to(estimated_placeholder_row_size);
         }
-        symbol.push_str(start);
 
         // If not transmitted in previous renders, only transmit once at the
         // first line.
@@ -184,8 +168,7 @@ fn render(
         // placeholder sequence
         write!(
             symbol,
-            // Set the background color to the kitty id
-            "{escape}[s{id_color}\u{10EEEE}{}{}{}",
+            "\x1b[s{id_color}\u{10EEEE}{}{}{}",
             diacritic(y),
             diacritic(0),
             diacritic(*id_extra)
