@@ -52,10 +52,7 @@ impl Kitty {
     /// Create a FixedKitty from an image.
     pub fn new(image: DynamicImage, area: Rect, id: u32, is_tmux: bool) -> Result<Self> {
         let proto_state = KittyProtoState::new(&image, id, is_tmux);
-        Ok(Self {
-            proto_state,
-            area,
-        })
+        Ok(Self { proto_state, area })
     }
 }
 
@@ -126,8 +123,7 @@ fn render(
     let full_width = area.width.min(rect.width);
     let width_usize = usize::from(full_width);
 
-    let estimated_placeholder_row_size =
-        id_color.len() +
+    let estimated_placeholder_row_size = id_color.len() +
         30 +  // diacritics
         (width_usize * 4) +
         30; // restore cursor dance
