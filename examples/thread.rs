@@ -27,6 +27,7 @@ struct App {
     source_code_lines: Vec<String>,
 }
 
+#[expect(clippy::large_enum_variant)]
 enum AppEvent {
     KeyEvent(KeyEvent),
     Redraw(Result<ResizeResponse, Errors>),
