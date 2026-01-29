@@ -41,6 +41,7 @@ pub struct Kitty {
     proto_state: KittyProtoState,
     unique_id: u32,
     area: Rect,
+    is_tmux: bool,
 }
 
 impl Kitty {
@@ -51,6 +52,7 @@ impl Kitty {
             proto_state,
             unique_id: id,
             area,
+            is_tmux,
         })
     }
 }
@@ -60,7 +62,7 @@ impl ProtocolTrait for Kitty {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
 
-        render(area, self.area, buf, self.unique_id, seq);
+        render(area, self.area, buf, self.is_tmux, self.unique_id, seq);
     }
 
     fn area(&self) -> Rect {
@@ -92,7 +94,7 @@ impl ProtocolTrait for StatefulKitty {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
 
-        render(area, self.rect, buf, self.unique_id, seq);
+        render(area, self.rect, buf, self.is_tmux, self.unique_id, seq);
     }
 
     fn area(&self) -> Rect {
@@ -110,10 +112,12 @@ impl StatefulProtocolTrait for StatefulKitty {
     }
 }
 
-fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&str>) {
+fn render(area: Rect, rect: Rect, buf: &mut Buffer, is_tmux: bool, id: u32, mut seq: Option<&str>) {
+    let (start, escape, end) = Parser::escape_tmux(is_tmux);
+
     let [id_extra, id_r, id_g, id_b] = id.to_be_bytes();
     // Set the background color to the kitty id
-    let id_color = format!("\x1b[38;2;{id_r};{id_g};{id_b}m");
+    let id_color = format!("{escape}[38;2;{id_r};{id_g};{id_b}m");
 
     // Draw each line of unicode placeholders but all into the first cell.
     // I couldn't work out actually drawing into each cell of the buffer so
@@ -124,7 +128,10 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&st
     for y in 0..(area.height.min(rect.height)) {
         // If not transmitted in previous renders, only transmit once at the
         // first line for obvious reasons.
-        let mut symbol = seq.take().unwrap_or_default().to_owned();
+        let mut symbol = start.to_owned();
+        if let Some(seq) = seq.take() {
+            symbol.push_str(seq);
+        }
 
         // the save-cursor-position string len that we write at the beginning
         let save_cursor_and_placeholder_len: usize = 3 + id_color.len() + (4 * 4);
@@ -134,14 +141,19 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&st
         let full_width = area.width.min(rect.width);
         let width_usize = usize::from(full_width);
 
-        symbol
-            .reserve(save_cursor_and_placeholder_len + (width_usize * 4) + RESTORE_CURSOR_POS_LEN);
+        symbol.reserve(
+            start.len()
+                + save_cursor_and_placeholder_len
+                + (width_usize * 4)
+                + RESTORE_CURSOR_POS_LEN
+                + end.len(),
+        );
 
         // Save cursor postion, including fg color which is what we want, and start the unicode
         // placeholder sequence
         write!(
             symbol,
-            "\x1b[s{id_color}\u{10EEEE}{}{}{}",
+            "{escape}[s{id_color}\u{10EEEE}{}{}{}",
             diacritic(y),
             diacritic(0),
             diacritic(u16::from(id_extra))
@@ -163,7 +175,8 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&st
         // the end of the area.
         let right = area.width - 1;
         let down = area.height - 1;
-        write!(symbol, "\x1b[u\x1b[{right}C\x1b[{down}B").unwrap();
+        write!(symbol, "{escape}[u{escape}[{right}C{escape}[{down}B").unwrap();
+        write!(symbol, "{end}").unwrap();
 
         if let Some(cell) = buf.cell_mut((area.left(), area.top() + y)) {
             cell.set_symbol(&symbol);
