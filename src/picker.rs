@@ -124,8 +124,7 @@ impl Picker {
 
                 // Wezterm reports kitty support but its implementation is incomplete.
                 // Suppress kitty and default to iterm2 (which wezterm fully supports).
-                let is_wezterm = env::var("WEZTERM_EXECUTABLE")
-                    .is_ok_and(|s| !s.is_empty());
+                let is_wezterm = env::var("WEZTERM_EXECUTABLE").is_ok_and(|s| !s.is_empty());
 
                 // IO-based detection is authoritative; env-based hints are fallbacks
                 // (env vars like KITTY_WINDOW_ID can be stale in tmux sessions).
@@ -303,11 +302,9 @@ fn detect_tmux_and_outer_protocol_from_env() -> (bool, Option<ProtocolType>) {
         .and_then(|mut child| child.wait()); // wait(), for check_device_attrs.
 
     // Crude guess based on the *existence* of some magic program specific env vars.
-    // Produces false positives, for example xterm started from kitty inherits KITTY_WINDOW_ID.
-    // Furthermore, tmux shares env vars from the first session, for example tmux started in xterm
-    // after a previous tmux session started in kitty, inherits KITTY_WINDOW_ID.
-    const OUTER_TERM_HINTS: [(&str, ProtocolType); 3] = [
-        ("KITTY_WINDOW_ID", ProtocolType::Kitty), // TODO: query should work inside tmux, remove?
+    // Note: kitty is detected via io query (which works through tmux passthrough),
+    // not env vars, since KITTY_WINDOW_ID is often stale in tmux sessions.
+    const OUTER_TERM_HINTS: [(&str, ProtocolType); 2] = [
         ("ITERM_SESSION_ID", ProtocolType::Iterm2),
         ("WEZTERM_EXECUTABLE", ProtocolType::Iterm2),
     ];
