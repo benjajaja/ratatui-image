@@ -37,32 +37,39 @@ fn encode(img: &DynamicImage, area: Rect, is_tmux: bool) -> Result<String> {
     let (w, h) = (img.width(), img.height());
     let img_rgba8 = img.to_rgba8();
     let bytes = img_rgba8.as_raw();
-
-    let mut data = sixel_encode(bytes, w as usize, h as usize, &EncodeOptions::default())
-        .map_err(|err| Errors::Sixel(format!("sixel encoding error: {err}")))?;
-
     let (start, escape, end) = Parser::escape_tmux(is_tmux);
+
     // Transparency needs explicit erasing of stale characters, or they stay behind the rendered
     // image due to skipping of the following characters _in the buffer_.
     // See comment in iterm2::encode about why we use ECH and movements instead of DECERA.
     // TODO: unify this with iterm2
-    let mut clear_seq = String::new();
     let width = area.width;
     let height = area.height;
-    for _ in 0..height {
-        write!(clear_seq, "{escape}[{width}X{escape}[1B").unwrap();
-    }
-    write!(clear_seq, "{escape}[{height}A").unwrap();
-    data.insert_str(0, &clear_seq);
 
+    let sixel_data = sixel_encode(bytes, w as usize, h as usize, &EncodeOptions::default())
+        .map_err(|err| Errors::Sixel(format!("sixel encoding error: {err}")))?;
+
+    let mut data = String::new();
     if is_tmux {
-        if data.strip_prefix('\x1b').is_none() {
+        if !sixel_data.starts_with('\x1b') {
             return Err(Errors::Tmux("sixel string did not start with escape"));
         }
-
-        data.insert_str(0, escape);
-        data.insert_str(0, start);
+        // The clear sequence must be inside the tmux passthrough since it uses
+        // doubled escapes.
+        data.push_str(start);
+        for _ in 0..height {
+            write!(data, "{escape}[{width}X{escape}[1B").unwrap();
+        }
+        write!(data, "{escape}[{height}A").unwrap();
+        data.push_str(escape);
+        data.push_str(&sixel_data[1..]);
         data.push_str(end);
+    } else {
+        for _ in 0..height {
+            write!(data, "{escape}[{width}X{escape}[1B").unwrap();
+        }
+        write!(data, "{escape}[{height}A").unwrap();
+        data.push_str(&sixel_data);
     }
     Ok(data)
 }
