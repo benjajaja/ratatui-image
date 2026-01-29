@@ -29,8 +29,6 @@ fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String
     let mut png: Vec<u8> = vec![];
     img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)?;
 
-    let data = base64_simd::STANDARD.encode_to_string(&png);
-
     let (start, escape, end) = Parser::escape_tmux(is_tmux);
 
     // Transparency needs explicit erasing of stale characters, or they stay behind the rendered
@@ -48,14 +46,16 @@ fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String
 
     write!(
         seq,
-        "{escape}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:{}\x07{end}",
+        "{escape}]1337;File=inline=1;size={};width={}px;height={}px;doNotMoveCursor=1:",
         png.len(),
         img.width(),
         img.height(),
-        data,
     )
     .unwrap();
 
+    base64_simd::STANDARD.encode_append(&png, &mut seq);
+
+    write!(seq, "\x07{end}").unwrap();
     Ok(seq)
 }
 
