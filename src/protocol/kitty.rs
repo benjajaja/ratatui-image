@@ -13,13 +13,19 @@ use super::{ProtocolTrait, StatefulProtocolTrait};
 struct KittyProtoState {
     transmitted: Arc<AtomicBool>,
     transmit_str: Option<String>,
+    id: (u32, String, u16), // Full ID, Formatted color ID, ID extra part for diacritic
 }
 
 impl KittyProtoState {
-    fn new(transmit_str: String) -> Self {
+    fn new(img: &DynamicImage, id: u32, is_tmux: bool) -> Self {
+        let transmit_str = transmit_virtual(img, id, is_tmux);
+        let [id_extra, id_r, id_g, id_b] = id.to_be_bytes();
+        let id_color = format!("\x1b[38;2;{id_r};{id_g};{id_b}m");
+        let id_extra = u16::from(id_extra);
         Self {
             transmitted: Arc::new(AtomicBool::new(false)),
             transmit_str: Some(transmit_str),
+            id: (id, id_color, id_extra),
         }
     }
 
@@ -35,23 +41,18 @@ impl KittyProtoState {
     }
 }
 
-// Fixed Kitty protocol (transmits image data on every render!)
+// Fixed Kitty protocol (transmits once via AtomicBool).
 #[derive(Clone, Default)]
 pub struct Kitty {
     proto_state: KittyProtoState,
-    unique_id: u32,
     area: Rect,
 }
 
 impl Kitty {
     /// Create a FixedKitty from an image.
     pub fn new(image: DynamicImage, area: Rect, id: u32, is_tmux: bool) -> Result<Self> {
-        let proto_state = KittyProtoState::new(transmit_virtual(&image, id, is_tmux));
-        Ok(Self {
-            proto_state,
-            unique_id: id,
-            area,
-        })
+        let proto_state = KittyProtoState::new(&image, id, is_tmux);
+        Ok(Self { proto_state, area })
     }
 }
 
@@ -60,7 +61,7 @@ impl ProtocolTrait for Kitty {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
 
-        render(area, self.area, buf, self.unique_id, seq);
+        render(area, self.area, buf, &self.proto_state.id, seq);
     }
 
     fn area(&self) -> Rect {
@@ -70,7 +71,7 @@ impl ProtocolTrait for Kitty {
 
 #[derive(Clone)]
 pub struct StatefulKitty {
-    pub unique_id: u32,
+    id: (u32, String, u16), // Full ID, Formatted color ID, ID extra part for diacritic
     rect: Rect,
     proto_state: KittyProtoState,
     is_tmux: bool,
@@ -78,8 +79,11 @@ pub struct StatefulKitty {
 
 impl StatefulKitty {
     pub fn new(id: u32, is_tmux: bool) -> StatefulKitty {
+        let [id_extra, id_r, id_g, id_b] = id.to_be_bytes();
+        let id_color = format!("\x1b[38;2;{id_r};{id_g};{id_b}m");
+        let id_extra = u16::from(id_extra);
         StatefulKitty {
-            unique_id: id,
+            id: (id, id_color, id_extra),
             rect: Rect::default(),
             proto_state: KittyProtoState::default(),
             is_tmux,
@@ -92,7 +96,7 @@ impl ProtocolTrait for StatefulKitty {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
 
-        render(area, self.rect, buf, self.unique_id, seq);
+        render(area, self.rect, buf, &self.id, seq);
     }
 
     fn area(&self) -> Rect {
@@ -102,55 +106,74 @@ impl ProtocolTrait for StatefulKitty {
 
 impl StatefulProtocolTrait for StatefulKitty {
     fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()> {
-        let data = transmit_virtual(&img, self.unique_id, self.is_tmux);
         self.rect = area;
         // If resized then we must transmit again.
-        self.proto_state = KittyProtoState::new(data);
+        self.proto_state = KittyProtoState::new(&img, self.id.0, self.is_tmux);
         Ok(())
     }
 }
 
-fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&str>) {
-    let [id_extra, id_r, id_g, id_b] = id.to_be_bytes();
-    // Set the background color to the kitty id
-    let id_color = format!("\x1b[38;2;{id_r};{id_g};{id_b}m");
+fn render(
+    area: Rect,
+    rect: Rect,
+    buf: &mut Buffer,
+    (_, id_color, id_extra): &(u32, String, u16),
+    mut seq: Option<&str>,
+) {
+    let full_width = area.width.min(rect.width);
+    let width_usize = usize::from(full_width);
 
-    // Draw each line of unicode placeholders but all into the first cell.
-    // I couldn't work out actually drawing into each cell of the buffer so
-    // that `.set_skip(true)` would be made unnecessary. Maybe some other escape
-    // sequence gets sneaked in somehow.
-    // It could also be made so that each cell starts and ends its own escape sequence
-    // with the image id, but maybe that's worse.
-    for y in 0..(area.height.min(rect.height)) {
+    let estimated_placeholder_row_size = id_color.len() +
+        30 +  // diacritics
+        (width_usize * 4) +
+        30; // restore cursor dance
+    let estimated_transmit_row_size =
+        estimated_placeholder_row_size + if let Some(seq) = seq { seq.len() } else { 0 };
+    let mut symbol = String::with_capacity(estimated_transmit_row_size);
+
+    let row_diacritics: String = std::iter::repeat_n('\u{10EEEE}', width_usize - 1).collect();
+
+    // Restore saved cursor position including color, and now we have to move back to
+    // the end of the area.
+    let right = area.width - 1;
+    let down = area.height - 1;
+    let restore_cursor = format!("\x1b[u\x1b[{right}C\x1b[{down}B");
+
+    // Clamp to effectively 297, the number of placeholders in the Kitty protocol.
+    // Anything beyond would just render the something that's wrong, so skip.
+    let height = area.height.min(rect.height).min(DIACRITICS.len() as u16);
+    for y in 0..height {
+        // Draw each line of unicode placeholders but all into the first cell.
+        // I couldn't work out actually drawing into each cell of the buffer so
+        // that `.set_skip(true)` would be made unnecessary. Maybe some other escape
+        // sequence gets sneaked in somehow.
+        // It could also be made so that each cell starts and ends its own escape sequence
+        // with the image id, but maybe that's worse.
+        symbol.clear();
+        if y == 1 {
+            symbol.shrink_to(estimated_placeholder_row_size);
+        }
+
         // If not transmitted in previous renders, only transmit once at the
-        // first line for obvious reasons.
-        let mut symbol = seq.take().unwrap_or_default().to_owned();
+        // first line.
+        if let Some(seq) = seq.take() {
+            symbol.push_str(seq);
+        }
 
-        // the save-cursor-position string len that we write at the beginning
-        let save_cursor_and_placeholder_len: usize = 3 + id_color.len() + (4 * 4);
-        // the worst-case width of the `write!` string at the bottom of this fn
-        const RESTORE_CURSOR_POS_LEN: usize = 19;
-
-        let full_width = area.width.min(rect.width);
-        let width_usize = usize::from(full_width);
-
-        symbol
-            .reserve(save_cursor_and_placeholder_len + (width_usize * 4) + RESTORE_CURSOR_POS_LEN);
-
-        // Save cursor postion, including fg color which is what we want, and start the unicode
+        // Save cursor position, including fg color which is what we want, and start the unicode
         // placeholder sequence
         write!(
             symbol,
             "\x1b[s{id_color}\u{10EEEE}{}{}{}",
             diacritic(y),
             diacritic(0),
-            diacritic(u16::from(id_extra))
+            diacritic(*id_extra)
         )
         .unwrap();
 
         // Add entire row with positions
         // Use inherited diacritic values
-        symbol.extend(std::iter::repeat_n('\u{10EEEE}', width_usize - 1));
+        symbol.push_str(&row_diacritics);
 
         for x in 1..full_width {
             // Skip or something may overwrite it
@@ -159,11 +182,7 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&st
             }
         }
 
-        // Restore saved cursor position including color, and now we have to move back to
-        // the end of the area.
-        let right = area.width - 1;
-        let down = area.height - 1;
-        write!(symbol, "\x1b[u\x1b[{right}C\x1b[{down}B").unwrap();
+        symbol.push_str(&restore_cursor);
 
         if let Some(cell) = buf.cell_mut((area.left(), area.top() + y)) {
             cell.set_symbol(&symbol);
@@ -173,7 +192,7 @@ fn render(area: Rect, rect: Rect, buf: &mut Buffer, id: u32, mut seq: Option<&st
 
 /// Create a kitty escape sequence for transmitting and virtual-placement.
 ///
-/// The image will be transmitted as RGB8 in chunks of 4096 bytes.
+/// The image will be transmitted as RGBA in chunks of 4096 bytes.
 /// A "virtual placement" (U=1) is created so that we can place it using unicode placeholders.
 /// Removing the placements when the unicode placeholder is no longer there is being handled
 /// automatically by kitty.
@@ -201,7 +220,6 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
     data.reserve_exact(reserve_size);
 
     for (i, chunk) in chunks.enumerate() {
-        let payload = base64_simd::STANDARD.encode_to_string(chunk);
         // tmux seems to only allow a limited amount of data in each passthrough sequence, since
         // we're already chunking the data for the kitty protocol that's a good enough chunk size to
         // use for the passthrough chunks too.
@@ -211,10 +229,13 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
             write!(data, "i={id},a=T,U=1,f=32,t=d,s={w},v={h},").unwrap();
         }
 
-        let more = u8::from(chunk_count > (i + 1));
-
         // m=0 means over
-        write!(data, "m={more};{payload}{escape}\\").unwrap();
+        let more = u8::from(chunk_count > (i + 1));
+        write!(data, "m={more};").unwrap();
+
+        base64_simd::STANDARD.encode_append(chunk, &mut data);
+
+        write!(data, "{escape}\\").unwrap();
     }
     data.push_str(end);
 

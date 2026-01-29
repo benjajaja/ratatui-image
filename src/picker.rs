@@ -120,13 +120,24 @@ impl Picker {
         // Write and read to stdin to query protocol capabilities and font-size.
         match query_with_timeout(is_tmux, options) {
             Ok((capability_proto, font_size, caps)) => {
-                // If some env var says that we should try iTerm2, then disregard protocol-from-capabilities.
                 let iterm2_proto = iterm2_from_env();
 
-                let protocol_type = tmux_proto
-                    .or(iterm2_proto)
-                    .or(capability_proto)
-                    .unwrap_or(ProtocolType::Halfblocks);
+                // Wezterm reports kitty support but its implementation is incomplete.
+                // Suppress kitty and default to iterm2 (which wezterm fully supports).
+                let is_wezterm = env::var("WEZTERM_EXECUTABLE").is_ok_and(|s| !s.is_empty());
+
+                // IO-based detection is authoritative; env-based hints are fallbacks
+                // (env vars like KITTY_WINDOW_ID can be stale in tmux sessions).
+                let protocol_type = if is_wezterm {
+                    capability_proto
+                        .filter(|p| *p != ProtocolType::Kitty)
+                        .unwrap_or(ProtocolType::Iterm2)
+                } else {
+                    capability_proto
+                        .or(tmux_proto)
+                        .or(iterm2_proto)
+                        .unwrap_or(ProtocolType::Halfblocks)
+                };
 
                 if let Some(font_size) = font_size {
                     Ok(Self {
@@ -291,11 +302,9 @@ fn detect_tmux_and_outer_protocol_from_env() -> (bool, Option<ProtocolType>) {
         .and_then(|mut child| child.wait()); // wait(), for check_device_attrs.
 
     // Crude guess based on the *existence* of some magic program specific env vars.
-    // Produces false positives, for example xterm started from kitty inherits KITTY_WINDOW_ID.
-    // Furthermore, tmux shares env vars from the first session, for example tmux started in xterm
-    // after a previous tmux session started in kitty, inherits KITTY_WINDOW_ID.
-    const OUTER_TERM_HINTS: [(&str, ProtocolType); 3] = [
-        ("KITTY_WINDOW_ID", ProtocolType::Kitty), // TODO: query should work inside tmux, remove?
+    // Note: kitty is detected via io query (which works through tmux passthrough),
+    // not env vars, since KITTY_WINDOW_ID is often stale in tmux sessions.
+    const OUTER_TERM_HINTS: [(&str, ProtocolType); 2] = [
         ("ITERM_SESSION_ID", ProtocolType::Iterm2),
         ("WEZTERM_EXECUTABLE", ProtocolType::Iterm2),
     ];
