@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+* Fix kitty in tmux. Since the image data is chunked, send each chunk as a separate tmux sequence to avoid exceeding some tmux limits.
+* Performance improvements related to image data in all protocols.
+* Use release-plz from now on.
+
 ## [10.0.4] - 2026-01-22
 
 ## [10.0.3] - 2026-01-19
