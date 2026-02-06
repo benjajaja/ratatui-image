@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [10.0.5](https://github.com/benjajaja/ratatui-image/compare/v10.0.4...v10.0.5) - 2026-02-06
+
+### Fixed
+
+- fix force iterm2 on wezterm+tmux
+
+### Other
+
+- use release-plz
+- wrap each kitty "chunk" in tmux passthrough individually
+- stop detecting kitty from env vars
+- do not use String::insert_str(0, ...) in sixel
+- apply same "append" optimization to iterm2
+- don't escape non APC sequences wrongly
+- lots of tiny optimizations for kitty
+- add missing tmux kitty escapes
+- unrelated warning fix
+
 * Fix kitty in tmux. Since the image data is chunked, send each chunk as a separate tmux sequence to avoid exceeding some tmux limits.
 * Performance improvements related to image data in all protocols.
 * Use release-plz from now on.
