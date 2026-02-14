@@ -1,7 +1,11 @@
 //! ITerm2 protocol implementation.
+use std::{cmp::min, fmt::Write, io::Cursor, num::NonZeroUsize};
+
 use image::DynamicImage;
-use ratatui::{buffer::Buffer, layout::Rect};
-use std::{cmp::min, fmt::Write, io::Cursor};
+use ratatui::{
+    buffer::{Buffer, CellDiffOption},
+    layout::Rect,
+};
 
 use crate::{Result, picker::cap_parser::Parser};
 
@@ -82,19 +86,19 @@ fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) 
         Some(r) => r,
     };
 
-    buf.cell_mut(render_area).map(|cell| cell.set_symbol(data));
+    buf.cell_mut(render_area).map(|cell| {
+        cell.set_symbol(data)
+            .set_diff_option(CellDiffOption::ForcedWidth(NonZeroUsize::new(1).unwrap()))
+    });
 
-    for x in (render_area.left() + 1)..render_area.right() {
-        if let Some(cell) = buf.cell_mut((x, render_area.top())) {
-            cell.set_skip(true);
-        }
-    }
-
-    // Skip entire area
-    for y in (render_area.top() + 1)..render_area.bottom() {
+    // Skip entire area (except first cell)
+    for y in render_area.top()..render_area.bottom() {
         for x in render_area.left()..render_area.right() {
+            if x == render_area.left() && y == render_area.top() {
+                continue;
+            }
             if let Some(cell) = buf.cell_mut((x, y)) {
-                cell.set_skip(true);
+                cell.set_diff_option(CellDiffOption::Skip);
             }
         }
     }
