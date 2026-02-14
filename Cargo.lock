@@ -627,7 +627,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1809,8 +1809,7 @@ dependencies = [
 [[package]]
 name = "ratatui"
 version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1ce67fb8ba4446454d1c8dbaeda0557ff5e94d39d5e5ed7f10a65eb4c8266bc"
+source = "git+https://github.com/ratatui/ratatui?branch=main#acbb4c76f1fb4ad2df6e46bc8dfd8c700286b942"
 dependencies = [
  "instability",
  "ratatui-core",
@@ -1823,8 +1822,7 @@ dependencies = [
 [[package]]
 name = "ratatui-core"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ef8dea09a92caaf73bff7adb70b76162e5937524058a7e5bff37869cbbec293"
+source = "git+https://github.com/ratatui/ratatui?branch=main#acbb4c76f1fb4ad2df6e46bc8dfd8c700286b942"
 dependencies = [
  "bitflags 2.10.0",
  "compact_str",
@@ -1843,8 +1841,7 @@ dependencies = [
 [[package]]
 name = "ratatui-crossterm"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "577c9b9f652b4c121fb25c6a391dd06406d3b092ba68827e6d2f09550edc54b3"
+source = "git+https://github.com/ratatui/ratatui?branch=main#acbb4c76f1fb4ad2df6e46bc8dfd8c700286b942"
 dependencies = [
  "cfg-if",
  "crossterm",
@@ -1876,8 +1873,7 @@ dependencies = [
 [[package]]
 name = "ratatui-termion"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cade85a8591fbc911e147951422f0d6fd40f4948b271b6216c7dc01838996f8"
+source = "git+https://github.com/ratatui/ratatui?branch=main#acbb4c76f1fb4ad2df6e46bc8dfd8c700286b942"
 dependencies = [
  "instability",
  "ratatui-core",
@@ -1887,8 +1883,7 @@ dependencies = [
 [[package]]
 name = "ratatui-termwiz"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f76fe0bd0ed4295f0321b1676732e2454024c15a35d01904ddb315afd3d545c"
+source = "git+https://github.com/ratatui/ratatui?branch=main#acbb4c76f1fb4ad2df6e46bc8dfd8c700286b942"
 dependencies = [
  "ratatui-core",
  "termwiz",
@@ -1897,8 +1892,7 @@ dependencies = [
 [[package]]
 name = "ratatui-widgets"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7dbfa023cd4e604c2553483820c5fe8aa9d71a42eea5aa77c6e7f35756612db"
+source = "git+https://github.com/ratatui/ratatui?branch=main#acbb4c76f1fb4ad2df6e46bc8dfd8c700286b942"
 dependencies = [
  "bitflags 2.10.0",
  "hashbrown",
@@ -2085,7 +2079,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2451,24 +2445,24 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.44"
+version = "0.3.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e7d9e3bb61134e77bde20dd4825b97c010155709965fedf0f49bb138e52a9d"
+checksum = "f9e442fc33d7fdb45aa9bfeb312c095964abdf596f7567261062b2a7107aaabd"
 dependencies = [
  "deranged",
  "libc",
  "num-conv",
  "num_threads",
  "powerfmt",
- "serde",
+ "serde_core",
  "time-core",
 ]
 
 [[package]]
 name = "time-core"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40868e7c1d2f0b8d73e4a8c7f0ff63af4f6d19be117e90bd73eb1d62cf831c6b"
+checksum = "8b36ee98fd31ec7426d599183e8fe26932a8dc1fb76ddb6214d05493377d34ca"
 
 [[package]]
 name = "tokio"
