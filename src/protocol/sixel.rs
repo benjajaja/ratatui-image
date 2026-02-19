@@ -5,7 +5,7 @@
 //! [`icy_sixel`]: https://github.com/mkrueger/icy_sixel
 //! [supports]: https://arewesixelyet.com
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel
-use std::{cmp::min, fmt::Write, num::NonZeroUsize};
+use std::{cmp::min, fmt::Write};
 
 use icy_sixel::{EncodeOptions, sixel_encode};
 use image::DynamicImage;
@@ -15,7 +15,7 @@ use ratatui::{
 };
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
-use crate::{Result, errors::Errors, picker::cap_parser::Parser};
+use crate::{Result, errors::Errors, picker::cap_parser::Parser, protocol::UNIT_WIDTH};
 
 // Fixed sixel protocol
 #[derive(Clone, Default)]
@@ -113,10 +113,9 @@ fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) 
         Some(r) => r,
     };
 
-    buf.cell_mut(render_area).map(|cell| {
-        cell.set_symbol(data)
-            .set_diff_option(CellDiffOption::ForcedWidth(NonZeroUsize::new(1).unwrap()))
-    });
+    if let Some(cell) = buf.cell_mut(render_area) {
+        cell.set_symbol(data).set_diff_option(UNIT_WIDTH);
+    }
 
     // Skip entire area (except first cell)
     for y in render_area.top()..render_area.bottom() {
