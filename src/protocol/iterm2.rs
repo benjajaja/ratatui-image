@@ -1,5 +1,5 @@
 //! ITerm2 protocol implementation.
-use std::{cmp::min, fmt::Write, io::Cursor, num::NonZeroUsize};
+use std::{cmp::min, fmt::Write, io::Cursor};
 
 use image::DynamicImage;
 use ratatui::{
@@ -7,7 +7,7 @@ use ratatui::{
     layout::Rect,
 };
 
-use crate::{Result, picker::cap_parser::Parser};
+use crate::{Result, picker::cap_parser::Parser, protocol::UNIT_WIDTH};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
 
@@ -86,10 +86,9 @@ fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) 
         Some(r) => r,
     };
 
-    buf.cell_mut(render_area).map(|cell| {
-        cell.set_symbol(data)
-            .set_diff_option(CellDiffOption::ForcedWidth(NonZeroUsize::new(1).unwrap()))
-    });
+    if let Some(cell) = buf.cell_mut(render_area) {
+        cell.set_symbol(data).set_diff_option(UNIT_WIDTH);
+    }
 
     // Skip entire area (except first cell)
     for y in render_area.top()..render_area.bottom() {
