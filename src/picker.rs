@@ -117,27 +117,28 @@ impl Picker {
             capabilities: Vec::new(),
         };
 
+        let mut options_with_blacklist = options;
+        let is_wezterm = env::var("WEZTERM_EXECUTABLE").is_ok_and(|s| !s.is_empty());
+        let is_konsole = env::var("KONSOLE_VERSION").is_ok_and(|s| !s.is_empty());
+        if is_wezterm || is_konsole {
+            // WezTerm could use Sixel, but iTerm2 (detected later is better).
+            // Konsole's Sixel implementation is buggy: https://github.com/benjajaja/ratatui-image?tab=readme-ov-file#compatibility-matrix
+            // Neither implement the placeholder part of kitty correctly.
+            options_with_blacklist
+                .blacklist_protocols(vec![ProtocolType::Kitty, ProtocolType::Sixel]);
+        }
+
         // Write and read to stdin to query protocol capabilities and font-size.
-        match query_with_timeout(is_tmux, options) {
+        match query_with_timeout(is_tmux, options_with_blacklist) {
             Ok((capability_proto, font_size, caps)) => {
                 let iterm2_proto = iterm2_from_env();
 
-                // Wezterm reports kitty support but its implementation is incomplete.
-                // Suppress kitty and default to iterm2 (which wezterm fully supports).
-                let is_wezterm = env::var("WEZTERM_EXECUTABLE").is_ok_and(|s| !s.is_empty());
-
                 // IO-based detection is authoritative; env-based hints are fallbacks
                 // (env vars like KITTY_WINDOW_ID can be stale in tmux sessions).
-                let protocol_type = if is_wezterm {
-                    capability_proto
-                        .filter(|p| *p != ProtocolType::Kitty)
-                        .unwrap_or(ProtocolType::Iterm2)
-                } else {
-                    capability_proto
-                        .or(tmux_proto)
-                        .or(iterm2_proto)
-                        .unwrap_or(ProtocolType::Halfblocks)
-                };
+                let protocol_type = capability_proto
+                    .or(tmux_proto)
+                    .or(iterm2_proto)
+                    .unwrap_or(ProtocolType::Halfblocks);
 
                 if let Some(font_size) = font_size {
                     Ok(Self {

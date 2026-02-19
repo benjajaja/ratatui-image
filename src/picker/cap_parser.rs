@@ -1,7 +1,7 @@
 //! Terminal stdio query parser module.
 use std::{fmt::Write, time::Duration};
 
-use crate::picker::STDIN_READ_TIMEOUT_MILLIS;
+use crate::picker::{ProtocolType, STDIN_READ_TIMEOUT_MILLIS};
 
 pub struct Parser {
     data: String,
@@ -27,13 +27,22 @@ pub enum Response {
 
 /// Extra query options
 pub struct QueryStdioOptions {
-    // Timeout for the stdio query.
+    /// Timeout for the stdio query.
     pub timeout: Duration,
     /// Query for [Text Sizing Protocol]. The result can be checked by searching for
     /// [crate::picker::Capability::TextSizingProtocol] in [crate::picker::Picker::capabilities].
     ///
     /// [Text Sizing Protocol] <https://sw.kovidgoyal.net/kitty/text-sizing-protocol//>
     pub text_sizing_protocol: bool,
+    /// Blacklist protocols from the detection query. Currently only kitty can be detected, so that
+    /// is the only ProtocolType that can have any effect here.
+    /// [`crate::picker::Picker`] currently sets ProtocolType::Kitty for WezTerm and Konsole.
+    blacklist_protocols: Vec<ProtocolType>,
+}
+impl QueryStdioOptions {
+    pub(crate) fn blacklist_protocols(&mut self, protocol_types: Vec<ProtocolType>) {
+        self.blacklist_protocols = protocol_types;
+    }
 }
 
 impl Default for QueryStdioOptions {
@@ -41,6 +50,7 @@ impl Default for QueryStdioOptions {
         Self {
             timeout: Duration::from_millis(STDIN_READ_TIMEOUT_MILLIS),
             text_sizing_protocol: false,
+            blacklist_protocols: Vec::new(),
         }
     }
 }
@@ -74,11 +84,15 @@ impl Parser {
         let mut buf = String::with_capacity(100);
         buf.push_str(start);
 
-        // Kitty graphics
-        write!(buf, "{escape}_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA{escape}\\").unwrap();
+        if !options.blacklist_protocols.contains(&ProtocolType::Kitty) {
+            // Kitty graphics
+            write!(buf, "{escape}_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA{escape}\\").unwrap();
+        }
 
-        // Device Attributes Report 1 (sixel support)
-        write!(buf, "{escape}[c").unwrap();
+        if !options.blacklist_protocols.contains(&ProtocolType::Sixel) {
+            // Device Attributes Report 1 (sixel support)
+            write!(buf, "{escape}[c").unwrap();
+        }
 
         // Font size in pixels
         write!(buf, "{escape}[16t").unwrap();
