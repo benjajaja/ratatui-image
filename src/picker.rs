@@ -122,7 +122,7 @@ impl Picker {
         let is_konsole = env::var("KONSOLE_VERSION").is_ok_and(|s| !s.is_empty());
         if is_wezterm || is_konsole {
             // WezTerm could use Sixel, but iTerm2 (detected later is better).
-            // Konsole's Sixel implementation is buggy: https://github.com/benjajaja/ratatui-image?tab=readme-ov-file#compatibility-matrix
+            // Konsole's Sixel implementation is buggy: https://github.com/ratatui/ratatui-image?tab=readme-ov-file#compatibility-matrix
             // Neither implement the placeholder part of kitty correctly.
             options_with_blacklist
                 .blacklist_protocols(vec![ProtocolType::Kitty, ProtocolType::Sixel]);

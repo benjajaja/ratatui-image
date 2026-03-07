@@ -4,8 +4,8 @@
 [![Crate Badge]][Crate]
 [![Docs Badge]][Docs]
 
-[CI Badge]: https://img.shields.io/github/actions/workflow/status/benjajaja/ratatui-image/ci.yaml?style=flat-square&logo=github
-[CI]: https://github.com/benjajaja/ratatui-image/actions?query=workflow%3A
+[CI Badge]: https://img.shields.io/github/actions/workflow/status/ratatui/ratatui-image/ci.yaml?style=flat-square&logo=github
+[CI]: https://github.com/ratatui/ratatui-image/actions?query=workflow%3A
 [Crate Badge]: https://img.shields.io/crates/v/ratatui-image?logo=rust&style=flat-square
 [Crate]: https://crates.io/crates/ratatui-image
 [Docs Badge]: https://img.shields.io/docsrs/ratatui-image?logo=rust&style=flat-square
@@ -185,8 +185,8 @@ Halfblocks should work in all terminals, even if the font size could not be dete
 ### Known issues
 Summary | Link
 --------|---------
-Termwiz backend does not work at all | [#1](https://github.com/benjajaja/ratatui-image/issues/1)
-Sixel image rendered on the last line of terminal causes a scroll | [#57](https://github.com/benjajaja/ratatui-image/issues/57)
+Termwiz backend does not work at all | [#1](https://github.com/ratatui/ratatui-image/issues/1)
+Sixel image rendered on the last line of terminal causes a scroll | [#57](https://github.com/ratatui/ratatui-image/issues/57)
 
 ### Projects that use ratatui-image
 
