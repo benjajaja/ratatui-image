@@ -66,6 +66,8 @@ Sixel image rendered on the last line of terminal causes a scroll | [#57](https:
   A Bluesky client using EventStream.
 * [Eilmeldung](https://github.com/christo-auer/eilmeldung)
   RSS reader
+* [rvIRC](https://github.com/KaraZajac/rvIRC)
+  An IRC client with vim keybindings.
 
 ### Comparison
 
