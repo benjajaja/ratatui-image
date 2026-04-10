@@ -200,6 +200,7 @@
         packages = with pkgs; [
           cargo-release
           cargo-insta
+          cargo-flamegraph
           chafa
           chafaStatic       # for chafa-static feature (has libchafa.a)
           chafaStatic.dev

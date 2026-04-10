@@ -50,6 +50,7 @@ windows = { version = "0.58.0", default-features = false, features = [
 name = "ratatui-image"
 path = "./src/bin/ratatui-image/main.rs" # cargo readme needs this for some reason
 required-features = ["crossterm"]
+bench = false
 
 [[example]]
 name = "demo"
@@ -73,6 +74,11 @@ crossterm = { version = "0.29.0", features = ["event-stream"] }
 futures = "0.3.31"
 tokio = { version = "1.45.1", features = ["macros", "rt", "rt-multi-thread"] }
 insta = "1.44.3"
+criterion = "0.5.1"
+
+[[bench]]
+name = "protocols"
+harness = false
 
 [package.metadata.docs.rs]
 features = ["crossterm"]
