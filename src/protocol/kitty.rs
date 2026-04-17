@@ -3,6 +3,7 @@ use std::fmt::Write;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::protocol::UNIT_WIDTH;
 use crate::{Result, picker::cap_parser::Parser};
 use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
@@ -113,6 +114,11 @@ impl StatefulProtocolTrait for StatefulKitty {
     }
 }
 
+// Save cursor position, which is the only way to save the current foreground color.
+// This is the reason why we need to restore the cursor and move 1 column to the right.
+const SAVE_CURSOR: &str = "\x1b[s";
+const RESTORE_CURSOR: &str = "\x1b[u\x1b[1C";
+
 fn render(
     area: Rect,
     rect: Rect,
@@ -121,71 +127,37 @@ fn render(
     mut seq: Option<&str>,
 ) {
     let full_width = area.width.min(rect.width);
-    let width_usize = usize::from(full_width);
-
-    let estimated_placeholder_row_size = id_color.len() +
-        30 +  // diacritics
-        (width_usize * 4) +
-        30; // restore cursor dance
-    let estimated_transmit_row_size =
-        estimated_placeholder_row_size + if let Some(seq) = seq { seq.len() } else { 0 };
-    let mut symbol = String::with_capacity(estimated_transmit_row_size);
-
-    let row_diacritics: String = std::iter::repeat_n('\u{10EEEE}', width_usize - 1).collect();
-
-    // Restore saved cursor position including color, and now we have to move back to
-    // the end of the area.
-    let right = area.width - 1;
-    let down = area.height - 1;
-    let restore_cursor = format!("\x1b[u\x1b[{right}C\x1b[{down}B");
 
     // Clamp to effectively 297, the number of placeholders in the Kitty protocol.
     // Anything beyond would just render the something that's wrong, so skip.
     let height = area.height.min(rect.height).min(DIACRITICS.len() as u16);
+    let width = full_width.min(DIACRITICS.len() as u16);
+
+    let mut symbol = String::new();
     for y in 0..height {
-        // Draw each line of unicode placeholders but all into the first cell.
-        // I couldn't work out actually drawing into each cell of the buffer so
-        // that `.set_skip(true)` would be made unnecessary. Maybe some other escape
-        // sequence gets sneaked in somehow.
-        // It could also be made so that each cell starts and ends its own escape sequence
-        // with the image id, but maybe that's worse.
-        symbol.clear();
-        if y == 1 {
-            symbol.shrink_to(estimated_placeholder_row_size);
-        }
+        for x in 0..width {
+            symbol.clear();
 
-        // If not transmitted in previous renders, only transmit once at the
-        // first line.
-        if let Some(seq) = seq.take() {
-            symbol.push_str(seq);
-        }
-
-        // Save cursor position, including fg color which is what we want, and start the unicode
-        // placeholder sequence
-        write!(
-            symbol,
-            "\x1b[s{id_color}\u{10EEEE}{}{}{}",
-            diacritic(y),
-            diacritic(0),
-            diacritic(*id_extra)
-        )
-        .unwrap();
-
-        // Add entire row with positions
-        // Use inherited diacritic values
-        symbol.push_str(&row_diacritics);
-
-        for x in 1..full_width {
-            // Skip or something may overwrite it
-            if let Some(cell) = buf.cell_mut((area.left() + x, area.top() + y)) {
-                cell.set_skip(true);
+            // Prepend transmit sequence to first cell only
+            if x == 0 && y == 0 {
+                if let Some(seq) = seq.take() {
+                    symbol.push_str(seq);
+                }
             }
-        }
 
-        symbol.push_str(&restore_cursor);
+            // Each placeholder has full diacritics: row, column, id_extra
+            write!(
+                symbol,
+                "{SAVE_CURSOR}{id_color}\u{10EEEE}{}{}{}{RESTORE_CURSOR}",
+                diacritic(y),
+                diacritic(x),
+                diacritic(*id_extra)
+            )
+            .unwrap();
 
-        if let Some(cell) = buf.cell_mut((area.left(), area.top() + y)) {
-            cell.set_symbol(&symbol);
+            if let Some(cell) = buf.cell_mut((area.left() + x, area.top() + y)) {
+                cell.set_symbol(&symbol).set_diff_option(UNIT_WIDTH);
+            }
         }
     }
 }
