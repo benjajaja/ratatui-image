@@ -13,7 +13,7 @@ jobs:
   nix-flake-check:
     name: Nix flake check
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'benjajaja' }}
+    if: ${{ github.repository_owner == 'ratatui' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: nix-flake-check
     environment: release
-    if: ${{ github.repository_owner == 'benjajaja' }}
+    if: ${{ github.repository_owner == 'ratatui' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
   release-plz-pr:
     name: Release-plz PR
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'benjajaja' }}
+    if: ${{ github.repository_owner == 'ratatui' }}
     concurrency:
       group: release-plz-${{ github.ref }}
       cancel-in-progress: false
