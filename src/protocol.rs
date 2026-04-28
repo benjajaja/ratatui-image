@@ -2,6 +2,7 @@
 
 use std::{
     collections::hash_map::DefaultHasher,
+    fmt::Write,
     hash::{Hash, Hasher},
 };
 
@@ -252,5 +253,21 @@ impl ImageSource {
         let width = (img_width as f32 / char_width as f32).ceil() as u16;
         let height = (img_height as f32 / char_height as f32).ceil() as u16;
         Rect::new(0, 0, width, height)
+    }
+}
+
+// Transparency needs explicit erasing of stale characters, or they stay behind the rendered
+// image due to skipping of the following characters _in the terminal buffer_.
+// DECERA does not work in WezTerm, however ECH and and cursor CUD and CUU do.
+// For each line, erase `width` characters, then move back and place image.
+fn clear_area(data: &mut String, escape: &str, width: u16, height: u16) {
+    if height == 1 {
+        // If the image is a single row then we don't need to move the cursor around at all.
+        write!(data, "{escape}[{width}X").unwrap();
+    } else {
+        for _ in 0..height {
+            write!(data, "{escape}[{width}X{escape}[1B").unwrap();
+        }
+        write!(data, "{escape}[{height}A").unwrap();
     }
 }

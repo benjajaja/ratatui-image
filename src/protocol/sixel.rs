@@ -8,9 +8,9 @@
 use icy_sixel::{EncodeOptions, sixel_encode};
 use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
-use std::{cmp::min, fmt::Write};
+use std::cmp::min;
 
-use super::{ProtocolTrait, StatefulProtocolTrait};
+use super::{ProtocolTrait, StatefulProtocolTrait, clear_area};
 use crate::{Result, errors::Errors, picker::cap_parser::Parser};
 
 // Fixed sixel protocol
@@ -39,10 +39,6 @@ fn encode(img: &DynamicImage, area: Rect, is_tmux: bool) -> Result<String> {
     let bytes = img_rgba8.as_raw();
     let (start, escape, end) = Parser::escape_tmux(is_tmux);
 
-    // Transparency needs explicit erasing of stale characters, or they stay behind the rendered
-    // image due to skipping of the following characters _in the buffer_.
-    // See comment in iterm2::encode about why we use ECH and movements instead of DECERA.
-    // TODO: unify this with iterm2
     let width = area.width;
     let height = area.height;
 
@@ -57,18 +53,12 @@ fn encode(img: &DynamicImage, area: Rect, is_tmux: bool) -> Result<String> {
         // The clear sequence must be inside the tmux passthrough since it uses
         // doubled escapes.
         data.push_str(start);
-        for _ in 0..height {
-            write!(data, "{escape}[{width}X{escape}[1B").unwrap();
-        }
-        write!(data, "{escape}[{height}A").unwrap();
+        clear_area(&mut data, escape, width, height);
         data.push_str(escape);
         data.push_str(&sixel_data[1..]);
         data.push_str(end);
     } else {
-        for _ in 0..height {
-            write!(data, "{escape}[{width}X{escape}[1B").unwrap();
-        }
-        write!(data, "{escape}[{height}A").unwrap();
+        clear_area(&mut data, escape, width, height);
         data.push_str(&sixel_data);
     }
     Ok(data)

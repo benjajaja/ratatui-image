@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Other
+- Unify the "clear_area" function across sixel and iterm2
+- Skip cursor movements in "clear_area" if only one row.
+- Add a criterion benchmark
+
 ## [10.0.6](https://github.com/benjajaja/ratatui-image/compare/v10.0.5...v10.0.6) - 2026-02-19
 
 ### Other

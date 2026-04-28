@@ -5,7 +5,7 @@ use std::{cmp::min, fmt::Write, io::Cursor};
 
 use crate::{Result, picker::cap_parser::Parser};
 
-use super::{ProtocolTrait, StatefulProtocolTrait};
+use super::{ProtocolTrait, StatefulProtocolTrait, clear_area};
 
 #[derive(Clone, Default)]
 pub struct Iterm2 {
@@ -31,18 +31,10 @@ fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String
 
     let (start, escape, end) = Parser::escape_tmux(is_tmux);
 
-    // Transparency needs explicit erasing of stale characters, or they stay behind the rendered
-    // image due to skipping of the following characters _in the buffer_.
-    // DECERA does not work in WezTerm, however ECH and and cursor CUD and CUU do.
-    // For each line, erase `width` characters, then move back and place image.
-    // TODO: unify this with sixel
     let width = render_area.width;
     let height = render_area.height;
     let mut seq = String::from(start);
-    for _ in 0..height {
-        write!(seq, "{escape}[{width}X{escape}[1B").unwrap();
-    }
-    write!(seq, "{escape}[{height}A").unwrap();
+    clear_area(&mut seq, escape, width, height);
 
     write!(
         seq,
