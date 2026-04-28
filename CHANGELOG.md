@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [10.0.7](https://github.com/ratatui/ratatui-image/compare/v10.0.6...v10.0.7) - 2026-04-28
+
+### Other
+
+- release-plz must use ratatui as owner now
+- unify clear_area() for sixel and iterm2, simplify single row
+- add criterion benchmark
+- Update README.md
+- move repo links from benjajaja/ to ratatui/
+
 ### Other
 - Unify the "clear_area" function across sixel and iterm2
 - Skip cursor movements in "clear_area" if only one row.
