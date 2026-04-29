@@ -24,6 +24,7 @@ tokio = ["dep:tokio"]
 thread-example = []
 chafa-dyn = ["dep:pkg-config"]
 chafa-static = ["dep:pkg-config"]
+kitty-offset = []
 
 [dependencies]
 image = { version = "^0.25.6", default-features = false, features = ["png"] }
@@ -81,4 +82,5 @@ name = "protocols"
 harness = false
 
 [package.metadata.docs.rs]
-features = ["crossterm"]
+features = ["crossterm", "kitty-offset"]
+rustdoc-args = ["--cfg", "docsrs"]
