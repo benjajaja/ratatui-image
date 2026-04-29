@@ -46,13 +46,24 @@ impl KittyProtoState {
 pub struct Kitty {
     proto_state: KittyProtoState,
     area: Rect,
+    skip_line_count: u16,
 }
 
 impl Kitty {
     /// Create a FixedKitty from an image.
     pub fn new(image: DynamicImage, area: Rect, id: u32, is_tmux: bool) -> Result<Self> {
         let proto_state = KittyProtoState::new(&image, id, is_tmux);
-        Ok(Self { proto_state, area })
+        Ok(Self {
+            proto_state,
+            area,
+            skip_line_count: 0,
+        })
+    }
+
+    pub fn skip_lines(&self, skip_line_count: u16) -> Kitty {
+        let mut clone: Kitty = self.clone();
+        clone.skip_line_count = skip_line_count;
+        clone
     }
 }
 
@@ -61,7 +72,14 @@ impl ProtocolTrait for Kitty {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
 
-        render(area, self.area, buf, &self.proto_state.id, seq);
+        render(
+            area,
+            self.area,
+            buf,
+            &self.proto_state.id,
+            seq,
+            self.skip_line_count,
+        );
     }
 
     fn area(&self) -> Rect {
@@ -96,7 +114,7 @@ impl ProtocolTrait for StatefulKitty {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
 
-        render(area, self.rect, buf, &self.id, seq);
+        render(area, self.rect, buf, &self.id, seq, 0);
     }
 
     fn area(&self) -> Rect {
@@ -119,6 +137,7 @@ fn render(
     buf: &mut Buffer,
     (_, id_color, id_extra): &(u32, String, u16),
     mut seq: Option<&str>,
+    skip_line_count: u16,
 ) {
     let full_width = area.width.min(rect.width);
     let width_usize = usize::from(full_width);
@@ -160,12 +179,14 @@ fn render(
             symbol.push_str(seq);
         }
 
+        let row_y = y + skip_line_count;
+
         // Save cursor position, including fg color which is what we want, and start the unicode
         // placeholder sequence
         write!(
             symbol,
             "\x1b[s{id_color}\u{10EEEE}{}{}{}",
-            diacritic(y),
+            diacritic(row_y),
             diacritic(0),
             diacritic(*id_extra)
         )
