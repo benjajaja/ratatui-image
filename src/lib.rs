@@ -128,6 +128,8 @@
 //! * `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
 //!   useful to save it in some user configuration.
 //! * `tokio` whether to use tokio's `UnboundedSender` in `ThreadProtocol`.
+//! * `kitty-offset` is an experimental feature that enables `skip_lines(u16)` on
+//!   [`protocol::kitty::Kitty`].
 //!
 //!
 //! [ratatui]: https://github.com/ratatui-org/ratatui
