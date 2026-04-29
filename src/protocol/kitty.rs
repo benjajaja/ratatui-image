@@ -1,7 +1,10 @@
 /// https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholders
 use std::fmt::Write;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+#[cfg(feature = "kitty-offset")]
+use std::sync::atomic::AtomicU16;
 
 use crate::{Result, picker::cap_parser::Parser};
 use image::DynamicImage;
@@ -14,6 +17,7 @@ struct KittyProtoState {
     transmitted: Arc<AtomicBool>,
     transmit_str: Option<String>,
     id: (u32, String, u16), // Full ID, Formatted color ID, ID extra part for diacritic
+    #[cfg(feature = "kitty-offset")]
     skip_line_count: Arc<AtomicU16>,
 }
 
@@ -27,6 +31,7 @@ impl KittyProtoState {
             transmitted: Arc::new(AtomicBool::new(false)),
             transmit_str: Some(transmit_str),
             id: (id, id_color, id_extra),
+            #[cfg(feature = "kitty-offset")]
             skip_line_count: Arc::new(AtomicU16::new(0)),
         }
     }
@@ -57,6 +62,50 @@ impl Kitty {
         Ok(Self { proto_state, area })
     }
 
+    #[cfg(feature = "kitty-offset")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "kitty-offset")))]
+    /// Experimental: Set "skip line count".
+    ///
+    /// To display an image partially, in general, start with making it into horizontal slices of
+    /// font-height, and then display the slices you want.
+    ///
+    /// For Kitty, this is wasteful, as the protocol is stateful and ratatui-image already takes
+    /// advantage of the unicode-placeholders feature.
+    ///
+    /// Thus, you can match the inner protocol and deal with kitty specifically.
+    ///
+    /// Kitty already as an internal mutable [`std::sync::atomic::AtomicBool`] to track wether the
+    /// image has been transmitted, the feature `kitty-offset` enables an additional
+    /// [`std::sync::atomic::AtomicU16`] to track how many unicode-placeholder lines to skip (or at
+    /// what line to start) in the next render.
+    ///
+    /// Since this is relies on internally mutating an atomic `u16`, the "normal" render path would
+    /// have to always set it to `0` before rendering.
+    ///
+    /// Example usage:
+    ///
+    /// ```ignore
+    /// match protocol {
+    ///     Protocol::Kitty(kitty) => {
+    ///         if y < 0 {
+    ///             kitty.skip_lines(y.unsigned_abs() as u16);
+    ///             // Should probably adjust `area` too now.
+    ///         } else {
+    ///             // This must be reverted to normal behaviour before the next render without
+    ///             // skipping.
+    ///             kitty.skip_lines(0);
+    ///         }
+    ///         f.render_widget(Image::new(&protocol), area);
+    ///     }
+    ///     _ => {
+    ///     }
+    ///     f.render_widget(Image::new(&protocol), area);
+    /// }
+    /// ```
+    ///
+    /// To make this work in practice, it is necessary to wrap `protocol` in an enum for
+    /// `Kitty(Protocol)` and `Sliced(Vec<Protocol>)`, or do something similar, as the source needs
+    /// to be different (either full image as usual, or sliced list of images).
     pub fn skip_lines(&self, skip_line_count: u16) {
         self.proto_state
             .skip_line_count
@@ -69,13 +118,18 @@ impl ProtocolTrait for Kitty {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
 
+        #[cfg(not(feature = "kitty-offset"))]
+        let skip_line_count = 0;
+        #[cfg(feature = "kitty-offset")]
+        let skip_line_count = self.proto_state.skip_line_count.load(Ordering::Acquire);
+
         render(
             area,
             self.area,
             buf,
             &self.proto_state.id,
             seq,
-            self.proto_state.skip_line_count.load(Ordering::Acquire),
+            skip_line_count,
         );
     }
 
@@ -159,6 +213,7 @@ fn render(
     // Anything beyond would just render the something that's wrong, so skip.
     let height = area.height.min(rect.height).min(DIACRITICS.len() as u16);
     for y in 0..height {
+        #[cfg(feature = "kitty-offset")]
         if y >= height {
             break;
         }
