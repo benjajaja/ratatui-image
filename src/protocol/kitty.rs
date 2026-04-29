@@ -1,7 +1,7 @@
 /// https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholders
 use std::fmt::Write;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 
 use crate::{Result, picker::cap_parser::Parser};
 use image::DynamicImage;
@@ -14,6 +14,7 @@ struct KittyProtoState {
     transmitted: Arc<AtomicBool>,
     transmit_str: Option<String>,
     id: (u32, String, u16), // Full ID, Formatted color ID, ID extra part for diacritic
+    skip_line_count: Arc<AtomicU16>,
 }
 
 impl KittyProtoState {
@@ -26,6 +27,7 @@ impl KittyProtoState {
             transmitted: Arc::new(AtomicBool::new(false)),
             transmit_str: Some(transmit_str),
             id: (id, id_color, id_extra),
+            skip_line_count: Arc::new(AtomicU16::new(0)),
         }
     }
 
@@ -46,24 +48,19 @@ impl KittyProtoState {
 pub struct Kitty {
     proto_state: KittyProtoState,
     area: Rect,
-    skip_line_count: u16,
 }
 
 impl Kitty {
     /// Create a FixedKitty from an image.
     pub fn new(image: DynamicImage, area: Rect, id: u32, is_tmux: bool) -> Result<Self> {
         let proto_state = KittyProtoState::new(&image, id, is_tmux);
-        Ok(Self {
-            proto_state,
-            area,
-            skip_line_count: 0,
-        })
+        Ok(Self { proto_state, area })
     }
 
-    pub fn skip_lines(&self, skip_line_count: u16) -> Kitty {
-        let mut clone: Kitty = self.clone();
-        clone.skip_line_count = skip_line_count;
-        clone
+    pub fn skip_lines(&self, skip_line_count: u16) {
+        self.proto_state
+            .skip_line_count
+            .store(skip_line_count, Ordering::SeqCst);
     }
 }
 
@@ -78,7 +75,7 @@ impl ProtocolTrait for Kitty {
             buf,
             &self.proto_state.id,
             seq,
-            self.skip_line_count,
+            self.proto_state.skip_line_count.load(Ordering::Acquire),
         );
     }
 
@@ -162,6 +159,9 @@ fn render(
     // Anything beyond would just render the something that's wrong, so skip.
     let height = area.height.min(rect.height).min(DIACRITICS.len() as u16);
     for y in 0..height {
+        if y >= height {
+            break;
+        }
         // Draw each line of unicode placeholders but all into the first cell.
         // I couldn't work out actually drawing into each cell of the buffer so
         // that `.set_skip(true)` would be made unnecessary. Maybe some other escape
