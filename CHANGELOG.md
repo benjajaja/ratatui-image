@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [10.0.8](https://github.com/ratatui/ratatui-image/compare/v10.0.7...v10.0.8) - 2026-04-30
+
+### Added
+
+- feature kitty-offset to skip unicode-placeholders in kitty
+
 ## [10.0.7](https://github.com/ratatui/ratatui-image/compare/v10.0.6...v10.0.7) - 2026-04-28
 
 ### Other
