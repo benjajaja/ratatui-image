@@ -128,8 +128,7 @@
 //! * `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
 //!   useful to save it in some user configuration.
 //! * `tokio` whether to use tokio's `UnboundedSender` in `ThreadProtocol`.
-//! * `kitty-offset` is an experimental feature that enables `skip_lines(u16)` on
-//!   [`protocol::kitty::Kitty`].
+//! * `sliced` is an experimental feature that enables [`sliced::SlicedImage`].
 //!
 //!
 //! [ratatui]: https://github.com/ratatui-org/ratatui
@@ -151,6 +150,7 @@ use ratatui::{
 pub mod errors;
 pub mod picker;
 pub mod protocol;
+pub mod sliced;
 pub mod thread;
 pub use image::imageops::FilterType;
 

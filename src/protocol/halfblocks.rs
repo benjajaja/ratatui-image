@@ -27,7 +27,6 @@ mod chafa;
 #[cfg(not(any(feature = "chafa-dyn", feature = "chafa-static",)))]
 mod primitive;
 
-/// Fixed Halfblocks protocol
 #[derive(Clone, Default)]
 pub struct Halfblocks {
     data: Vec<HalfBlock>,
@@ -35,7 +34,7 @@ pub struct Halfblocks {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct HalfBlock {
+pub struct HalfBlock {
     pub upper: Color,
     pub lower: Color,
     pub char: char,

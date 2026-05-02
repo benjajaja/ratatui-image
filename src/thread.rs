@@ -45,7 +45,7 @@ pub struct ResizeResponse {
     id: u64,
 }
 
-/// The state of a ThreadImage.
+/// The state for a threaded [`crate::StatefulImage`].
 ///
 /// Has `inner` [StatefulProtocol] and sents requests through the mspc channel to do the
 /// `resize_encode()` work.

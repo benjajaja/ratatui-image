@@ -1,19 +1,22 @@
 //! Sixel protocol implementations.
 //! Uses [`icy_sixel`] to draw image pixels, if the terminal [supports] the [Sixel] protocol.
-//! Needs the `sixel` feature.
+//!
+//! Delivers the image on each render as [Sixel]s.
 //!
 //! [`icy_sixel`]: https://github.com/mkrueger/icy_sixel
 //! [supports]: https://arewesixelyet.com
 //! [Sixel]: https://en.wikipedia.org/wiki/Sixel
 use icy_sixel::{EncodeOptions, sixel_encode};
 use image::DynamicImage;
-use ratatui::{buffer::Buffer, layout::Rect};
+use ratatui::{
+    buffer::Buffer,
+    layout::{Position, Rect},
+};
 use std::cmp::min;
 
 use super::{ProtocolTrait, StatefulProtocolTrait, clear_area};
 use crate::{Result, errors::Errors, picker::cap_parser::Parser};
 
-// Fixed sixel protocol
 #[derive(Clone, Default)]
 pub struct Sixel {
     pub data: String,
@@ -29,6 +32,13 @@ impl Sixel {
             area,
             is_tmux,
         })
+    }
+
+    /// Experimental: render with a callback that can map the sixel data.
+    ///
+    /// Used in [`crate::sliced::SlicedImage`].
+    pub(crate) fn render_map(&self, area: Rect, buf: &mut Buffer, slice: impl Fn(&str) -> String) {
+        render(&slice(&self.data), area, buf)
     }
 }
 
@@ -61,12 +71,37 @@ fn encode(img: &DynamicImage, area: Rect, is_tmux: bool) -> Result<String> {
         clear_area(&mut data, escape, width, height);
         data.push_str(&sixel_data);
     }
+
     Ok(data)
 }
 
 impl ProtocolTrait for Sixel {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        render(self.area, &self.data, area, buf, false)
+        let render_area = match render_area(self.area, area, false) {
+            None => {
+                // If we render out of area, then the buffer will attempt to write regular text (or
+                // possibly other sixels) over the image.
+                //
+                // On some implementations (e.g. Xterm), this actually works but the image is
+                // forever overwritten since we won't write out the same sixel data for the same
+                // (col,row) position again (see buffer diffing).
+                // Thus, when the area grows, the newly available cells will skip rendering and
+                // leave artifacts instead of the image data.
+                //
+                // On some implementations (e.g. ???), only text with its foreground color is
+                // overlayed on the image, also forever overwritten.
+                //
+                // On some implementations (e.g. patched Alactritty), image graphics are never
+                // overwritten and simply draw over other UI elements.
+                //
+                // Note that [ResizeProtocol] forces to ignore this early return, since it will
+                // always resize itself to the area.
+                return;
+            }
+            Some(r) => r,
+        };
+
+        render(&self.data, render_area, buf)
     }
 
     fn area(&self) -> Rect {
@@ -74,37 +109,14 @@ impl ProtocolTrait for Sixel {
     }
 }
 
-fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) {
-    let render_area = match render_area(rect, area, overdraw) {
-        None => {
-            // If we render out of area, then the buffer will attempt to write regular text (or
-            // possibly other sixels) over the image.
-            //
-            // On some implementations (e.g. Xterm), this actually works but the image is
-            // forever overwritten since we won't write out the same sixel data for the same
-            // (col,row) position again (see buffer diffing).
-            // Thus, when the area grows, the newly available cells will skip rendering and
-            // leave artifacts instead of the image data.
-            //
-            // On some implementations (e.g. ???), only text with its foreground color is
-            // overlayed on the image, also forever overwritten.
-            //
-            // On some implementations (e.g. patched Alactritty), image graphics are never
-            // overwritten and simply draw over other UI elements.
-            //
-            // Note that [ResizeProtocol] forces to ignore this early return, since it will
-            // always resize itself to the area.
-            return;
-        }
-        Some(r) => r,
-    };
-
-    buf.cell_mut(render_area).map(|cell| cell.set_symbol(data));
+fn render(data: &str, area: Rect, buf: &mut Buffer) {
+    buf.cell_mut(Into::<Position>::into(area))
+        .map(|cell| cell.set_symbol(data));
     let mut skip_first = false;
 
     // Skip entire area
-    for y in render_area.top()..render_area.bottom() {
-        for x in render_area.left()..render_area.right() {
+    for y in area.top()..area.bottom() {
+        for x in area.left()..area.right() {
             if !skip_first {
                 skip_first = true;
                 continue;

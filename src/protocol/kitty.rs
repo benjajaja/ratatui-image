@@ -1,10 +1,13 @@
-/// https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholders
+//! Kitty protocol.
+//!
+//! Transmits the image once on first render, tracked via an AtomicBool, and then subsequentially
+//! renders the image with the [unicode-placeholders] feature of the [kitty protocol].
+//!
+//! [unicode-placeholders]: https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholders
+//! [kitty protocol]: https://sw.kovidgoyal.net/kitty/graphics-protocol
 use std::fmt::Write;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-#[cfg(feature = "kitty-offset")]
-use std::sync::atomic::AtomicU16;
 
 use crate::{Result, picker::cap_parser::Parser};
 use image::DynamicImage;
@@ -17,8 +20,6 @@ struct KittyProtoState {
     transmitted: Arc<AtomicBool>,
     transmit_str: Option<String>,
     id: (u32, String, u16), // Full ID, Formatted color ID, ID extra part for diacritic
-    #[cfg(feature = "kitty-offset")]
-    skip_line_count: Arc<AtomicU16>,
 }
 
 impl KittyProtoState {
@@ -31,8 +32,6 @@ impl KittyProtoState {
             transmitted: Arc::new(AtomicBool::new(false)),
             transmit_str: Some(transmit_str),
             id: (id, id_color, id_extra),
-            #[cfg(feature = "kitty-offset")]
-            skip_line_count: Arc::new(AtomicU16::new(0)),
         }
     }
 
@@ -48,7 +47,6 @@ impl KittyProtoState {
     }
 }
 
-// Fixed Kitty protocol (transmits once via AtomicBool).
 #[derive(Clone, Default)]
 pub struct Kitty {
     proto_state: KittyProtoState,
@@ -56,73 +54,15 @@ pub struct Kitty {
 }
 
 impl Kitty {
-    /// Create a FixedKitty from an image.
     pub fn new(image: DynamicImage, area: Rect, id: u32, is_tmux: bool) -> Result<Self> {
         let proto_state = KittyProtoState::new(&image, id, is_tmux);
         Ok(Self { proto_state, area })
     }
 
-    #[cfg(feature = "kitty-offset")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "kitty-offset")))]
-    /// Experimental: Set "skip line count".
-    ///
-    /// To display an image partially, in general, start with making it into horizontal slices of
-    /// font-height, and then display the slices you want.
-    ///
-    /// For Kitty, this is wasteful, as the protocol is stateful and ratatui-image already takes
-    /// advantage of the unicode-placeholders feature.
-    ///
-    /// Thus, you can match the inner protocol and deal with kitty specifically.
-    ///
-    /// Kitty already as an internal mutable [`std::sync::atomic::AtomicBool`] to track wether the
-    /// image has been transmitted, the feature `kitty-offset` enables an additional
-    /// [`std::sync::atomic::AtomicU16`] to track how many unicode-placeholder lines to skip (or at
-    /// what line to start) in the next render.
-    ///
-    /// Since this is relies on internally mutating an atomic `u16`, the "normal" render path would
-    /// have to always set it to `0` before rendering.
-    ///
-    /// Example usage:
-    ///
-    /// ```ignore
-    /// let y: i16 = -3;
-    /// match protocol {
-    ///     Protocol::Kitty(kitty) => {
-    ///         if y < 0 {
-    ///             kitty.skip_lines(y.unsigned_abs() as u16);
-    ///             area.height = area.height.saturating_sub(y.unsigned_abs() as u16);
-    ///         } else {
-    ///             // This must be reverted to normal behaviour before the next render without
-    ///             // skipping.
-    ///             kitty.skip_lines(0);
-    ///         }
-    ///         f.render_widget(Image::new(&protocol), area);
-    ///     }
-    ///     _ => {
-    ///     }
-    ///     f.render_widget(Image::new(&protocol), area);
-    /// }
-    /// ```
-    ///
-    /// To make this work in practice, it is necessary to wrap `protocol` in an enum for
-    /// `Kitty(Protocol)` and `Sliced(Vec<Protocol>)`, or do something similar, as the source needs
-    /// to be different (either full image as usual, or sliced list of images).
-    pub fn skip_lines(&self, skip_line_count: u16) {
-        self.proto_state
-            .skip_line_count
-            .store(skip_line_count, Ordering::SeqCst);
-    }
-}
-
-impl ProtocolTrait for Kitty {
-    fn render(&self, area: Rect, buf: &mut Buffer) {
+    /// Only for SlicedImage
+    pub(crate) fn render_with_skip(&self, area: Rect, buf: &mut Buffer, skip_line_count: u16) {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
-
-        #[cfg(not(feature = "kitty-offset"))]
-        let skip_line_count = 0;
-        #[cfg(feature = "kitty-offset")]
-        let skip_line_count = self.proto_state.skip_line_count.load(Ordering::Acquire);
 
         render(
             area,
@@ -132,6 +72,15 @@ impl ProtocolTrait for Kitty {
             seq,
             skip_line_count,
         );
+    }
+}
+
+impl ProtocolTrait for Kitty {
+    fn render(&self, area: Rect, buf: &mut Buffer) {
+        // Transmit only once, track at this point via the AtomicBool in proto_state.
+        let seq = self.proto_state.make_transmit();
+
+        render(area, self.area, buf, &self.proto_state.id, seq, 0);
     }
 
     fn area(&self) -> Rect {

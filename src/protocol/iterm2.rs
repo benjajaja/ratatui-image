@@ -1,4 +1,6 @@
 //! ITerm2 protocol implementation.
+//!
+//! Delivers the full raw png image on every render.
 use image::DynamicImage;
 use ratatui::{buffer::Buffer, layout::Rect};
 use std::{cmp::min, fmt::Write, io::Cursor};

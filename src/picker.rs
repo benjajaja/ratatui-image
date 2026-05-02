@@ -50,6 +50,7 @@ pub struct Picker {
     background_color: Rgba<u8>,
     is_tmux: bool,
     capabilities: Vec<Capability>,
+    is_foot: bool,
 }
 
 /// Serde-friendly protocol-type enum for [Picker].
@@ -115,11 +116,13 @@ impl Picker {
             protocol_type: ProtocolType::Halfblocks,
             is_tmux: false,
             capabilities: Vec::new(),
+            is_foot: false,
         };
 
         let mut options_with_blacklist = options;
         let is_wezterm = env::var("WEZTERM_EXECUTABLE").is_ok_and(|s| !s.is_empty());
         let is_konsole = env::var("KONSOLE_VERSION").is_ok_and(|s| !s.is_empty());
+        let is_foot = env::var("TERM").is_ok_and(|s| s == "foot");
         if is_wezterm || is_konsole {
             // WezTerm could use Sixel, but iTerm2 (detected later is better).
             // Konsole's Sixel implementation is buggy: https://github.com/ratatui/ratatui-image?tab=readme-ov-file#compatibility-matrix
@@ -147,16 +150,19 @@ impl Picker {
                         protocol_type,
                         is_tmux,
                         capabilities: caps,
+                        is_foot,
                     })
                 } else {
                     let mut p = DEFAULT_PICKER.clone();
                     p.is_tmux = is_tmux;
+                    p.is_foot = is_foot;
                     Ok(p)
                 }
             }
             Err(Errors::NoCap | Errors::NoStdinResponse | Errors::NoFontSize) => {
                 let mut p = DEFAULT_PICKER.clone();
                 p.is_tmux = is_tmux;
+                p.is_foot = is_foot;
                 Ok(p)
             }
             Err(err) => Err(err),
@@ -174,6 +180,7 @@ impl Picker {
     pub fn halfblocks() -> Self {
         // Detect tmux, ignore iTerm2 as we don't have font-size.
         let (is_tmux, _tmux_proto) = detect_tmux_and_outer_protocol_from_env();
+        let is_foot = env::var("TERM").is_ok_and(|s| s == "foot");
 
         Self {
             font_size: (10, 20),
@@ -181,6 +188,7 @@ impl Picker {
             protocol_type: ProtocolType::Halfblocks,
             is_tmux,
             capabilities: Vec::new(),
+            is_foot,
         }
     }
 
@@ -192,6 +200,7 @@ impl Picker {
     pub fn from_fontsize(font_size: FontSize) -> Self {
         // Detect tmux, and if positive then take some risky guess for iTerm2 support.
         let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();
+        let is_foot = env::var("TERM").is_ok_and(|s| s == "foot");
 
         // Disregard protocol-from-capabilities if some env var says that we could try iTerm2.
         let iterm2_proto = iterm2_from_env();
@@ -206,6 +215,7 @@ impl Picker {
             protocol_type,
             is_tmux,
             capabilities: Vec::new(),
+            is_foot,
         }
     }
 
@@ -234,6 +244,24 @@ impl Picker {
         &self.capabilities
     }
 
+    pub(crate) fn new_protocol_unresized(
+        &self,
+        image: DynamicImage,
+        area: Rect,
+    ) -> Result<Protocol> {
+        match self.protocol_type {
+            ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::new(image, area)?)),
+            ProtocolType::Sixel => Ok(Protocol::Sixel(Sixel::new(image, area, self.is_tmux)?)),
+            ProtocolType::Kitty => Ok(Protocol::Kitty(Kitty::new(
+                image,
+                area,
+                rand::random(),
+                self.is_tmux,
+            )?)),
+            ProtocolType::Iterm2 => Ok(Protocol::ITerm2(Iterm2::new(image, area, self.is_tmux)?)),
+        }
+    }
+
     /// Returns a new protocol for [`crate::Image`] widgets that fits into the given size.
     pub fn new_protocol(
         &self,
@@ -252,17 +280,7 @@ impl Picker {
                 None => (source.image, source.desired),
             };
 
-        match self.protocol_type {
-            ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::new(image, area)?)),
-            ProtocolType::Sixel => Ok(Protocol::Sixel(Sixel::new(image, area, self.is_tmux)?)),
-            ProtocolType::Kitty => Ok(Protocol::Kitty(Kitty::new(
-                image,
-                area,
-                rand::random(),
-                self.is_tmux,
-            )?)),
-            ProtocolType::Iterm2 => Ok(Protocol::ITerm2(Iterm2::new(image, area, self.is_tmux)?)),
-        }
+        self.new_protocol_unresized(image, area)
     }
 
     /// Returns a new *stateful* protocol for [`crate::StatefulImage`] widgets.
@@ -283,6 +301,10 @@ impl Picker {
             }),
         };
         StatefulProtocol::new(source, self.font_size, protocol_type)
+    }
+
+    pub(crate) fn is_foot(&self) -> bool {
+        self.is_foot
     }
 }
 

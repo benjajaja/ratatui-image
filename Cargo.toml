@@ -24,7 +24,6 @@ tokio = ["dep:tokio"]
 thread-example = []
 chafa-dyn = ["dep:pkg-config"]
 chafa-static = ["dep:pkg-config"]
-kitty-offset = []
 
 [dependencies]
 image = { version = "^0.25.6", default-features = false, features = ["png"] }
@@ -66,6 +65,10 @@ required-features = ["crossterm", "thread-example"] # clashes with "tokio".
 name = "tokio"
 required-features = ["crossterm", "tokio"]
 
+[[example]]
+name = "sliced"
+required-features = ["crossterm"]
+
 [build-dependencies]
 pkg-config = { version = "0.3", optional = true }
 
@@ -82,5 +85,5 @@ name = "protocols"
 harness = false
 
 [package.metadata.docs.rs]
-features = ["crossterm", "kitty-offset"]
+features = ["crossterm"]
 rustdoc-args = ["--cfg", "docsrs"]
