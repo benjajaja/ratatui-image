@@ -24,7 +24,7 @@ pub mod iterm2;
 pub mod kitty;
 pub mod sixel;
 
-trait ProtocolTrait: Send + Sync {
+pub(crate) trait ProtocolTrait: Send + Sync {
     /// Render the currently resized and encoded data to the buffer.
     fn render(&self, area: Rect, buf: &mut Buffer);
 

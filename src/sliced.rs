@@ -3,7 +3,7 @@ use crate::{
     FontSize, Resize,
     errors::Errors,
     picker::{Picker, ProtocolType},
-    protocol::Protocol,
+    protocol::{Protocol, kitty::Kitty, sixel::Sixel},
 };
 use image::DynamicImage;
 use ratatui::{
@@ -62,22 +62,21 @@ impl Widget for SlicedImage<'_> {
     where
         Self: Sized,
     {
+        use crate::protocol::ProtocolTrait;
+
         let mut image_area: Rect = self.size.into();
         image_area.x = area.x;
         image_area.y = area.y;
 
         match &self.sliced_protocol {
-            SlicedProtocol::Kitty(protocol) => {
-                let Protocol::Kitty(kitty) = protocol else {
-                    unreachable!("SlicedProtocol::Kitty must contain Protocol::Kitty");
-                };
+            SlicedProtocol::Kitty(kitty) => {
                 let skip_line_count = if self.position < 0 {
                     image_area.height -= self.position.unsigned_abs();
                     self.position.unsigned_abs()
                 } else {
                     image_area.y += self.position as u16;
                     image_area.height =
-                        (area.height - self.position.unsigned_abs()).min(protocol.area().height);
+                        (area.height - self.position.unsigned_abs()).min(kitty.area().height);
                     0
                 };
                 if image_area.height > 0 {
@@ -100,22 +99,19 @@ impl Widget for SlicedImage<'_> {
                     area.y += 1;
                 }
             }
-            SlicedProtocol::Sixel(protocol, font_height) => {
-                let Protocol::Sixel(sixel) = protocol else {
-                    unreachable!("SlicedProtocol::Unsupported must contain Protocol::Sixel");
-                };
+            SlicedProtocol::Sixel(sixel, font_height) => {
                 let skip_line_count = if self.position < 0 {
                     image_area.height -= self.position.unsigned_abs();
                     self.position.unsigned_abs()
                 } else {
                     image_area.y += self.position as u16;
                     image_area.height =
-                        (area.height - self.position.unsigned_abs()).min(protocol.area().height);
+                        (area.height - self.position.unsigned_abs()).min(sixel.area().height);
                     0
                 };
                 if image_area.height > 0 {
-                    if skip_line_count == 0 && image_area.height >= protocol.area().height {
-                        protocol.render(image_area, buf);
+                    if skip_line_count == 0 && image_area.height >= sixel.area().height {
+                        sixel.render(image_area, buf);
                     } else {
                         sixel.render_map(image_area, buf, |data| {
                             sixel_slice::slice(
@@ -137,8 +133,8 @@ impl Widget for SlicedImage<'_> {
 /// Contains either several images (the "sliced" rows), or is a marker for the Kitty protocol.
 pub enum SlicedProtocol {
     Sliced(Vec<Protocol>),
-    Kitty(Protocol),
-    Sixel(Protocol, u16),
+    Kitty(Kitty),
+    Sixel(Sixel, u16),
 }
 
 impl SlicedProtocol {
@@ -150,22 +146,28 @@ impl SlicedProtocol {
     ) -> Result<SlicedProtocol, Errors> {
         match picker.protocol_type() {
             ProtocolType::Kitty => {
-                let proto = picker.new_protocol(
+                let Protocol::Kitty(kitty) = picker.new_protocol(
                     dyn_img,
                     Rect::new(0, 0, size.width, size.height),
                     Resize::Fit(None),
-                )?;
-                Ok(SlicedProtocol::Kitty(proto))
+                )?
+                else {
+                    unreachable!("ProtocolType::Kitty must produce Protocol::Kitty");
+                };
+                Ok(SlicedProtocol::Kitty(kitty))
             }
-            protocol_type => {
-                if protocol_type == ProtocolType::Sixel && picker.is_foot() {
-                    let proto = picker.new_protocol(
-                        dyn_img,
-                        Rect::new(0, 0, size.width, size.height),
-                        Resize::Fit(None),
-                    )?;
-                    return Ok(SlicedProtocol::Sixel(proto, picker.font_size().1));
-                }
+            ProtocolType::Sixel => {
+                let Protocol::Sixel(sixel) = picker.new_protocol(
+                    dyn_img,
+                    Rect::new(0, 0, size.width, size.height),
+                    Resize::Fit(None),
+                )?
+                else {
+                    unreachable!("ProtocolType::Sixel must produce Protocol::Sixel");
+                };
+                Ok(SlicedProtocol::Sixel(sixel, picker.font_size().1))
+            }
+            _ => {
                 let (slices, image_size) = Self::slice_rows(dyn_img, &picker.font_size(), size);
                 let row_count = slices.len() as u16;
                 let mut row_size = image_size;
