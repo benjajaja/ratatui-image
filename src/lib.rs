@@ -128,7 +128,6 @@
 //! * `serde` for `#[derive]`s on [picker::ProtocolType] for convenience, because it might be
 //!   useful to save it in some user configuration.
 //! * `tokio` whether to use tokio's `UnboundedSender` in `ThreadProtocol`.
-//! * `sliced` is an experimental feature that enables [`sliced::SlicedImage`].
 //!
 //!
 //! [ratatui]: https://github.com/ratatui-org/ratatui

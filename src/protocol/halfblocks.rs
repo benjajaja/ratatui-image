@@ -60,6 +60,23 @@ impl Halfblocks {
         let data = encode(&image, area);
         Ok(Self { data, area })
     }
+
+    pub(crate) fn render_with_skip(&self, area: Rect, buf: &mut Buffer, skip_line_count: u16) {
+        let range = (self.area.width * skip_line_count) as usize
+            ..(self.area.width * self.area.height) as usize;
+        let hbs = &self.data[range];
+        for (i, hb) in hbs.iter().enumerate() {
+            let x = i as u16 % self.area.width;
+            let y = i as u16 / self.area.width;
+            if x >= area.width || y >= area.height {
+                continue;
+            }
+
+            if let Some(cell) = buf.cell_mut((area.x + x, area.y + y)) {
+                hb.set_cell(cell);
+            }
+        }
+    }
 }
 
 // chafa-static and chafa-dyn: always use chafa (no fallback needed/possible)

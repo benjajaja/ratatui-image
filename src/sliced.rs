@@ -3,7 +3,7 @@ use crate::{
     FontSize, Resize,
     errors::Errors,
     picker::{Picker, ProtocolType},
-    protocol::{Protocol, kitty::Kitty, sixel::Sixel},
+    protocol::{Protocol, halfblocks::Halfblocks, kitty::Kitty, sixel::Sixel},
 };
 use image::DynamicImage;
 use ratatui::{
@@ -124,6 +124,19 @@ impl Widget for SlicedImage<'_> {
                     }
                 }
             }
+            SlicedProtocol::Halfblocks(halfblocks) => {
+                let skip_line_count = if self.position < 0 {
+                    image_area.height -= self.position.unsigned_abs();
+                    self.position.unsigned_abs()
+                } else {
+                    image_area.y += self.position as u16;
+                    image_area.height =
+                        (area.height - self.position.unsigned_abs()).min(halfblocks.area().height);
+                    0
+                };
+
+                halfblocks.render_with_skip(image_area, buf, skip_line_count);
+            }
         }
     }
 }
@@ -135,6 +148,7 @@ pub enum SlicedProtocol {
     Sliced(Vec<Protocol>),
     Kitty(Kitty),
     Sixel(Sixel, u16),
+    Halfblocks(Halfblocks),
 }
 
 impl SlicedProtocol {
@@ -166,6 +180,17 @@ impl SlicedProtocol {
                     unreachable!("ProtocolType::Sixel must produce Protocol::Sixel");
                 };
                 Ok(SlicedProtocol::Sixel(sixel, picker.font_size().1))
+            }
+            ProtocolType::Halfblocks => {
+                let Protocol::Halfblocks(halfblocks) = picker.new_protocol(
+                    dyn_img,
+                    Rect::new(0, 0, size.width, size.height),
+                    Resize::Fit(None),
+                )?
+                else {
+                    unreachable!("ProtocolType::Halfblocks must produce Protocol::Halfblocks");
+                };
+                Ok(SlicedProtocol::Halfblocks(halfblocks))
             }
             _ => {
                 let (slices, image_size) = Self::slice_rows(dyn_img, &picker.font_size(), size);
