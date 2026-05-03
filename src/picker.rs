@@ -234,11 +234,10 @@ impl Picker {
         &self.capabilities
     }
 
-    pub(crate) fn new_protocol_unresized(
-        &self,
-        image: DynamicImage,
-        area: Rect,
-    ) -> Result<Protocol> {
+    /// Returns a new protocol.
+    ///
+    /// The image must match the given area at the terminal's current font size.
+    pub(crate) fn new_protocol_raw(&self, image: DynamicImage, area: Rect) -> Result<Protocol> {
         match self.protocol_type {
             ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::new(image, area)?)),
             ProtocolType::Sixel => Ok(Protocol::Sixel(Sixel::new(image, area, self.is_tmux)?)),
@@ -270,7 +269,7 @@ impl Picker {
                 None => (source.image, source.desired),
             };
 
-        self.new_protocol_unresized(image, area)
+        self.new_protocol_raw(image, area)
     }
 
     /// Returns a new *stateful* protocol for [`crate::StatefulImage`] widgets.

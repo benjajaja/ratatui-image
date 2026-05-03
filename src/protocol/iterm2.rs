@@ -18,9 +18,9 @@ pub struct Iterm2 {
 
 impl Iterm2 {
     pub fn new(image: DynamicImage, area: Rect, is_tmux: bool) -> Result<Self> {
-        let data = encode(&image, area, is_tmux)?;
+        let png = encode(&image, area, is_tmux)?;
         Ok(Self {
-            data,
+            data: png,
             area,
             is_tmux,
         })

@@ -61,10 +61,15 @@ impl Halfblocks {
         Ok(Self { data, area })
     }
 
+    /// Specialized render for [`crate::sliced::SlicedImage`].
     pub(crate) fn render_with_skip(&self, area: Rect, buf: &mut Buffer, skip_line_count: u16) {
-        let range = (self.area.width * skip_line_count) as usize
-            ..(self.area.width * self.area.height) as usize;
-        let hbs = &self.data[range];
+        let start = (self.area.width * skip_line_count) as usize;
+        let end = self.area.width as usize * (skip_line_count as usize + area.height as usize);
+        let hbs = &self.data[start..end];
+        self.render_halfblocks(hbs, area, buf);
+    }
+
+    fn render_halfblocks(&self, hbs: &[HalfBlock], area: Rect, buf: &mut Buffer) {
         for (i, hb) in hbs.iter().enumerate() {
             let x = i as u16 % self.area.width;
             let y = i as u16 / self.area.width;
@@ -93,17 +98,7 @@ fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
 
 impl ProtocolTrait for Halfblocks {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        for (i, hb) in self.data.iter().enumerate() {
-            let x = i as u16 % self.area.width;
-            let y = i as u16 / self.area.width;
-            if x >= area.width || y >= area.height {
-                continue;
-            }
-
-            if let Some(cell) = buf.cell_mut((area.x + x, area.y + y)) {
-                hb.set_cell(cell);
-            }
-        }
+        self.render_halfblocks(&self.data, area, buf);
     }
     fn area(&self) -> Rect {
         self.area

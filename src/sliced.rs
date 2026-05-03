@@ -13,8 +13,7 @@ use ratatui::{
 
 /// An image "sliced" into rows for partially displaying, for example in vertical scrolling.
 ///
-/// Uses a specialized [`SlicedProtocol`], that either really slices the image into rows, or in the
-/// case of Kitty, takes advantage of the unicode-placeholder mechanism.
+/// Uses a specialized [`SlicedProtocol`] with specialized operations based on the protocol.
 pub struct SlicedImage<'a> {
     sliced_protocol: &'a SlicedProtocol,
     size: Size,
@@ -25,6 +24,8 @@ impl<'a> SlicedImage<'a> {
     ///
     /// The position is relative to the `area` parameter of [`SlicedImage::render`], which is
     /// either a direct argument or stems from `frame.render_widget(w, area)`.
+    ///
+    /// Example that renders an image as if starting at 3 lines *above* the terminal viewport:
     ///
     /// ```rust
     /// # use ratatui_image::picker::Picker;
@@ -43,11 +44,13 @@ impl<'a> SlicedImage<'a> {
     ///
     /// terminal.draw(|f| {
     ///     let position = -3;
-    ///     // Will render the image as if starting at 3 lines *above* terminal viewport.
     ///     f.render_widget(SlicedImage::new(&sliced, size, position), f.area());
     /// });
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// The same works for e.g. ending N lines below viewport, or within any other inner area of
+    /// the TUI.
     pub fn new(sliced_protocol: &'a SlicedProtocol, size: Size, position: i16) -> SlicedImage<'a> {
         SlicedImage {
             sliced_protocol,
@@ -143,16 +146,27 @@ impl Widget for SlicedImage<'_> {
 
 /// The sliced image for [`SlicedImage`].
 ///
-/// Contains either several images (the "sliced" rows), or is a marker for the Kitty protocol.
+/// Contains the sliced data specialized for the protocol.
 pub enum SlicedProtocol {
+    /// Generic, simply a list of image slices (or rows).
+    /// Not suitable for Sixel, as the foot terminal has some striding glitch. In practice, this is
+    /// only used for [`crate::protocol::iterm2::Iterm2`].
     Sliced(Vec<Protocol>),
+    /// Takes full advantage of the unicode-placeholder mechanism.
     Kitty(Kitty),
+    /// Strips sixel "bands" at render time to display only relevant parts, since the sixel format
+    /// already is row based. Not pixel accurate, but good enough. Stores font-height to match
+    /// against sixel "bands" height.
+    ///
+    /// TODO: deconstruct at encode-time instead of render-time.
     Sixel(Sixel, u16),
+    /// Renders the full image (with chafa if available) for best ASCII art results, then just
+    /// renders the relevant rows.
     Halfblocks(Halfblocks),
 }
 
 impl SlicedProtocol {
-    /// Create the image rows or normal image for kitty, with the given size.
+    /// Create a `SlicedProtocol` for the target [`ratatui::layout::Size`].
     pub fn new(
         picker: &Picker,
         dyn_img: DynamicImage,
@@ -199,7 +213,7 @@ impl SlicedProtocol {
                 row_size.height /= row_count;
                 let rows = slices
                     .into_iter()
-                    .map(|row| picker.new_protocol_unresized(row, row_size))
+                    .map(|row| picker.new_protocol_raw(row, row_size))
                     .collect::<Result<Vec<Protocol>, Errors>>()?;
 
                 Ok(SlicedProtocol::Sliced(rows))
@@ -209,8 +223,12 @@ impl SlicedProtocol {
 
     /// Simply slices the DynamicImage into rows.
     ///
-    /// Suitable for iterm2 or halfblocks, although halfblocks could make use of a custom
-    /// implementation.
+    /// Could work for any protocol, but:
+    /// * Kitty would transmit multiple times.
+    /// * Halfblocks would not render as good with chafa.
+    /// * Sixel glitches in foot, would otherwise be okay.
+    ///
+    /// So this only is used for Iterm2.
     fn slice_rows(
         image: DynamicImage,
         font_size: &FontSize,
@@ -363,5 +381,82 @@ mod sixel_slice {
         }
 
         i
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn test_sixel_slice_bands() {
+            // Simple data with bands separated by -
+            // The slice function strips preamble, so we need ESC P in the data
+            let esc = '\u{1b}';
+            let bs = '\\';
+            // Minimal sixel-like: ESC P q "attrs" header-bands-terminator ESC backslash
+            let data = format!("{esc}Pq\"1;1;8;16#0band1-band2-band3{esc}{bs}");
+
+            // Skip 1 row, show 1 row, font height 6 means 1 band per row
+            let result = slice(&data, 1, 1, 6);
+            // band1 should be skipped, band2 should be present
+            assert!(!result.contains("band1"));
+            assert!(result.contains("band2"));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_slice_rows_basic() {
+        use image::RgbaImage;
+
+        // Create a 4x4 image (4 pixels wide, 4 pixels tall)
+        let mut img = RgbaImage::new(4, 4);
+        for y in 0..4u32 {
+            for x in 0..4u32 {
+                img.put_pixel(x, y, image::Rgba([(x * 64) as u8, (y * 64) as u8, 0, 255]));
+            }
+        }
+        let dyn_img = DynamicImage::ImageRgba8(img);
+
+        let font_size = (1, 1); // 1x1 font means 1 row per pixel row
+        let size = Size::new(4, 4);
+
+        let (rows, image_size) = SlicedProtocol::slice_rows(dyn_img, &font_size, size);
+
+        assert_eq!(rows.len(), 4); // 4 rows
+        assert_eq!(image_size, Rect::new(0, 0, 4, 4));
+        assert_eq!(rows[0].height(), 1);
+        assert_eq!(rows[1].height(), 1);
+        assert_eq!(rows[2].height(), 1);
+        assert_eq!(rows[3].height(), 1);
+    }
+
+    #[test]
+    fn test_slice_rows_font_height() {
+        use image::RgbaImage;
+
+        // Create a 4x8 image
+        let mut img = RgbaImage::new(4, 8);
+        for y in 0..8u32 {
+            for x in 0..4u32 {
+                img.put_pixel(x, y, image::Rgba([(x * 64) as u8, (y * 64) as u8, 0, 255]));
+            }
+        }
+        let dyn_img = DynamicImage::ImageRgba8(img);
+
+        let font_size = (1, 2); // font is 2 pixels tall
+        let size = Size::new(4, 4); // 4 rows
+
+        let (rows, image_size) = SlicedProtocol::slice_rows(dyn_img, &font_size, size);
+
+        assert_eq!(rows.len(), 4); // 4 rows
+        assert_eq!(image_size, Rect::new(0, 0, 4, 4));
+        // Each row should be 2 pixels tall (font height)
+        for row in &rows {
+            assert_eq!(row.height(), 2);
+        }
     }
 }
