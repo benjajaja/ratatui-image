@@ -10,6 +10,12 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - feature kitty-offset in favor of SlicedImage and SlicedProtocol
 
+### Fixed
+- Blacklist Kitty protocol on iTerm2
+  ITerm2 has gained support for kitty, but does not seem to work with unicode-placeholders, at
+  least with ratatui-image's implementation.
+  https://gitlab.com/gnachman/iterm2/-/work_items/11766
+
 ## [10.0.8](https://github.com/ratatui/ratatui-image/compare/v10.0.7...v10.0.8) - 2026-04-30
 
 ### Added
