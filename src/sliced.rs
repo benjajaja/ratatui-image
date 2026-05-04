@@ -351,10 +351,15 @@ mod sixel_slice {
                 b'"' => {
                     // raster attribute line, skip to next `#` or sixel data char
                     i += 1;
-                    while i < bytes.len() && bytes[i] != b'#' && !(63..=126).contains(&bytes[i]) {
+                    while i < bytes.len()
+                        && bytes[i] != b'#'
+                        && bytes[i] != b'-'
+                        && !(63..=126).contains(&bytes[i])
+                    {
                         i += 1;
                     }
                 }
+                b'-' => break,
                 b'#' => {
                     // peek ahead: is this `#digits;` (color def) or `#digits` followed by data?
                     let start = i;
@@ -365,7 +370,10 @@ mod sixel_slice {
                     }
                     if i < bytes.len() && bytes[i] == b';' {
                         // it's a color definition — skip the rest of it
-                        while i < bytes.len() && bytes[i] != b'#' && !(63..=126).contains(&bytes[i])
+                        while i < bytes.len()
+                            && bytes[i] != b'#'
+                            && bytes[i] != b'-'
+                            && !(63..=126).contains(&bytes[i])
                         {
                             i += 1;
                         }
