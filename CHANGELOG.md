@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [11.0.0-alpha.2](https://github.com/ratatui/ratatui-image/compare/v11.0.0-alpha.1...v11.0.0-alpha.2) - 2026-05-04
+
+### Other
+
+- v11.0.0-alpha.2 fix not finding correct sixel band start
+
 ### Added
 - SlicedImage and SlicedProtocol for partially rendering images (horizontal slices)
 
