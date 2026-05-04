@@ -10,7 +10,6 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - feature kitty-offset in favor of SlicedImage and SlicedProtocol
 
-
 ## [10.0.8](https://github.com/ratatui/ratatui-image/compare/v10.0.7...v10.0.8) - 2026-04-30
 
 ### Added
