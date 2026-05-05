@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - SlicedImage and SlicedProtocol for partially rendering images (horizontal slices)
+- `Protocol::needs_placeholder` that returns a `Rect` for a placeholder if the image would not
+  render.
 
 ### Removed
 - feature kitty-offset in favor of SlicedImage and SlicedProtocol

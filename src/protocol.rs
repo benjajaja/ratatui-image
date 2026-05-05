@@ -72,6 +72,27 @@ impl Protocol {
         };
         inner.size()
     }
+
+    /// Returns a placeholder area, if the image will not render into the given area, or `None`.
+    ///
+    /// The returned [`ratatui::layout::Rect`] is the area the image would cover, constrained by
+    /// the size of `area` argument, if the image does not fit.
+    ///
+    /// Kitty and Halfblocks can always render partially, so they always return `None`.
+    pub fn needs_placeholder(&self, area: Rect) -> Option<Rect> {
+        let image_size = self.size();
+        if area.width < image_size.width
+            || area.height < image_size.height
+                && (matches!(self, Self::Sixel(_)) || matches!(self, Self::Halfblocks(_)))
+        {
+            let mut placeholder_area = area;
+            placeholder_area.width = placeholder_area.width.min(image_size.width);
+            placeholder_area.height = placeholder_area.height.min(image_size.height);
+            return Some(placeholder_area);
+        }
+        // Kitty and Halfblocks can render into a smaller area.
+        None
+    }
 }
 
 /// A stateful resizing image protocol for the [crate::StatefulImage] widget.

@@ -21,7 +21,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect, Size},
     style::{Color, Stylize},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
 };
 use ratatui_image::{
     Image, Resize, StatefulImage,
@@ -259,15 +259,24 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     match app.show_images {
         ShowImages::Resized => {}
         _ => {
-            let image = Image::new(&app.image_static);
             // Let it be surrounded by styled text.
-            let offset_area = Rect {
+            let area = Rect {
                 x: area.x + 1,
                 y: area.y + 1,
                 width: area.width.saturating_sub(2),
                 height: area.height.saturating_sub(2),
             };
-            f.render_widget(image, offset_area);
+
+            if let Some(placeholder_area) = app.image_static.needs_placeholder(area) {
+                let placeholder = Block::bordered()
+                    .border_type(BorderType::QuadrantOutside)
+                    .bg(Color::DarkGray);
+                f.render_widget(Clear {}, placeholder.inner(placeholder_area));
+                f.render_widget(placeholder, placeholder_area);
+            } else {
+                let image = Image::new(&app.image_static);
+                f.render_widget(image, area);
+            }
         }
     }
 
