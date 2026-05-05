@@ -142,7 +142,7 @@ use image::{DynamicImage, ImageBuffer, Rgba, imageops};
 use protocol::{ImageSource, Protocol};
 use ratatui::{
     buffer::Buffer,
-    layout::Rect,
+    layout::{Rect, Size},
     widgets::{StatefulWidget, Widget},
 };
 
@@ -156,7 +156,23 @@ pub use image::imageops::FilterType;
 type Result<T> = std::result::Result<T, errors::Errors>;
 
 /// The terminal's font size in `(width, height)`
-pub type FontSize = (u16, u16);
+#[derive(Copy, Clone, Debug)]
+pub struct FontSize {
+    pub width: u16,
+    pub height: u16,
+}
+
+impl FontSize {
+    pub const fn new(width: u16, height: u16) -> Self {
+        Self { width, height }
+    }
+}
+
+impl From<(u16, u16)> for FontSize {
+    fn from((width, height): (u16, u16)) -> Self {
+        Self::new(width, height)
+    }
+}
 
 /// Fixed size image widget that uses [Protocol].
 ///
@@ -197,7 +213,7 @@ impl Widget for Image<'_> {
 pub trait ResizeEncodeRender {
     /// Resize and encode if necessary, and render immediately.
     fn resize_encode_render(&mut self, resize: &Resize, area: Rect, buf: &mut Buffer) {
-        if let Some(rect) = self.needs_resize(resize, area) {
+        if let Some(rect) = self.needs_resize(resize, area.into()) {
             self.resize_encode(resize, rect);
         }
         self.render(area, buf);
@@ -207,7 +223,7 @@ pub trait ResizeEncodeRender {
     /// that next call for the given area does not need to redo the work.
     ///
     /// This can be done in a background thread, and the result is stored in this [protocol::StatefulProtocol].
-    fn resize_encode(&mut self, resize: &Resize, area: Rect);
+    fn resize_encode(&mut self, resize: &Resize, size: Size);
 
     /// Render the currently resized and encoded data to the buffer.
     fn render(&mut self, area: Rect, buf: &mut Buffer);
@@ -216,7 +232,7 @@ pub trait ResizeEncodeRender {
     /// This can be called by the UI thread to check if this [protocol::StatefulProtocol] should be sent off
     /// to some background thread/task to do the resizing and encoding, instead of rendering. The
     /// thread should then return the [protocol::StatefulProtocol] so that it can be rendered.
-    fn needs_resize(&self, resize: &Resize, area: Rect) -> Option<Rect>;
+    fn needs_resize(&self, resize: &Resize, size: Size) -> Option<Size>;
 }
 
 /// Resizeable image widget that uses a [protocol::StatefulProtocol] state.
@@ -331,11 +347,11 @@ impl Resize {
         &self,
         source: &ImageSource,
         font_size: FontSize,
-        area: Rect,
+        size: Size,
         background_color: Rgba<u8>,
     ) -> DynamicImage {
-        let width = (area.width * font_size.0) as u32;
-        let height = (area.height * font_size.1) as u32;
+        let width = (size.width * font_size.width) as u32;
+        let height = (size.height * font_size.height) as u32;
 
         // Resize/Crop/etc., fitting a multiple of font-size, but not necessarily the area.
         let mut image = self.resize_image(source, width, height);
@@ -351,35 +367,35 @@ impl Resize {
 
     /// Check if [`ImageSource`]'s "desired" fits into `area` and is different than `current`.
     ///
-    /// The returned `Rect` is the area the image needs to be resized to, depending on the resize
+    /// The returned `Size` is the area the image needs to be resized to, depending on the resize
     /// type.
     pub fn needs_resize(
         &self,
         image: &ImageSource,
         font_size: FontSize,
-        current: Rect,
-        area: Rect,
+        current: Size,
+        size: Size,
         force: bool,
-    ) -> Option<Rect> {
+    ) -> Option<Size> {
         let desired = image.desired;
         // Check if resize is needed at all.
         if !force
             && !matches!(self, &Resize::Scale(_))
-            && desired.width <= area.width
-            && desired.height <= area.height
+            && desired.width <= size.width
+            && desired.height <= size.height
             && desired == current
         {
-            let width = (desired.width * font_size.0) as u32;
-            let height = (desired.height * font_size.1) as u32;
+            let width = (desired.width * font_size.width) as u32;
+            let height = (desired.height * font_size.height) as u32;
             if image.image.width() == width || image.image.height() == height {
                 return None;
             }
         }
 
-        let rect = self.render_area(image, font_size, area);
-        debug_assert!(rect.width <= area.width, "needs_resize exceeds area width");
+        let rect = self.render_area(image, font_size, size);
+        debug_assert!(rect.width <= size.width, "needs_resize exceeds area width");
         debug_assert!(
-            rect.height <= area.height,
+            rect.height <= size.height,
             "needs_resize exceeds area height"
         );
         if force || rect != current {
@@ -388,11 +404,11 @@ impl Resize {
         None
     }
 
-    pub fn render_area(&self, image: &ImageSource, font_size: FontSize, available: Rect) -> Rect {
+    pub fn render_area(&self, image: &ImageSource, font_size: FontSize, available: Size) -> Size {
         let (width, height) = self.needs_resize_pixels(
             &image.image,
-            (available.width as u32) * (font_size.0 as u32),
-            (available.height as u32) * (font_size.1 as u32),
+            (available.width as u32) * (font_size.width as u32),
+            (available.height as u32) * (font_size.height as u32),
         );
         ImageSource::round_pixel_size_to_cells(width, height, font_size)
     }
@@ -474,7 +490,7 @@ mod tests {
 
     use super::*;
 
-    const FONT_SIZE: FontSize = (10, 10);
+    const FONT_SIZE: FontSize = FontSize::new(10, 10);
 
     fn s(w: u16, h: u16) -> ImageSource {
         let image: DynamicImage =
@@ -482,8 +498,8 @@ mod tests {
         ImageSource::new(image, FONT_SIZE, [0, 0, 0, 0].into())
     }
 
-    fn r(w: u16, h: u16) -> Rect {
-        Rect::new(0, 0, w, h)
+    fn r(w: u16, h: u16) -> Size {
+        Size::new(w, h)
     }
 
     #[test]

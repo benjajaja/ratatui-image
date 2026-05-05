@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{Result, picker::cap_parser::Parser};
 use image::DynamicImage;
+use ratatui::layout::Size;
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use super::{ProtocolTrait, StatefulProtocolTrait};
@@ -50,13 +51,13 @@ impl KittyProtoState {
 #[derive(Clone, Default)]
 pub struct Kitty {
     proto_state: KittyProtoState,
-    area: Rect,
+    size: Size,
 }
 
 impl Kitty {
-    pub fn new(image: DynamicImage, area: Rect, id: u32, is_tmux: bool) -> Result<Self> {
+    pub fn new(image: DynamicImage, size: Size, id: u32, is_tmux: bool) -> Result<Self> {
         let proto_state = KittyProtoState::new(&image, id, is_tmux);
-        Ok(Self { proto_state, area })
+        Ok(Self { proto_state, size })
     }
 
     /// Only for SlicedImage
@@ -66,7 +67,7 @@ impl Kitty {
 
         render(
             area,
-            self.area,
+            self.size,
             buf,
             &self.proto_state.id,
             seq,
@@ -80,18 +81,18 @@ impl ProtocolTrait for Kitty {
         // Transmit only once, track at this point via the AtomicBool in proto_state.
         let seq = self.proto_state.make_transmit();
 
-        render(area, self.area, buf, &self.proto_state.id, seq, 0);
+        render(area, self.size, buf, &self.proto_state.id, seq, 0);
     }
 
-    fn area(&self) -> Rect {
-        self.area
+    fn size(&self) -> Size {
+        self.size
     }
 }
 
 #[derive(Clone)]
 pub struct StatefulKitty {
     id: (u32, String, u16), // Full ID, Formatted color ID, ID extra part for diacritic
-    rect: Rect,
+    size: Size,
     proto_state: KittyProtoState,
     is_tmux: bool,
 }
@@ -103,7 +104,7 @@ impl StatefulKitty {
         let id_extra = u16::from(id_extra);
         StatefulKitty {
             id: (id, id_color, id_extra),
-            rect: Rect::default(),
+            size: Size::default(),
             proto_state: KittyProtoState::default(),
             is_tmux,
         }
@@ -115,17 +116,17 @@ impl ProtocolTrait for StatefulKitty {
         // Transmit only once. This is why self is mut.
         let seq = self.proto_state.make_transmit();
 
-        render(area, self.rect, buf, &self.id, seq, 0);
+        render(area, self.size, buf, &self.id, seq, 0);
     }
 
-    fn area(&self) -> Rect {
-        self.rect
+    fn size(&self) -> Size {
+        self.size
     }
 }
 
 impl StatefulProtocolTrait for StatefulKitty {
-    fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()> {
-        self.rect = area;
+    fn resize_encode(&mut self, img: DynamicImage, size: Size) -> Result<()> {
+        self.size = size;
         // If resized then we must transmit again.
         self.proto_state = KittyProtoState::new(&img, self.id.0, self.is_tmux);
         Ok(())
@@ -134,13 +135,13 @@ impl StatefulProtocolTrait for StatefulKitty {
 
 fn render(
     area: Rect,
-    rect: Rect,
+    size: Size,
     buf: &mut Buffer,
     (_, id_color, id_extra): &(u32, String, u16),
     mut seq: Option<&str>,
     skip_line_count: u16,
 ) {
-    let full_width = area.width.min(rect.width);
+    let full_width = area.width.min(size.width);
     let width_usize = usize::from(full_width);
 
     let estimated_placeholder_row_size = id_color.len() +
@@ -161,7 +162,7 @@ fn render(
 
     // Clamp to effectively 297, the number of placeholders in the Kitty protocol.
     // Anything beyond would just render the something that's wrong, so skip.
-    let height = area.height.min(rect.height).min(DIACRITICS.len() as u16);
+    let height = area.height.min(size.height).min(DIACRITICS.len() as u16);
     for y in 0..height {
         // Draw each line of unicode placeholders but all into the first cell.
         // I couldn't work out actually drawing into each cell of the buffer so

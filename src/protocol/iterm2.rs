@@ -2,7 +2,10 @@
 //!
 //! Delivers the full raw png image on every render.
 use image::DynamicImage;
-use ratatui::{buffer::Buffer, layout::Rect};
+use ratatui::{
+    buffer::Buffer,
+    layout::{Rect, Size},
+};
 use std::{cmp::min, fmt::Write, io::Cursor};
 
 use crate::{Result, picker::cap_parser::Parser};
@@ -12,29 +15,29 @@ use super::{ProtocolTrait, StatefulProtocolTrait, clear_area};
 #[derive(Clone, Default)]
 pub struct Iterm2 {
     pub data: String,
-    pub area: Rect,
+    pub size: Size,
     pub is_tmux: bool,
 }
 
 impl Iterm2 {
-    pub fn new(image: DynamicImage, area: Rect, is_tmux: bool) -> Result<Self> {
-        let png = encode(&image, area, is_tmux)?;
+    pub fn new(image: DynamicImage, size: Size, is_tmux: bool) -> Result<Self> {
+        let png = encode(&image, size, is_tmux)?;
         Ok(Self {
             data: png,
-            area,
+            size,
             is_tmux,
         })
     }
 }
 
-fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String> {
+fn encode(img: &DynamicImage, size: Size, is_tmux: bool) -> Result<String> {
     let mut png: Vec<u8> = vec![];
     img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)?;
 
     let (start, escape, end) = Parser::escape_tmux(is_tmux);
 
-    let width = render_area.width;
-    let height = render_area.height;
+    let width = size.width;
+    let height = size.height;
     let mut seq = String::from(start);
     clear_area(&mut seq, escape, width, height);
 
@@ -55,16 +58,16 @@ fn encode(img: &DynamicImage, render_area: Rect, is_tmux: bool) -> Result<String
 
 impl ProtocolTrait for Iterm2 {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        render(self.area, &self.data, area, buf, false)
+        render(self.size, &self.data, area, buf, false)
     }
 
-    fn area(&self) -> Rect {
-        self.area
+    fn size(&self) -> Size {
+        self.size
     }
 }
 
-fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) {
-    let render_area = match render_area(rect, area, overdraw) {
+fn render(size: Size, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) {
+    let render_area = match render_area(size, area, overdraw) {
         None => {
             // If we render out of area, then the buffer will attempt to write regular text (or
             // possibly other sixels) over the image.
@@ -94,28 +97,28 @@ fn render(rect: Rect, data: &str, area: Rect, buf: &mut Buffer, overdraw: bool) 
     }
 }
 
-fn render_area(rect: Rect, area: Rect, overdraw: bool) -> Option<Rect> {
+fn render_area(size: Size, area: Rect, overdraw: bool) -> Option<Rect> {
     if overdraw {
         return Some(Rect::new(
             area.x,
             area.y,
-            min(rect.width, area.width),
-            min(rect.height, area.height),
+            min(size.width, area.width),
+            min(size.height, area.height),
         ));
     }
 
-    if rect.width > area.width || rect.height > area.height {
+    if size.width > area.width || size.height > area.height {
         return None;
     }
-    Some(Rect::new(area.x, area.y, rect.width, rect.height))
+    Some(Rect::new(area.x, area.y, size.width, size.height))
 }
 
 impl StatefulProtocolTrait for Iterm2 {
-    fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()> {
-        let data = encode(&img, area, self.is_tmux)?;
+    fn resize_encode(&mut self, img: DynamicImage, size: Size) -> Result<()> {
+        let data = encode(&img, size, self.is_tmux)?;
         *self = Iterm2 {
             data,
-            area,
+            size,
             ..*self
         };
         Ok(())

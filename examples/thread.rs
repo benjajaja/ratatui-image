@@ -8,7 +8,7 @@ use std::{
 use ratatui::{
     Frame,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-    layout::{Position, Rect},
+    layout::{Position, Rect, Size},
     style::{Color, Stylize},
     widgets::{Block, Borders, Clear, Paragraph},
 };
@@ -21,7 +21,7 @@ use ratatui_image::{
 
 struct App {
     async_state: ThreadProtocol,
-    last_known_size: Rect,
+    last_known_size: Size,
     logo_pos: Position,
     logo_size: f64,
     source_code_lines: Vec<String>,
@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut app = App {
         async_state: ThreadProtocol::new(tx_worker, Some(picker.new_resize_protocol(dyn_img))),
-        last_known_size: Rect::default(),
+        last_known_size: Size::default(),
         logo_pos: Position { x: 1, y: 1 },
         logo_size: 0.1,
         source_code_lines: Vec::new(),
@@ -140,7 +140,9 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
         f.render_widget(p, Rect::new(inner_area.x, y, inner_area.width, 1));
     }
 
-    let size_for = app.async_state.size_for(Resize::Fit(None), inner_area);
+    let size_for = app
+        .async_state
+        .size_for(Resize::Fit(None), inner_area.into());
 
     let mut size = size_for.unwrap_or(app.last_known_size);
     app.last_known_size = size;
@@ -148,7 +150,7 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
     size.width = (f64::from(size.width) * app.logo_size).ceil() as u16;
     size.height = (f64::from(size.height) * app.logo_size).ceil() as u16;
 
-    let mut image_block_area = size;
+    let mut image_block_area: Rect = size.into();
     image_block_area.width += 2;
     image_block_area.height += 2;
 

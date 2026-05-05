@@ -7,7 +7,10 @@ use std::{
 };
 
 use image::{DynamicImage, ImageBuffer, Rgba, imageops};
-use ratatui::{buffer::Buffer, layout::Rect};
+use ratatui::{
+    buffer::Buffer,
+    layout::{Rect, Size},
+};
 
 use self::{
     halfblocks::Halfblocks,
@@ -28,9 +31,8 @@ pub(crate) trait ProtocolTrait: Send + Sync {
     /// Render the currently resized and encoded data to the buffer.
     fn render(&self, area: Rect, buf: &mut Buffer);
 
-    // Get the area of the image.
-    #[allow(dead_code)]
-    fn area(&self) -> Rect;
+    // Get the size of the image.
+    fn size(&self) -> Size;
 }
 
 trait StatefulProtocolTrait: ProtocolTrait {
@@ -38,7 +40,7 @@ trait StatefulProtocolTrait: ProtocolTrait {
     /// that next call for the given area does not need to redo the work.
     ///
     /// This can be done in a background thread, and the result is stored in this [StatefulProtocol].
-    fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()>;
+    fn resize_encode(&mut self, img: DynamicImage, size: Size) -> Result<()>;
 }
 
 /// A fixed-size image protocol for the [crate::Image] widget.
@@ -60,14 +62,15 @@ impl Protocol {
         };
         inner.render(area, buf);
     }
-    pub fn area(&self) -> Rect {
+    // Get the size of the image.
+    pub fn size(&self) -> Size {
         let inner: &dyn ProtocolTrait = match self {
             Self::Halfblocks(halfblocks) => halfblocks,
             Self::Sixel(sixel) => sixel,
             Self::Kitty(kitty) => kitty,
             Self::ITerm2(iterm2) => iterm2,
         };
-        inner.area()
+        inner.size()
     }
 }
 
@@ -126,8 +129,8 @@ impl StatefulProtocol {
     }
 
     // Calculate the area that this image will ultimately render to, inside the given area.
-    pub fn size_for(&self, resize: Resize, area: Rect) -> Rect {
-        resize.render_area(&self.source, self.font_size, area)
+    pub fn size_for(&self, resize: Resize, size: Size) -> Size {
+        resize.render_area(&self.source, self.font_size, size)
     }
 
     pub fn protocol_type(&self) -> &StatefulProtocolType {
@@ -148,24 +151,24 @@ impl StatefulProtocol {
         self.source.background_color
     }
 
-    fn last_encoding_area(&self) -> Rect {
-        self.protocol_type.inner_trait().area()
+    fn last_encoding_area(&self) -> Size {
+        self.protocol_type.inner_trait().size()
     }
 }
 
 impl ResizeEncodeRender for StatefulProtocol {
-    fn resize_encode(&mut self, resize: &Resize, area: Rect) {
-        if area.width == 0 || area.height == 0 {
+    fn resize_encode(&mut self, resize: &Resize, size: Size) {
+        if size.width == 0 || size.height == 0 {
             return;
         }
 
-        let img = resize.resize(&self.source, self.font_size, area, self.background_color());
+        let img = resize.resize(&self.source, self.font_size, size, self.background_color());
 
         // TODO: save err in struct
         let result = self
             .protocol_type
             .inner_trait_mut()
-            .resize_encode(img, area);
+            .resize_encode(img, size);
 
         if result.is_ok() {
             self.hash = self.source.hash
@@ -178,12 +181,12 @@ impl ResizeEncodeRender for StatefulProtocol {
         self.protocol_type.inner_trait_mut().render(area, buf);
     }
 
-    fn needs_resize(&self, resize: &Resize, area: Rect) -> Option<Rect> {
+    fn needs_resize(&self, resize: &Resize, size: Size) -> Option<Size> {
         resize.needs_resize(
             &self.source,
             self.font_size,
             self.last_encoding_area(),
-            area,
+            size,
             self.source.hash != self.hash,
         )
     }
@@ -208,7 +211,7 @@ pub struct ImageSource {
     /// The original image without resizing.
     pub image: DynamicImage,
     /// The area that the [`ImageSource::image`] covers, but not necessarily fills.
-    pub desired: Rect,
+    pub desired: Size,
     /// TODO: document this; when image changes but it doesn't need a resize, force a render.
     pub hash: u64,
     /// The background color that should be used for padding or background when resizing.
@@ -245,14 +248,10 @@ impl ImageSource {
         }
     }
     /// Round an image pixel size to the nearest matching cell size, given a font size.
-    pub fn round_pixel_size_to_cells(
-        img_width: u32,
-        img_height: u32,
-        (char_width, char_height): FontSize,
-    ) -> Rect {
-        let width = (img_width as f32 / char_width as f32).ceil() as u16;
-        let height = (img_height as f32 / char_height as f32).ceil() as u16;
-        Rect::new(0, 0, width, height)
+    pub fn round_pixel_size_to_cells(img_width: u32, img_height: u32, font_size: FontSize) -> Size {
+        let width = (img_width as f32 / font_size.width as f32).ceil() as u16;
+        let height = (img_height as f32 / font_size.height as f32).ceil() as u16;
+        Size::new(width, height)
     }
 }
 

@@ -20,7 +20,7 @@ use crate::{
 use cap_parser::{Parser, QueryStdioOptions, Response};
 use image::{DynamicImage, Rgba};
 use rand::random;
-use ratatui::layout::Rect;
+use ratatui::layout::Size;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -110,7 +110,7 @@ impl Picker {
             // This is completely arbitrary. For halfblocks, it doesn't have to be precise
             // since we're not rendering pixels. It should be roughly 1:2 ratio, and some
             // reasonable size.
-            font_size: (10, 20),
+            font_size: FontSize::new(10, 20),
             background_color: DEFAULT_BACKGROUND,
             protocol_type: ProtocolType::Halfblocks,
             is_tmux: false,
@@ -176,7 +176,7 @@ impl Picker {
         let (is_tmux, _tmux_proto) = detect_tmux_and_outer_protocol_from_env();
 
         Self {
-            font_size: (10, 20),
+            font_size: FontSize::new(10, 20),
             background_color: DEFAULT_BACKGROUND,
             protocol_type: ProtocolType::Halfblocks,
             is_tmux,
@@ -237,17 +237,17 @@ impl Picker {
     /// Returns a new protocol.
     ///
     /// The image must match the given area at the terminal's current font size.
-    pub(crate) fn new_protocol_raw(&self, image: DynamicImage, area: Rect) -> Result<Protocol> {
+    pub(crate) fn new_protocol_raw(&self, image: DynamicImage, size: Size) -> Result<Protocol> {
         match self.protocol_type {
-            ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::new(image, area)?)),
-            ProtocolType::Sixel => Ok(Protocol::Sixel(Sixel::new(image, area, self.is_tmux)?)),
+            ProtocolType::Halfblocks => Ok(Protocol::Halfblocks(Halfblocks::new(image, size)?)),
+            ProtocolType::Sixel => Ok(Protocol::Sixel(Sixel::new(image, size, self.is_tmux)?)),
             ProtocolType::Kitty => Ok(Protocol::Kitty(Kitty::new(
                 image,
-                area,
+                size,
                 rand::random(),
                 self.is_tmux,
             )?)),
-            ProtocolType::Iterm2 => Ok(Protocol::ITerm2(Iterm2::new(image, area, self.is_tmux)?)),
+            ProtocolType::Iterm2 => Ok(Protocol::ITerm2(Iterm2::new(image, size, self.is_tmux)?)),
         }
     }
 
@@ -255,7 +255,7 @@ impl Picker {
     pub fn new_protocol(
         &self,
         image: DynamicImage,
-        size: Rect,
+        size: Size,
         resize: Resize,
     ) -> Result<Protocol> {
         let source = ImageSource::new(image, self.font_size, self.background_color);
@@ -424,7 +424,7 @@ fn font_size_fallback() -> Option<FontSize> {
         return None;
     }
 
-    Some((x / cols, y / rows))
+    Some(FontSize::new(x / cols, y / rows))
 }
 
 #[cfg(windows)]
@@ -510,7 +510,7 @@ fn interpret_parser_responses(
             Response::RectangularOps => Some(Capability::RectangularOps),
             Response::CellSize(cell_size) => {
                 if let Some((w, h)) = cell_size {
-                    font_size = Some((*w, *h));
+                    font_size = Some((*w, *h).into());
                 }
                 Some(Capability::CellSize(*cell_size))
             }

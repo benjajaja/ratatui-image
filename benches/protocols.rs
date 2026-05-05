@@ -1,6 +1,10 @@
 #![expect(clippy::unwrap_used)]
 use criterion::{Criterion, criterion_group, criterion_main};
-use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget as _};
+use ratatui::{
+    buffer::Buffer,
+    layout::{Rect, Size},
+    widgets::StatefulWidget as _,
+};
 use ratatui_image::{
     Resize, ResizeEncodeRender, StatefulImage,
     picker::{Picker, ProtocolType},
@@ -47,7 +51,7 @@ fn bench_resize_encode_render(c: &mut Criterion) {
                 picker.set_protocol_type(protocol);
                 let mut proto = picker.new_resize_protocol(black_box(image.clone()));
 
-                let area = Rect::new(0, 0, 10, 10);
+                let area = Size::new(10, 10);
                 proto.resize_encode(&Resize::Fit(None), black_box(area));
             })
         });

@@ -10,6 +10,24 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - feature kitty-offset in favor of SlicedImage and SlicedProtocol
 
+### Changed
+- `FontSize = (u16, u16)` alias became `struct FontSize { width: u16, height: u16 }`
+- Replaced `Rect` with `Size` everywhere it was used for size, or without positioning
+  - `Picker::new_protocol()`
+  - `Resize::render_area()`
+  - `ProtocolTrait::area() -> Rect` became `ProtocolTrait::size() -> Size`
+  - `StatefulProtocol::size_for()`
+  - `ResizeEncodeRender::resize_encode()`
+  - `ResizeEncodeRender::needs_resize()`
+  - `Halfblocks::new()`
+  - `Kitty::new()`
+  - `Sixel::new()`
+  - `ITerm2::new()`
+  - `ImageSource::round_pixel_size_to_cells()`
+  - `chafa::encode()`
+  - `primitive::encode()`
+  - Any places missed here should be trivial to fix
+
 ## [10.0.8](https://github.com/ratatui/ratatui-image/compare/v10.0.7...v10.0.8) - 2026-04-30
 
 ### Added

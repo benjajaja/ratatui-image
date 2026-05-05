@@ -28,8 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dyn_img = image::ImageReader::open("./assets/Ada.png")?.decode()?;
     let font_size = picker.font_size();
     let size = Size::new(
-        dyn_img.width().div_ceil(font_size.0 as u32) as u16,
-        dyn_img.height().div_ceil(font_size.1 as u32) as u16,
+        dyn_img.width().div_ceil(font_size.width as u32) as u16,
+        dyn_img.height().div_ceil(font_size.height as u32) as u16,
     );
 
     let mut terminal_size = Size::default();
@@ -135,9 +135,6 @@ fn ui(f: &mut Frame<'_>, app: &App) {
             Rect::new(inner_area.x, inner_area.y + i, inner_area.width, 1),
         );
     }
-
-    let mut area: Rect = app.size.into();
-    area.x = 1;
 
     f.render_widget(
         SlicedImage::new(&app.sliced, app.size, app.position),

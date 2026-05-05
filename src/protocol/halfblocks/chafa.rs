@@ -6,7 +6,7 @@ use std::ffi::c_void;
 use std::sync::OnceLock;
 
 use image::DynamicImage;
-use ratatui::{layout::Rect, style::Color};
+use ratatui::{layout::Size, style::Color};
 
 use super::HalfBlock;
 
@@ -72,11 +72,11 @@ fn init_chafa() -> ChafaState {
 }
 
 /// Encode using chafa.
-pub fn encode(img: &DynamicImage, area: Rect) -> Option<Vec<HalfBlock>> {
+pub fn encode(img: &DynamicImage, size: Size) -> Option<Vec<HalfBlock>> {
     let chafa = CHAFA.get_or_init(init_chafa);
 
-    let width = area.width;
-    let height = area.height;
+    let width = size.width;
+    let height = size.height;
 
     unsafe {
         let config = chafa_canvas_config_new();

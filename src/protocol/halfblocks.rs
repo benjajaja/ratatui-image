@@ -14,7 +14,7 @@ compile_error!("features `chafa-static` and `chafa-dyn` are mutually exclusive")
 use image::DynamicImage;
 use ratatui::{
     buffer::{Buffer, Cell},
-    layout::Rect,
+    layout::{Rect, Size},
     style::Color,
 };
 
@@ -30,7 +30,7 @@ mod primitive;
 #[derive(Clone, Default)]
 pub struct Halfblocks {
     data: Vec<HalfBlock>,
-    area: Rect,
+    size: Size,
 }
 
 #[derive(Clone, Debug)]
@@ -56,23 +56,23 @@ impl Halfblocks {
     /// the image could be resized in relation to the font size beforehand.
     /// Also note that the font-size is probably just some arbitrary size with a 1:2 ratio when the
     /// protocol is Halfblocks, and not the actual font size of the terminal.
-    pub fn new(image: DynamicImage, area: Rect) -> Result<Self> {
-        let data = encode(&image, area);
-        Ok(Self { data, area })
+    pub fn new(image: DynamicImage, size: Size) -> Result<Self> {
+        let data = encode(&image, size);
+        Ok(Self { data, size })
     }
 
     /// Specialized render for [`crate::sliced::SlicedImage`].
     pub(crate) fn render_with_skip(&self, area: Rect, buf: &mut Buffer, skip_line_count: u16) {
-        let start = (self.area.width * skip_line_count) as usize;
-        let end = self.area.width as usize * (skip_line_count as usize + area.height as usize);
+        let start = (self.size.width * skip_line_count) as usize;
+        let end = self.size.width as usize * (skip_line_count as usize + area.height as usize);
         let hbs = &self.data[start..end];
         self.render_halfblocks(hbs, area, buf);
     }
 
     fn render_halfblocks(&self, hbs: &[HalfBlock], area: Rect, buf: &mut Buffer) {
         for (i, hb) in hbs.iter().enumerate() {
-            let x = i as u16 % self.area.width;
-            let y = i as u16 / self.area.width;
+            let x = i as u16 % self.size.width;
+            let y = i as u16 / self.size.width;
             if x >= area.width || y >= area.height {
                 continue;
             }
@@ -86,29 +86,29 @@ impl Halfblocks {
 
 // chafa-static and chafa-dyn: always use chafa (no fallback needed/possible)
 #[cfg(any(feature = "chafa-static", feature = "chafa-dyn"))]
-fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
-    chafa::encode(img, rect).expect("chafa is always available with compile-time linking")
+fn encode(img: &DynamicImage, size: Size) -> Vec<HalfBlock> {
+    chafa::encode(img, size).expect("chafa is always available with compile-time linking")
 }
 
 // no chafa feature: use primitive only
 #[cfg(not(any(feature = "chafa-dyn", feature = "chafa-static")))]
-fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
-    primitive::encode(img, rect)
+fn encode(img: &DynamicImage, size: Size) -> Vec<HalfBlock> {
+    primitive::encode(img, size)
 }
 
 impl ProtocolTrait for Halfblocks {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         self.render_halfblocks(&self.data, area, buf);
     }
-    fn area(&self) -> Rect {
-        self.area
+    fn size(&self) -> Size {
+        self.size
     }
 }
 
 impl StatefulProtocolTrait for Halfblocks {
-    fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()> {
-        let data = encode(&img, area);
-        *self = Halfblocks { data, area };
+    fn resize_encode(&mut self, img: DynamicImage, size: Size) -> Result<()> {
+        let data = encode(&img, size);
+        *self = Halfblocks { data, size };
         Ok(())
     }
 }
@@ -117,7 +117,7 @@ impl StatefulProtocolTrait for Halfblocks {
 mod tests {
     use image::{Rgb, RgbImage};
     use insta::assert_snapshot;
-    use ratatui::{Terminal, backend::TestBackend, layout::Rect};
+    use ratatui::{Terminal, backend::TestBackend, layout::Size};
 
     use crate::{
         Image,
@@ -139,7 +139,7 @@ mod tests {
                     .unwrap()
                     .decode()
                     .unwrap();
-                let area = Rect::new(0, 0, 40, 20);
+                let area = Size::new(40, 20);
                 let hbs = Halfblocks::new(image, area).unwrap();
                 frame.render_widget(Image::new(&Protocol::Halfblocks(hbs)), frame.area());
             })

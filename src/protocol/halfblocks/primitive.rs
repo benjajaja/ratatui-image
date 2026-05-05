@@ -2,7 +2,7 @@
 
 use image::DynamicImage;
 use image::imageops::FilterType;
-use ratatui::{layout::Rect, style::Color};
+use ratatui::{layout::Size, style::Color};
 
 use super::HalfBlock;
 
@@ -10,10 +10,10 @@ const HALF_UPPER: char = '▀';
 const HALF_LOWER: char = '▄';
 const SPACE: char = ' ';
 
-pub fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
+pub fn encode(img: &DynamicImage, size: Size) -> Vec<HalfBlock> {
     let img = img.resize_exact(
-        rect.width as u32,
-        (rect.height * 2) as u32,
+        size.width as u32,
+        (size.height * 2) as u32,
         FilterType::Triangle,
     );
 
@@ -23,12 +23,12 @@ pub fn encode(img: &DynamicImage, rect: Rect) -> Vec<HalfBlock> {
             lower: Color::Rgb(0, 0, 0),
             char: HALF_UPPER,
         };
-        (rect.width * rect.height) as usize
+        (size.width * size.height) as usize
     ];
 
     for (y, row) in img.to_rgb8().rows().enumerate() {
         for (x, pixel) in row.enumerate() {
-            let position = x + (rect.width as usize) * (y / 2);
+            let position = x + (size.width as usize) * (y / 2);
             if y % 2 == 0 {
                 data[position].upper = Color::Rgb(pixel[0], pixel[1], pixel[2]);
             } else {

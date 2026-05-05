@@ -37,8 +37,8 @@ impl<'a> SlicedImage<'a> {
     /// let font_size = picker.font_size();
     /// // This example would render the image at its actual pixel size.
     /// let size = Size::new(
-    ///     dyn_img.width().div_ceil(font_size.0 as u32) as u16,
-    ///     dyn_img.height().div_ceil(font_size.1 as u32) as u16,
+    ///     dyn_img.width().div_ceil(font_size.width as u32) as u16,
+    ///     dyn_img.height().div_ceil(font_size.height as u32) as u16,
     /// );
     /// let sliced = SlicedProtocol::new(&picker, dyn_img, size)?;
     ///
@@ -79,7 +79,7 @@ impl Widget for SlicedImage<'_> {
                 } else {
                     image_area.y += self.position as u16;
                     image_area.height =
-                        (area.height - self.position.unsigned_abs()).min(kitty.area().height);
+                        (area.height - self.position.unsigned_abs()).min(kitty.size().height);
                     0
                 };
                 if image_area.height > 0 {
@@ -109,11 +109,11 @@ impl Widget for SlicedImage<'_> {
                 } else {
                     image_area.y += self.position as u16;
                     image_area.height =
-                        (area.height - self.position.unsigned_abs()).min(sixel.area().height);
+                        (area.height - self.position.unsigned_abs()).min(sixel.size().height);
                     0
                 };
                 if image_area.height > 0 {
-                    if skip_line_count == 0 && image_area.height >= sixel.area().height {
+                    if skip_line_count == 0 && image_area.height >= sixel.size().height {
                         sixel.render(image_area, buf);
                     } else {
                         sixel.render_map(image_area, buf, |data| {
@@ -134,7 +134,7 @@ impl Widget for SlicedImage<'_> {
                 } else {
                     image_area.y += self.position as u16;
                     image_area.height =
-                        (area.height - self.position.unsigned_abs()).min(halfblocks.area().height);
+                        (area.height - self.position.unsigned_abs()).min(halfblocks.size().height);
                     0
                 };
 
@@ -174,40 +174,31 @@ impl SlicedProtocol {
     ) -> Result<SlicedProtocol, Errors> {
         match picker.protocol_type() {
             ProtocolType::Kitty => {
-                let Protocol::Kitty(kitty) = picker.new_protocol(
-                    dyn_img,
-                    Rect::new(0, 0, size.width, size.height),
-                    Resize::Fit(None),
-                )?
+                let Protocol::Kitty(kitty) =
+                    picker.new_protocol(dyn_img, size, Resize::Fit(None))?
                 else {
                     unreachable!("ProtocolType::Kitty must produce Protocol::Kitty");
                 };
                 Ok(SlicedProtocol::Kitty(kitty))
             }
             ProtocolType::Sixel => {
-                let Protocol::Sixel(sixel) = picker.new_protocol(
-                    dyn_img,
-                    Rect::new(0, 0, size.width, size.height),
-                    Resize::Fit(None),
-                )?
+                let Protocol::Sixel(sixel) =
+                    picker.new_protocol(dyn_img, size, Resize::Fit(None))?
                 else {
                     unreachable!("ProtocolType::Sixel must produce Protocol::Sixel");
                 };
-                Ok(SlicedProtocol::Sixel(sixel, picker.font_size().1))
+                Ok(SlicedProtocol::Sixel(sixel, picker.font_size().height))
             }
             ProtocolType::Halfblocks => {
-                let Protocol::Halfblocks(halfblocks) = picker.new_protocol(
-                    dyn_img,
-                    Rect::new(0, 0, size.width, size.height),
-                    Resize::Fit(None),
-                )?
+                let Protocol::Halfblocks(halfblocks) =
+                    picker.new_protocol(dyn_img, size, Resize::Fit(None))?
                 else {
                     unreachable!("ProtocolType::Halfblocks must produce Protocol::Halfblocks");
                 };
                 Ok(SlicedProtocol::Halfblocks(halfblocks))
             }
             _ => {
-                let (slices, image_size) = Self::slice_rows(dyn_img, &picker.font_size(), size);
+                let (slices, image_size) = Self::slice_rows(dyn_img, picker.font_size(), size);
                 let row_count = slices.len() as u16;
                 let mut row_size = image_size;
                 row_size.height /= row_count;
@@ -231,22 +222,22 @@ impl SlicedProtocol {
     /// So this only is used for Iterm2.
     fn slice_rows(
         image: DynamicImage,
-        font_size: &FontSize,
+        font_size: FontSize,
         size: Size,
-    ) -> (Vec<DynamicImage>, Rect) {
+    ) -> (Vec<DynamicImage>, Size) {
         let image = image.resize(
-            (size.width * font_size.0).into(),
-            (size.height * font_size.1).into(),
+            (size.width * font_size.width).into(),
+            (size.height * font_size.height).into(),
             image::imageops::FilterType::Nearest,
         );
 
         let height = image.height();
         let width = image.width();
 
-        let row_count = (height as f64 / font_size.1 as f64).ceil() as u16;
+        let row_count = (height as f64 / font_size.height as f64).ceil() as u16;
         let mut rows = Vec::new();
 
-        let font_height = font_size.1 as u32;
+        let font_height = font_size.height as u32;
         for i in 0..row_count {
             let y = i as u32 * font_height;
             let row_height = font_height.min(height - y);
@@ -254,8 +245,8 @@ impl SlicedProtocol {
             rows.push(cropped);
         }
 
-        let col_count = (width as f64 / font_size.0 as f64).ceil() as u16;
-        (rows, Rect::new(0, 0, col_count, row_count))
+        let col_count = (width as f64 / font_size.width as f64).ceil() as u16;
+        (rows, Size::new(col_count, row_count))
     }
 }
 
@@ -429,13 +420,13 @@ mod tests {
         }
         let dyn_img = DynamicImage::ImageRgba8(img);
 
-        let font_size = (1, 1); // 1x1 font means 1 row per pixel row
+        let font_size = FontSize::new(1, 1); // 1x1 font means 1 row per pixel row
         let size = Size::new(4, 4);
 
-        let (rows, image_size) = SlicedProtocol::slice_rows(dyn_img, &font_size, size);
+        let (rows, image_size) = SlicedProtocol::slice_rows(dyn_img, font_size, size);
 
         assert_eq!(rows.len(), 4); // 4 rows
-        assert_eq!(image_size, Rect::new(0, 0, 4, 4));
+        assert_eq!(image_size, Size::new(4, 4));
         assert_eq!(rows[0].height(), 1);
         assert_eq!(rows[1].height(), 1);
         assert_eq!(rows[2].height(), 1);
@@ -455,13 +446,13 @@ mod tests {
         }
         let dyn_img = DynamicImage::ImageRgba8(img);
 
-        let font_size = (1, 2); // font is 2 pixels tall
+        let font_size = FontSize::new(1, 2); // font is 2 pixels tall
         let size = Size::new(4, 4); // 4 rows
 
-        let (rows, image_size) = SlicedProtocol::slice_rows(dyn_img, &font_size, size);
+        let (rows, image_size) = SlicedProtocol::slice_rows(dyn_img, font_size, size);
 
         assert_eq!(rows.len(), 4); // 4 rows
-        assert_eq!(image_size, Rect::new(0, 0, 4, 4));
+        assert_eq!(image_size, Size::new(4, 4));
         // Each row should be 2 pixels tall (font height)
         for row in &rows {
             assert_eq!(row.height(), 2);

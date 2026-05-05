@@ -18,7 +18,7 @@ use image::DynamicImage;
 use ratatui::{
     Frame, Terminal,
     backend::Backend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect, Size},
     style::{Color, Stylize},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -67,8 +67,8 @@ struct App {
     image_scale_state: StatefulProtocol,
 }
 
-fn size() -> Rect {
-    Rect::new(0, 0, 30, 16)
+fn size() -> Size {
+    Size::new(30, 16)
 }
 
 impl App {
@@ -296,7 +296,11 @@ fn ui(f: &mut Frame<'_>, app: &mut App) {
                 Span::from("t").green(),
                 Span::from(format!(": toggle ({:?})", app.show_images)),
             ]),
-            Line::from(format!("Font size: {:?}", app.picker.font_size())),
+            Line::from(format!(
+                "Font size: {}×{}",
+                app.picker.font_size().width,
+                app.picker.font_size().height
+            )),
             Line::from(format!("Protocol: {:?}", app.picker.protocol_type())),
         ]),
         area,

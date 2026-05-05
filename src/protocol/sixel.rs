@@ -10,7 +10,7 @@ use icy_sixel::{EncodeOptions, sixel_encode};
 use image::DynamicImage;
 use ratatui::{
     buffer::Buffer,
-    layout::{Position, Rect},
+    layout::{Position, Rect, Size},
 };
 use std::cmp::min;
 
@@ -20,16 +20,16 @@ use crate::{Result, errors::Errors, picker::cap_parser::Parser};
 #[derive(Clone, Default)]
 pub struct Sixel {
     pub data: String,
-    pub area: Rect,
+    pub size: Size,
     pub is_tmux: bool,
 }
 
 impl Sixel {
-    pub fn new(image: DynamicImage, area: Rect, is_tmux: bool) -> Result<Self> {
-        let data = encode(&image, area, is_tmux)?;
+    pub fn new(image: DynamicImage, size: Size, is_tmux: bool) -> Result<Self> {
+        let data = encode(&image, size, is_tmux)?;
         Ok(Self {
             data,
-            area,
+            size,
             is_tmux,
         })
     }
@@ -43,14 +43,14 @@ impl Sixel {
 }
 
 // TODO: change E to sixel_rs::status::Error and map when calling
-fn encode(img: &DynamicImage, area: Rect, is_tmux: bool) -> Result<String> {
+fn encode(img: &DynamicImage, size: Size, is_tmux: bool) -> Result<String> {
     let (w, h) = (img.width(), img.height());
     let img_rgba8 = img.to_rgba8();
     let bytes = img_rgba8.as_raw();
     let (start, escape, end) = Parser::escape_tmux(is_tmux);
 
-    let width = area.width;
-    let height = area.height;
+    let width = size.width;
+    let height = size.height;
 
     let sixel_data = sixel_encode(bytes, w as usize, h as usize, &EncodeOptions::default())
         .map_err(|err| Errors::Sixel(format!("sixel encoding error: {err}")))?;
@@ -77,7 +77,7 @@ fn encode(img: &DynamicImage, area: Rect, is_tmux: bool) -> Result<String> {
 
 impl ProtocolTrait for Sixel {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        let render_area = match render_area(self.area, area, false) {
+        let render_area = match render_area(self.size, area, false) {
             None => {
                 // If we render out of area, then the buffer will attempt to write regular text (or
                 // possibly other sixels) over the image.
@@ -104,8 +104,8 @@ impl ProtocolTrait for Sixel {
         render(&self.data, render_area, buf)
     }
 
-    fn area(&self) -> Rect {
-        self.area
+    fn size(&self) -> Size {
+        self.size
     }
 }
 
@@ -126,28 +126,28 @@ fn render(data: &str, area: Rect, buf: &mut Buffer) {
     }
 }
 
-fn render_area(rect: Rect, area: Rect, overdraw: bool) -> Option<Rect> {
+fn render_area(size: Size, area: Rect, overdraw: bool) -> Option<Rect> {
     if overdraw {
         return Some(Rect::new(
             area.x,
             area.y,
-            min(rect.width, area.width),
-            min(rect.height, area.height),
+            min(size.width, area.width),
+            min(size.height, area.height),
         ));
     }
 
-    if rect.width > area.width || rect.height > area.height {
+    if size.width > area.width || size.height > area.height {
         return None;
     }
-    Some(Rect::new(area.x, area.y, rect.width, rect.height))
+    Some(Rect::new(area.x, area.y, size.width, size.height))
 }
 
 impl StatefulProtocolTrait for Sixel {
-    fn resize_encode(&mut self, img: DynamicImage, area: Rect) -> Result<()> {
-        let data = encode(&img, area, self.is_tmux)?;
+    fn resize_encode(&mut self, img: DynamicImage, size: Size) -> Result<()> {
+        let data = encode(&img, size, self.is_tmux)?;
         *self = Sixel {
             data,
-            area,
+            size,
             ..*self
         };
         Ok(())

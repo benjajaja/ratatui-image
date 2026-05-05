@@ -10,7 +10,10 @@ use std::sync::mpsc::Sender;
 use tokio::sync::mpsc::UnboundedSender as Sender;
 
 use image::Rgba;
-use ratatui::prelude::{Buffer, Rect};
+use ratatui::{
+    layout::Size,
+    prelude::{Buffer, Rect},
+};
 
 use crate::{
     Resize, ResizeEncodeRender,
@@ -22,13 +25,13 @@ use crate::{
 pub struct ResizeRequest {
     protocol: StatefulProtocol,
     resize: Resize,
-    area: Rect,
+    size: Size,
     id: u64,
 }
 
 impl ResizeRequest {
     pub fn resize_encode(mut self) -> Result<ResizeResponse, Errors> {
-        self.protocol.resize_encode(&self.resize, self.area);
+        self.protocol.resize_encode(&self.resize, self.size);
         self.protocol
             .last_encoding_result()
             .expect("The resize has just been performed")?;
@@ -92,10 +95,10 @@ impl ThreadProtocol {
         equal
     }
 
-    pub fn size_for(&self, resize: Resize, area: Rect) -> Option<Rect> {
+    pub fn size_for(&self, resize: Resize, size: Size) -> Option<Size> {
         self.inner
             .as_ref()
-            .map(|protocol| protocol.size_for(resize, area))
+            .map(|protocol| protocol.size_for(resize, size))
     }
 
     fn increment_id(&mut self) {
@@ -104,20 +107,20 @@ impl ThreadProtocol {
 }
 
 impl ResizeEncodeRender for ThreadProtocol {
-    fn needs_resize(&self, resize: &Resize, area: Rect) -> Option<Rect> {
+    fn needs_resize(&self, resize: &Resize, size: Size) -> Option<Size> {
         self.inner
             .as_ref()
-            .and_then(|protocol| protocol.needs_resize(resize, area))
+            .and_then(|protocol| protocol.needs_resize(resize, size))
     }
 
     /// Senda a `ResizeRequest` through the channel if there already isn't a pending `ResizeRequest`
-    fn resize_encode(&mut self, resize: &Resize, area: Rect) {
+    fn resize_encode(&mut self, resize: &Resize, size: Size) {
         let _ = self.inner.take().map(|protocol| {
             self.increment_id();
             _ = self.tx.send(ResizeRequest {
                 protocol,
                 resize: resize.clone(),
-                area,
+                size,
                 id: self.id,
             });
         });
