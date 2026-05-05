@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [11.0.0-alpha.3](https://github.com/ratatui/ratatui-image/compare/v11.0.0-alpha.2...v11.0.0-alpha.3) - 2026-05-05
+
+### Other
+
+- add Protocol::needs_placeholder
+- use ratatui::layout::Size instead of Rect where applicable
+
 ### Added
 - SlicedImage and SlicedProtocol for partially rendering images (horizontal slices)
 - `Protocol::needs_placeholder` that returns a `Rect` for a placeholder if the image would not
