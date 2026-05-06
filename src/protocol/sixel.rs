@@ -12,7 +12,6 @@ use ratatui::{
     buffer::Buffer,
     layout::{Position, Rect, Size},
 };
-use std::cmp::min;
 
 use super::{ProtocolTrait, StatefulProtocolTrait, clear_area};
 use crate::{Result, errors::Errors, picker::cap_parser::Parser};
@@ -33,22 +32,6 @@ impl Sixel {
             is_tmux,
         })
     }
-
-    /// Experimental: render with a callback that can map the sixel data.
-    ///
-    /// Used in [`crate::sliced::SlicedImage`].
-    pub(crate) fn render_map(&self, area: Rect, buf: &mut Buffer, slice: impl Fn(&str) -> String) {
-        if self.size.width > area.width {
-            return;
-        }
-        let render_area = Rect::new(
-            area.x,
-            area.y,
-            min(self.size.width, area.width),
-            min(self.size.height, area.height),
-        );
-        render(&slice(&self.data), render_area, buf)
-    }
 }
 
 // TODO: change E to sixel_rs::status::Error and map when calling
@@ -56,7 +39,7 @@ fn encode(img: &DynamicImage, size: Size, is_tmux: bool) -> Result<String> {
     let (w, h) = (img.width(), img.height());
     let img_rgba8 = img.to_rgba8();
     let bytes = img_rgba8.as_raw();
-    let (start, escape, end) = Parser::escape_tmux(is_tmux);
+    let (start, escape, end) = Parser::tmux_start_escape_end(is_tmux);
 
     let width = size.width;
     let height = size.height;
@@ -99,7 +82,7 @@ impl ProtocolTrait for Sixel {
     }
 }
 
-fn render(data: &str, area: Rect, buf: &mut Buffer) {
+pub(crate) fn render(data: &str, area: Rect, buf: &mut Buffer) {
     buf.cell_mut(Into::<Position>::into(area))
         .map(|cell| cell.set_symbol(data));
     let mut skip_first = false;

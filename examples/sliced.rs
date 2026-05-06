@@ -54,6 +54,12 @@ terminal: {:?}
     let source = fs::read_to_string("./examples/sliced.rs")?;
     background_text.push_str(&source);
 
+    background_text = background_text
+        .lines()
+        .enumerate()
+        .map(|(i, line)| format!("{:02}: {}\n", i + 1, line))
+        .collect();
+
     let sliced = SlicedProtocol::new(&picker, dyn_img, size)?;
 
     let mut app = App {

@@ -34,7 +34,7 @@ fn encode(img: &DynamicImage, size: Size, is_tmux: bool) -> Result<String> {
     let mut png: Vec<u8> = vec![];
     img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)?;
 
-    let (start, escape, end) = Parser::escape_tmux(is_tmux);
+    let (start, escape, end) = Parser::tmux_start_escape_end(is_tmux);
 
     let width = size.width;
     let height = size.height;

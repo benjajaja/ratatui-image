@@ -48,7 +48,7 @@ pub struct Picker {
     font_size: FontSize,
     protocol_type: ProtocolType,
     background_color: Rgba<u8>,
-    is_tmux: bool,
+    pub(crate) is_tmux: bool,
     capabilities: Vec<Capability>,
 }
 

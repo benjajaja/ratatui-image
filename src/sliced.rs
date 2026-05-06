@@ -3,7 +3,8 @@ use crate::{
     FontSize, Resize,
     errors::Errors,
     picker::{Picker, ProtocolType},
-    protocol::{Protocol, halfblocks::Halfblocks, kitty::Kitty, sixel::Sixel},
+    protocol::{ImageSource, Protocol, halfblocks::Halfblocks, kitty::Kitty, sixel::Sixel},
+    sliced::sixel_slice::SlicedSixel,
 };
 use image::DynamicImage;
 use ratatui::{
@@ -102,7 +103,8 @@ impl Widget for SlicedImage<'_> {
                     area.y += 1;
                 }
             }
-            SlicedProtocol::Sixel(sixel, font_height) => {
+            SlicedProtocol::Sixel(sliced_sixel) => {
+                let sixel = sliced_sixel.borrow_owner();
                 let skip_line_count = if self.position < 0 {
                     image_area.height -= self.position.unsigned_abs();
                     self.position.unsigned_abs()
@@ -116,14 +118,8 @@ impl Widget for SlicedImage<'_> {
                     if skip_line_count == 0 && image_area.height >= sixel.size().height {
                         sixel.render(image_area, buf);
                     } else {
-                        sixel.render_map(image_area, buf, |data| {
-                            sixel_slice::slice(
-                                data,
-                                skip_line_count,
-                                image_area.height,
-                                *font_height,
-                            )
-                        });
+                        let sliced = sliced_sixel.borrow_dependent();
+                        sliced.render(image_area, buf, skip_line_count, image_area.height);
                     }
                 }
             }
@@ -159,7 +155,7 @@ pub enum SlicedProtocol {
     /// against sixel "bands" height.
     ///
     /// TODO: deconstruct at encode-time instead of render-time.
-    Sixel(Sixel, u16),
+    Sixel(SlicedSixel),
     /// Renders the full image (with chafa if available) for best ASCII art results, then just
     /// renders the relevant rows.
     Halfblocks(Halfblocks),
@@ -182,12 +178,25 @@ impl SlicedProtocol {
                 Ok(SlicedProtocol::Kitty(kitty))
             }
             ProtocolType::Sixel => {
-                let Protocol::Sixel(sixel) =
-                    picker.new_protocol(dyn_img, size, Resize::Fit(None))?
-                else {
-                    unreachable!("ProtocolType::Sixel must produce Protocol::Sixel");
-                };
-                Ok(SlicedProtocol::Sixel(sixel, picker.font_size().height))
+                let font_size = picker.font_size();
+                let source = ImageSource::new(dyn_img, font_size, image::Rgba([0, 0, 0, 0]));
+                let resize = Resize::Fit(None);
+
+                let (dyn_img, _area) =
+                    match resize.needs_resize(&source, font_size, source.desired, size, false) {
+                        Some(area) => {
+                            let dyn_img =
+                                resize.resize(&source, font_size, area, image::Rgba([0, 0, 0, 0]));
+                            (dyn_img, area)
+                        }
+                        None => (source.image, source.desired),
+                    };
+
+                let sixel = Sixel::new(dyn_img, size, picker.is_tmux)?;
+
+                let sliced = SlicedSixel::from_sixel(sixel, font_size.height, picker.is_tmux);
+
+                Ok(SlicedProtocol::Sixel(sliced))
             }
             ProtocolType::Halfblocks => {
                 let Protocol::Halfblocks(halfblocks) =
@@ -257,82 +266,114 @@ impl SlicedProtocol {
 /// six pixel columns of data. Therefore it's easy to remove some sixel bands anywhere in the
 /// image, for vertical clipping.
 mod sixel_slice {
-    pub fn slice(data: &str, skip_line_count: u16, area_height: u16, font_height: u16) -> String {
-        let skip_bands = (skip_line_count * font_height).div_ceil(6) as usize;
-        let take_bands = ((area_height * font_height) / 6) as usize;
+    use std::cmp::min;
 
-        // Rebuild CSI preamble with visible_rows instead of original row count
-        let preamble = rebuild_preamble(data, area_height);
+    use ratatui::layout::{Rect, Size};
+    use self_cell::self_cell;
 
-        // Strip original CSI preamble, start from ESC P
-        let dcs_start = data.find("\u{1b}P").unwrap_or(0);
-        debug_assert!(dcs_start != 0, "CSI ECH preamble was (likely) not found");
-        let data = &data[dcs_start..];
+    use crate::{
+        picker::cap_parser::Parser,
+        protocol::{
+            clear_area,
+            sixel::{self, Sixel},
+        },
+    };
 
-        let header_end = find_sixel_data_start(data);
-        let (header, body) = data.split_at(header_end);
-
-        let mut bands: Vec<&str> = body.split('-').collect();
-        let terminator = bands.pop().unwrap_or("");
-        debug_assert!(!terminator.is_empty(), "sixel terminator not found");
-
-        let available = bands.len().saturating_sub(skip_bands);
-        let take_bands = take_bands.min(available);
-
-        let sliced_bands: Vec<&str> = bands
-            .iter()
-            .skip(skip_bands)
-            .take(take_bands)
-            .copied()
-            .collect();
-
-        let mut out = String::with_capacity(data.len());
-        out.push_str(&preamble);
-        out.push_str(header);
-        out.push_str(&sliced_bands.join("-"));
-        if !sliced_bands.is_empty() {
-            out.push('-');
+    self_cell!(
+        pub struct SlicedSixel {
+            owner: Sixel,
+            #[covariant]
+            dependent: SlicedSixelData,
         }
-        out.push('-');
-        out.push_str(terminator);
-        out
+    );
+
+    pub struct SlicedSixelData<'a> {
+        size: Size,
+        font_height: u16,
+        is_tmux: bool,
+        header: &'a str,
+        bands: Vec<&'a str>,
+    }
+    impl<'a> SlicedSixelData<'a> {
+        pub fn render(
+            &self,
+            area: ratatui::prelude::Rect,
+            buf: &mut ratatui::prelude::Buffer,
+            skip_line_count: u16,
+            area_height: u16,
+        ) {
+            if self.size.width > area.width {
+                return;
+            }
+            let area = Rect::new(
+                area.x,
+                area.y,
+                min(self.size.width, area.width),
+                min(self.size.height, area.height),
+            );
+
+            let data = self.to_sequence(skip_line_count, area_height, area.width);
+            sixel::render(&data, area, buf);
+        }
+
+        pub fn to_sequence(&self, skip_line_count: u16, area_height: u16, width: u16) -> String {
+            let (start, escape, end) = Parser::tmux_start_escape_end(self.is_tmux);
+
+            let skip_bands = (skip_line_count * self.font_height).div_ceil(6) as usize;
+            let take_bands = ((area_height * self.font_height) / 6) as usize;
+
+            let available = self.bands.len().saturating_sub(skip_bands);
+            let take_bands = take_bands.min(available);
+
+            let mut data = String::from(start);
+            clear_area(&mut data, escape, width, area_height);
+            data.push_str(self.header);
+
+            let sliced_bands: Vec<&str> = self
+                .bands
+                .iter()
+                .skip(skip_bands)
+                .take(take_bands)
+                .copied()
+                .collect();
+
+            data.push_str(&sliced_bands.join("-"));
+
+            if !sliced_bands.is_empty() {
+                data.push('-');
+            }
+            data.push('-');
+            data.push('\x1b');
+            data.push('\\');
+            data.push_str(end);
+
+            data
+        }
     }
 
-    fn rebuild_preamble(data: &str, rows: u16) -> String {
-        // Extract erase-width: find ESC [ <digits> X anchored at the start
-        let width_str = data
-            .strip_prefix("\u{1b}[")
-            .and_then(|rest| {
-                let end = rest.find('X')?;
-                let candidate = &rest[..end];
-                // Make sure it's purely numeric — don't match into image data
-                if candidate.chars().all(|c| c.is_ascii_digit()) {
-                    Some(candidate)
-                } else {
-                    None
+    impl SlicedSixel {
+        pub fn from_sixel(sixel: Sixel, font_height: u16, is_tmux: bool) -> SlicedSixel {
+            SlicedSixel::new(sixel, |s| {
+                let size = s.size;
+                let dcs_start = s.data.find("\u{1b}P").unwrap_or(0);
+                eprintln!(
+                    "from_sixel 1: {}",
+                    &s.data[0..dcs_start].replace("\x1b", "<esc>")
+                );
+                let data = &s.data[dcs_start..];
+                let header_end = find_sixel_data_start(data);
+                let (header, body) = data.split_at(header_end);
+                let mut bands: Vec<&str> = body.split('-').collect();
+                bands.pop();
+                SlicedSixelData {
+                    size,
+                    font_height,
+                    is_tmux,
+                    header,
+                    bands,
                 }
             })
-            .unwrap_or("");
-        debug_assert!(
-            !width_str.is_empty(),
-            "rebuild_preamble did not find the ECH width"
-        );
-        if width_str.is_empty() {
-            return String::new();
         }
-
-        let mut out = String::new();
-        if rows == 1 {
-            // Mirror the height==1 branch in clear_area: just ECH, no cursor movement
-            out.push_str(&format!("\u{1b}[{width_str}X"));
-        } else {
-            for _ in 0..rows {
-                out.push_str(&format!("\u{1b}[{width_str}X\u{1b}[1B"));
-            }
-            out.push_str(&format!("\u{1b}[{rows}A"));
-        }
-
-        out
     }
 
     fn find_sixel_data_start(data: &str) -> usize {
@@ -409,9 +450,8 @@ mod sixel_slice {
         use crate::{
             FontSize, Resize,
             protocol::{ImageSource, sixel::Sixel},
+            sliced::sixel_slice::SlicedSixel,
         };
-
-        use super::*;
 
         #[test]
         fn test_sixel_slice_bands() {
@@ -420,13 +460,18 @@ mod sixel_slice {
             let esc = '\u{1b}';
             let bs = '\\';
             // Minimal sixel-like: ESC P q "attrs" header-bands-terminator ESC backslash
-            let data = format!("{esc}[6X{esc}Pq\"1;1;8;16#0band1-band2-band3{esc}{bs}");
-
+            // TODO: is there always a `-` before `<esc>\`?
+            let data = format!("{esc}[6X{esc}Pq\"1;1;8;16#0band1-band2-band3-{esc}{bs}");
             // Skip 1 row, show 1 row, font height 6 means 1 band per row
-            let result = slice(&data, 1, 1, 6);
+            let sixel = Sixel {
+                data,
+                size: Size::default(),
+                is_tmux: false,
+            };
+            let sliced = SlicedSixel::from_sixel(sixel, 6, false);
+            let sliced = sliced.borrow_dependent();
             // band1 should be skipped, band2 should be present
-            assert!(!result.contains("band1"));
-            assert!(result.contains("band2"));
+            assert_eq!(sliced.bands, vec!["#0band1", "band2", "band3"]);
         }
 
         #[test]
@@ -438,19 +483,23 @@ mod sixel_slice {
             ];
             let size = Size::new(10, 10);
             let font_size = FontSize::new(8, 16);
-            let sixel_images = images.map(|p| {
+            let sliced_sixels = images.map(|p| {
                 let dyn_img = image::ImageReader::open(p).unwrap().decode().unwrap();
                 let source = ImageSource::new(dyn_img, font_size, Rgba([0, 0, 0, 0]));
                 let dyn_img =
                     Resize::Fit(None).resize(&source, font_size, size, Rgba([0, 0, 0, 0]));
-                Sixel::new(dyn_img, size, false).unwrap()
+                let sixel = Sixel::new(dyn_img, size, false).unwrap();
+                SlicedSixel::from_sixel(sixel, font_size.height, false)
             });
-            for sixel_image in sixel_images {
-                let source = sixel_image.data;
-                let sliced = slice(&source, 0, size.height, font_size.height);
+            for sliced in sliced_sixels {
+                let source = &sliced.borrow_owner().data;
+                // let sliced = slice(&source, 0, size.height, font_size.height);
+                let sliced = sliced
+                    .borrow_dependent()
+                    .to_sequence(0, size.height, size.width);
                 eprintln!("source: {}", source.replace("\x1b", "<esc>"));
                 eprintln!("sliced: {}", sliced.replace("\x1b", "<esc>"));
-                if sliced != source {
+                if sliced != *source {
                     for (i, char) in source.chars().enumerate() {
                         let Some(sliced_char) = sliced.chars().nth(i) else {
                             panic!("sliced is shorter after {i}");

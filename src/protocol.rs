@@ -280,7 +280,7 @@ impl ImageSource {
 // image due to skipping of the following characters _in the terminal buffer_.
 // DECERA does not work in WezTerm, however ECH and and cursor CUD and CUU do.
 // For each line, erase `width` characters, then move back and place image.
-fn clear_area(data: &mut String, escape: &str, width: u16, height: u16) {
+pub(crate) fn clear_area(data: &mut String, escape: &str, width: u16, height: u16) {
     if height == 1 {
         // If the image is a single row then we don't need to move the cursor around at all.
         write!(data, "{escape}[{width}X").unwrap();

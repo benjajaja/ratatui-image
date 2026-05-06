@@ -224,7 +224,7 @@ fn transmit_virtual(img: &DynamicImage, id: u32, is_tmux: bool) -> String {
     let img_rgba8 = img.to_rgba8();
     let bytes = img_rgba8.as_raw();
 
-    let (start, escape, end) = Parser::escape_tmux(is_tmux);
+    let (start, escape, end) = Parser::tmux_start_escape_end(is_tmux);
 
     // Max chunk size is 4096 bytes of base64 encoded data
     const CHARS_PER_CHUNK: usize = 4096;
