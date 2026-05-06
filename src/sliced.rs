@@ -274,7 +274,7 @@ mod sixel_slice {
 
         let mut bands: Vec<&str> = body.split('-').collect();
         let terminator = bands.pop().unwrap_or("");
-        debug_assert!(terminator != "", "sixel terminator not found");
+        debug_assert!(!terminator.is_empty(), "sixel terminator not found");
 
         let available = bands.len().saturating_sub(skip_bands);
         let take_bands = take_bands.min(available);
@@ -317,7 +317,7 @@ mod sixel_slice {
             !width_str.is_empty(),
             "rebuild_preamble did not find the ECH width"
         );
-        if width_str == "" {
+        if width_str.is_empty() {
             return String::new();
         }
 
@@ -439,7 +439,7 @@ mod sixel_slice {
             let size = Size::new(10, 10);
             let font_size = FontSize::new(8, 16);
             let sixel_images = images.map(|p| {
-                let dyn_img = image::ImageReader::open(&p).unwrap().decode().unwrap();
+                let dyn_img = image::ImageReader::open(p).unwrap().decode().unwrap();
                 let source = ImageSource::new(dyn_img, font_size, Rgba([0, 0, 0, 0]));
                 let dyn_img =
                     Resize::Fit(None).resize(&source, font_size, size, Rgba([0, 0, 0, 0]));
