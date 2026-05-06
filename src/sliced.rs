@@ -266,6 +266,7 @@ mod sixel_slice {
 
         // Strip original CSI preamble, start from ESC P
         let dcs_start = data.find("\u{1b}P").unwrap_or(0);
+        debug_assert!(dcs_start != 0, "CSI ECH preamble was (likely) not found");
         let data = &data[dcs_start..];
 
         let header_end = find_sixel_data_start(data);
@@ -273,6 +274,7 @@ mod sixel_slice {
 
         let mut bands: Vec<&str> = body.split('-').collect();
         let terminator = bands.pop().unwrap_or("");
+        debug_assert!(terminator != "", "sixel terminator not found");
 
         let available = bands.len().saturating_sub(skip_bands);
         let take_bands = take_bands.min(available);
@@ -291,28 +293,45 @@ mod sixel_slice {
         if !sliced_bands.is_empty() {
             out.push('-');
         }
+        out.push('-');
         out.push_str(terminator);
         out
     }
 
     fn rebuild_preamble(data: &str, rows: u16) -> String {
-        // Extract the erase-width from the original preamble, e.g. `\u{1b}[34X` → 34
-        // Find first occurrence of ESC [ ... X
+        // Extract erase-width: find ESC [ <digits> X anchored at the start
         let width_str = data
-            .find("\u{1b}[")
-            .and_then(|i| {
-                let rest = &data[i + 2..];
+            .strip_prefix("\u{1b}[")
+            .and_then(|rest| {
                 let end = rest.find('X')?;
-                Some(&rest[..end])
+                let candidate = &rest[..end];
+                // Make sure it's purely numeric — don't match into image data
+                if candidate.chars().all(|c| c.is_ascii_digit()) {
+                    Some(candidate)
+                } else {
+                    None
+                }
             })
-            .unwrap_or("0");
+            .unwrap_or("");
+        debug_assert!(
+            !width_str.is_empty(),
+            "rebuild_preamble did not find the ECH width"
+        );
+        if width_str == "" {
+            return String::new();
+        }
 
         let mut out = String::new();
-        for _ in 0..rows {
-            out.push_str(&format!("\u{1b}[{width_str}X\u{1b}[1B"));
+        if rows == 1 {
+            // Mirror the height==1 branch in clear_area: just ECH, no cursor movement
+            out.push_str(&format!("\u{1b}[{width_str}X"));
+        } else {
+            for _ in 0..rows {
+                out.push_str(&format!("\u{1b}[{width_str}X\u{1b}[1B"));
+            }
+            out.push_str(&format!("\u{1b}[{rows}A"));
         }
-        // cursor back up by rows
-        out.push_str(&format!("\u{1b}[{rows}A"));
+
         out
     }
 
@@ -384,7 +403,16 @@ mod sixel_slice {
 
     #[cfg(test)]
     mod tests {
+        use image::Rgba;
+        use ratatui::layout::Size;
+
+        use crate::{
+            FontSize, Resize,
+            protocol::{ImageSource, sixel::Sixel},
+        };
+
         use super::*;
+
         #[test]
         fn test_sixel_slice_bands() {
             // Simple data with bands separated by -
@@ -392,13 +420,46 @@ mod sixel_slice {
             let esc = '\u{1b}';
             let bs = '\\';
             // Minimal sixel-like: ESC P q "attrs" header-bands-terminator ESC backslash
-            let data = format!("{esc}Pq\"1;1;8;16#0band1-band2-band3{esc}{bs}");
+            let data = format!("{esc}[6X{esc}Pq\"1;1;8;16#0band1-band2-band3{esc}{bs}");
 
             // Skip 1 row, show 1 row, font height 6 means 1 band per row
             let result = slice(&data, 1, 1, 6);
             // band1 should be skipped, band2 should be present
             assert!(!result.contains("band1"));
             assert!(result.contains("band2"));
+        }
+
+        #[test]
+        fn test_idempotence() {
+            let images = [
+                "./assets/Screenshot.png",
+                "./assets/NixOS.png",
+                "./assets/Ada.png",
+            ];
+            let size = Size::new(10, 10);
+            let font_size = FontSize::new(8, 16);
+            let sixel_images = images.map(|p| {
+                let dyn_img = image::ImageReader::open(&p).unwrap().decode().unwrap();
+                let source = ImageSource::new(dyn_img, font_size, Rgba([0, 0, 0, 0]));
+                let dyn_img =
+                    Resize::Fit(None).resize(&source, font_size, size, Rgba([0, 0, 0, 0]));
+                Sixel::new(dyn_img, size, false).unwrap()
+            });
+            for sixel_image in sixel_images {
+                let source = sixel_image.data;
+                let sliced = slice(&source, 0, size.height, font_size.height);
+                eprintln!("source: {}", source.replace("\x1b", "<esc>"));
+                eprintln!("sliced: {}", sliced.replace("\x1b", "<esc>"));
+                if sliced != source {
+                    for (i, char) in source.chars().enumerate() {
+                        let Some(sliced_char) = sliced.chars().nth(i) else {
+                            panic!("sliced is shorter after {i}");
+                        };
+                        assert_eq!(char, sliced_char, "index #{i}");
+                    }
+                    panic!("should have found the first different char");
+                }
+            }
         }
     }
 }

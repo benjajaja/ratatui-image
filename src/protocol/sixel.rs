@@ -38,7 +38,16 @@ impl Sixel {
     ///
     /// Used in [`crate::sliced::SlicedImage`].
     pub(crate) fn render_map(&self, area: Rect, buf: &mut Buffer, slice: impl Fn(&str) -> String) {
-        render(&slice(&self.data), area, buf)
+        if self.size.width > area.width {
+            return;
+        }
+        let render_area = Rect::new(
+            area.x,
+            area.y,
+            min(self.size.width, area.width),
+            min(self.size.height, area.height),
+        );
+        render(&slice(&self.data), render_area, buf)
     }
 }
 
@@ -77,29 +86,10 @@ fn encode(img: &DynamicImage, size: Size, is_tmux: bool) -> Result<String> {
 
 impl ProtocolTrait for Sixel {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        let render_area = match render_area(self.size, area, false) {
-            None => {
-                // If we render out of area, then the buffer will attempt to write regular text (or
-                // possibly other sixels) over the image.
-                //
-                // On some implementations (e.g. Xterm), this actually works but the image is
-                // forever overwritten since we won't write out the same sixel data for the same
-                // (col,row) position again (see buffer diffing).
-                // Thus, when the area grows, the newly available cells will skip rendering and
-                // leave artifacts instead of the image data.
-                //
-                // On some implementations (e.g. ???), only text with its foreground color is
-                // overlayed on the image, also forever overwritten.
-                //
-                // On some implementations (e.g. patched Alactritty), image graphics are never
-                // overwritten and simply draw over other UI elements.
-                //
-                // Note that [ResizeProtocol] forces to ignore this early return, since it will
-                // always resize itself to the area.
-                return;
-            }
-            Some(r) => r,
-        };
+        if self.size.width > area.width || self.size.height > area.height {
+            return;
+        }
+        let render_area = Rect::new(area.x, area.y, self.size.width, self.size.height);
 
         render(&self.data, render_area, buf)
     }
@@ -124,22 +114,6 @@ fn render(data: &str, area: Rect, buf: &mut Buffer) {
             buf.cell_mut((x, y)).map(|cell| cell.set_skip(true));
         }
     }
-}
-
-fn render_area(size: Size, area: Rect, overdraw: bool) -> Option<Rect> {
-    if overdraw {
-        return Some(Rect::new(
-            area.x,
-            area.y,
-            min(size.width, area.width),
-            min(size.height, area.height),
-        ));
-    }
-
-    if size.width > area.width || size.height > area.height {
-        return None;
-    }
-    Some(Rect::new(area.x, area.y, size.width, size.height))
 }
 
 impl StatefulProtocolTrait for Sixel {
