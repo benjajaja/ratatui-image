@@ -85,6 +85,31 @@ pub struct QueryStdioOptions {
     /// The name is `/rtui-` and those 22 characters, in URL-safe Base64 without padding: a fresh
     /// one from [`QueryStdioOptions::probe_kitty_smo`].
     pub kitty_shared_memory_object: Option<String>,
+    /// Read the terminal's answer from this file instead of stdin.
+    ///
+    /// Set this when stdin is not the terminal — piped, redirected from a file, or read to EOF
+    /// already — because such a stdin cannot carry the terminal's answer back to the query. Open
+    /// the controlling terminal instead:
+    ///
+    /// ```no_run
+    /// use ratatui_image::picker::{Picker, cap_parser::QueryStdioOptions};
+    ///
+    /// # fn main() -> Result<(), std::io::Error> {
+    /// let terminal = std::fs::File::open("/dev/tty")?;
+    /// let picker = Picker::from_query_stdio_with_options(QueryStdioOptions {
+    ///     input: Some(terminal),
+    ///     ..Default::default()
+    /// });
+    /// # let _ = picker;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// The query is still written to stdout, and raw mode is set on this file for the duration
+    /// of the query, then put back. Windows is unaffected: there the answer is read from `$CONIN`
+    /// whether stdin is the terminal or not.
+    #[cfg(not(windows))]
+    pub input: Option<std::fs::File>,
 }
 
 impl QueryStdioOptions {
@@ -106,6 +131,8 @@ impl Default for QueryStdioOptions {
             blacklist_protocols: Vec::new(),
             kitty_compression: false,
             kitty_shared_memory_object: None,
+            #[cfg(not(windows))]
+            input: None,
         }
     }
 }

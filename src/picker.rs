@@ -117,6 +117,9 @@ impl Picker {
     /// See [QueryStdioOptions] for documentation the exact options. Generally,
     ///
     /// The specific results of some of the options can be inspected on [Picker::capabilities].
+    ///
+    /// Set `QueryStdioOptions::input` when stdin cannot carry the terminal's answer back — it is
+    /// a pipe, say — so that the answer is read from the terminal itself.
     pub fn from_query_stdio_with_options(mut options: QueryStdioOptions) -> Result<Self> {
         // Detect tmux, and only if positive then take some risky guess for iTerm2 support.
         let (is_tmux, tmux_proto) = detect_tmux_and_outer_protocol_from_env();
@@ -383,21 +386,20 @@ fn iterm2_from_env() -> Option<ProtocolType> {
 }
 
 #[cfg(not(windows))]
-fn enable_raw_mode() -> Result<impl FnOnce() -> Result<()>> {
+fn enable_raw_mode(input: std::os::fd::BorrowedFd<'_>) -> Result<impl FnOnce() -> Result<()>> {
     use rustix::termios::{self, LocalModes, OptionalActions};
 
-    let stdin = io::stdin();
-    let mut termios = termios::tcgetattr(&stdin)?;
+    let mut termios = termios::tcgetattr(input)?;
     let termios_original = termios.clone();
 
     // Disable canonical mode to read without waiting for Enter, disable echoing.
     termios.local_modes &= !LocalModes::ICANON;
     termios.local_modes &= !LocalModes::ECHO;
-    termios::tcsetattr(&stdin, OptionalActions::Drain, &termios)?;
+    termios::tcsetattr(input, OptionalActions::Drain, &termios)?;
 
     Ok(move || {
         Ok(termios::tcsetattr(
-            io::stdin(),
+            input,
             OptionalActions::Now,
             &termios_original,
         )?)
@@ -537,10 +539,13 @@ fn interpret_parser_responses(
 
 fn query_with_timeout(
     is_tmux: bool,
-    options: QueryStdioOptions,
+    #[cfg_attr(windows, allow(unused_mut))] mut options: QueryStdioOptions,
 ) -> Result<(Option<ProtocolType>, Option<FontSize>, Vec<Capability>)> {
-    // Enter raw mode before sending query.
-    let disable_raw_mode = enable_raw_mode()?;
+    let timeout_ms = options.timeout_ms;
+    // A caller whose stdin cannot carry the answer back (it is a pipe, say) hands over the
+    // terminal to read it from instead. See `QueryStdioOptions::input`.
+    #[cfg(not(windows))]
+    let input = options.input.take();
 
     // Send several control sequences at once:
     // `_Gi=...`: Kitty graphics support.
@@ -549,22 +554,53 @@ fn query_with_timeout(
     // `[1337n`: iTerm2 (some terminals implement the protocol but sadly not this custom CSI)
     // `[5n`: Device Status Report, implemented by all terminals, ensure that there is some
     // response and we don't hang reading forever.
-    let timeout_ms = options.timeout_ms;
     let query = Parser::query(is_tmux, options);
+
+    #[cfg(not(windows))]
+    let responses = {
+        use std::os::fd::AsFd;
+        match &input {
+            Some(input) => query_on(input.as_fd(), &query, timeout_ms)?,
+            None => query_on(io::stdin().as_fd(), &query, timeout_ms)?,
+        }
+    };
+    #[cfg(windows)]
+    let responses = query_on(&query, timeout_ms)?;
+
+    interpret_parser_responses(responses)
+}
+
+/// Writes the query out and reads the terminal's answers back, raw mode held in between.
+fn query_on(
+    #[cfg(not(windows))] input: std::os::fd::BorrowedFd<'_>,
+    query: &str,
+    timeout_ms: i32,
+) -> Result<Vec<Response>> {
+    // Enter raw mode before sending query.
+    #[cfg(not(windows))]
+    let disable_raw_mode = enable_raw_mode(input)?;
+    #[cfg(windows)]
+    let disable_raw_mode = enable_raw_mode()?;
 
     io::stdout().write_all(query.as_bytes())?;
     io::stdout().flush()?;
 
+    #[cfg(not(windows))]
+    let responses = poll_and_parse(input, timeout_ms)?;
+    #[cfg(windows)]
     let responses = poll_and_parse(timeout_ms)?;
 
     disable_raw_mode()?;
-    interpret_parser_responses(responses)
+    Ok(responses)
 }
 
 // The important thing is that stdin reading must work with any size.
 const STDIN_READ_SIZE: usize = 64;
 
-fn poll_and_parse(timeout_ms: i32) -> Result<Vec<Response>> {
+fn poll_and_parse(
+    #[cfg(not(windows))] input: std::os::fd::BorrowedFd<'_>,
+    timeout_ms: i32,
+) -> Result<Vec<Response>> {
     let mut parser = Parser::new();
     let mut responses = vec![];
     let deadline = Instant::now() + Duration::from_millis(timeout_ms as u64);
@@ -577,6 +613,9 @@ fn poll_and_parse(timeout_ms: i32) -> Result<Vec<Response>> {
         let timeout_ms = remaining.as_millis() as i32;
 
         let mut charbuf: [u8; STDIN_READ_SIZE] = [0; STDIN_READ_SIZE];
+        #[cfg(not(windows))]
+        let read_count = poll_stdin(input, timeout_ms, &mut charbuf)?;
+        #[cfg(windows)]
         let read_count = poll_stdin(timeout_ms, &mut charbuf)?;
         for ch in charbuf.iter().take(read_count) {
             let mut more_caps = parser.push(char::from(*ch));
@@ -598,13 +637,14 @@ impl Drop for KittySmoProbeGuard {
 }
 
 #[cfg(not(windows))]
-fn poll_stdin(timeout_ms: i32, charbuf: &mut [u8; STDIN_READ_SIZE]) -> Result<usize> {
+fn poll_stdin(
+    input: std::os::fd::BorrowedFd<'_>,
+    timeout_ms: i32,
+    charbuf: &mut [u8; STDIN_READ_SIZE],
+) -> Result<usize> {
     use rustix::event::{PollFd, PollFlags, poll};
-    use rustix::fd::AsFd;
     use rustix::io::read;
-    let stdin = io::stdin();
-    let stdin_fd = stdin.as_fd();
-    let mut pollfds = [PollFd::new(&stdin_fd, PollFlags::IN)];
+    let mut pollfds = [PollFd::new(&input, PollFlags::IN)];
     let ready = poll(&mut pollfds, timeout_ms).map_err(|_| Errors::NoStdinResponse)?;
     if ready == 0 {
         return Err(Errors::NoStdinResponse);
@@ -624,7 +664,7 @@ fn poll_stdin(timeout_ms: i32, charbuf: &mut [u8; STDIN_READ_SIZE]) -> Result<us
 
     // Important to use rustix::io::read and not std::io::read, which can do its userspace
     // buffering, where poll() would return 0 on next read.
-    Ok(read(stdin_fd, charbuf)?)
+    Ok(read(input, charbuf)?)
 }
 
 #[cfg(windows)]
@@ -773,6 +813,22 @@ mod tests {
     #[test]
     fn test_from_query_stdio_no_hang() {
         let _ = Picker::from_query_stdio();
+    }
+
+    /// The answer has to come from the file the caller named, not from stdin (which is a pipe
+    /// when this matters). `poll_and_parse` is the only place the answer is read, so a canned
+    /// terminal answer arrives even with nothing on stdin.
+    #[test]
+    #[cfg(not(windows))]
+    fn test_reads_the_answer_from_the_given_input() {
+        use std::{io::Write, os::fd::AsFd};
+
+        let (mut terminal, answer) = std::os::unix::net::UnixStream::pair().unwrap();
+        // A kitty graphics answer, then the DSR reply that ends the read loop.
+        terminal.write_all(b"\x1b_Gi=31;OK\x1b\\\x1b[0n").unwrap();
+
+        let responses = super::poll_and_parse(answer.as_fd(), 1000).unwrap();
+        assert_eq!(responses, vec![Response::Kitty]);
     }
 
     #[test]
